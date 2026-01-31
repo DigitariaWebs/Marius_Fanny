@@ -8,10 +8,11 @@ import Time from './components/Timeline';
 import Footer from './components/Footer';
 import Shop from './components/Shop';
 import ProductSelection from './components/ProductSelection';
+import Politique from './components/Politique';
 
 const HomePage: React.FC = () => {
   return (
-    <div className="bg-bakery-cream min-h-screen text-bakery-text bg-grain">
+    <>
       <Navbar />
       <main>
         <Hero />
@@ -29,13 +30,13 @@ const HomePage: React.FC = () => {
       <section id="footer">
         <Footer />
       </section>
-    </div>
+    </>
   );
 };
 
 const ProductsPage: React.FC = () => {
   return (
-    <div className="bg-bakery-cream min-h-screen text-bakery-text bg-grain">
+    <>
       <Navbar />
       <main className="py-10">
         <ProductSelection />
@@ -43,17 +44,20 @@ const ProductsPage: React.FC = () => {
       <section id="footer">
         <Footer />
       </section>
-    </div>
+    </>
   );
 };
 
 const App: React.FC = () => {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/products" element={<ProductsPage />} />
-      </Routes>
+      <div className="bg-bakery-cream min-h-screen text-bakery-text bg-grain">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/politique-retour" element={<Politique />} />
+        </Routes>
+      </div>
     </Router>
   );
 }

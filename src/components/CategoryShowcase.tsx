@@ -33,12 +33,10 @@ const CategoryShowcase: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) 
   const navigate = useNavigate();
 
   const handleCategoryClick = (categoryId: number, categoryTitle: string) => {
-    // Si une fonction de rappel est fournie par le parent
     if (onCategoryClick) {
       onCategoryClick(categoryId, categoryTitle);
     }
     
-    // Navigation vers la page ProductSelection avec les paramètres
     navigate(`/products?category=${categoryId}&title=${encodeURIComponent(categoryTitle)}`);
   };
 

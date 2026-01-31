@@ -11,10 +11,9 @@ const styles = {
   fontSans: '"Inter", sans-serif',
 };
 
-// --- Interfaces ---
 interface Product {
   id: number;
-  categoryId: number; // Pour les sous-catégories, on utilisera des ID spécifiques (ex: 51, 52...)
+  categoryId: number; 
   name: string;
   description: string;
   price: number;
@@ -29,17 +28,14 @@ interface ProductSelectionProps {
   onBack?: () => void;
 }
 
-// --- Configuration des Sous-Catégories (Boîte à lunch - ID 5) ---
 const LUNCH_SUBCATEGORIES = [
-  { id: 51, title: "Boite à lunch", image: "./boite.jpg" }, // Remplacez par vos images réelles
-  { id: 52, title: "Salade repas", image: "./salade.jpg" },
-  { id: 53, title: "Plateau repas", image: "./plateau.jpg" },
-  { id: 54, title: "Option végétarienne", image: "./vege.jpg" },
+  { id: 51, title: "Boite à lunch", image: "./boite.jpg" }, 
+  { id: 52, title: "Salade repas", image: "./salade1.jpg" },
+  { id: 53, title: "Plateau repas", image: "./salade2.jpg" },
+  { id: 54, title: "Option végétarienne", image: "./salade3.jpg" },
 ];
 
-// --- Mock Data (Vos données + Nouveaux produits pour le lunch) ---
 const ALL_PRODUCTS: Product[] = [
-  // --- Vos produits existants ---
   { 
     id: 101, categoryId: 1, name: "La marguerite", description: "Mousse mascarpone, roulade nature, framboise, 6 ou 12 personnes", price: 37.50, image: "./gateau.jpg", tag: "en stock", allergens: ["Gluten", "Lait", "Oeufs", "Fruits à coque"]
   },
@@ -57,18 +53,13 @@ const ALL_PRODUCTS: Product[] = [
   },
 
   // --- NOUVEAUX PRODUITS POUR LA BOÎTE À LUNCH ---
-  // ID 51: Boite à lunch classique
   { id: 5101, categoryId: 51, name: "Le Parisien", description: "Sandwich jambon beurre, fromage, dessert du jour et boisson.", price: 12.50, image: "./boite.jpg", allergens: ["Gluten", "Lait"] },
-  { id: 5102, categoryId: 51, name: "Le Club", description: "Club sandwich poulet, mayonnaise maison, chips et dessert.", price: 13.50, image: "./boite.jpg", allergens: ["Gluten", "Oeufs"] },
 
-  // ID 52: Salades
-  { id: 5201, categoryId: 52, name: "Salade César", description: "Poulet grillé, parmesan, croûtons, sauce césar maison.", price: 14.00, image: "./salade.jpg", allergens: ["Lait", "Gluten", "Oeufs"] },
+  { id: 5201, categoryId: 52, name: "Salade César", description: "Poulet grillé, parmesan, croûtons, sauce césar maison.", price: 14.00, image: "./salade1.jpg", allergens: ["Lait", "Gluten", "Oeufs"] },
   
-  // ID 53: Plateau repas
-  { id: 5301, categoryId: 53, name: "Plateau Affaires", description: "Entrée, plat chaud, fromages affinés et dessert signature.", price: 22.00, image: "./plateau.jpg", allergens: ["Lait", "Gluten"] },
+  { id: 5301, categoryId: 53, name: "Plateau Affaires", description: "Entrée, plat chaud, fromages affinés et dessert signature.", price: 22.00, image: "./salade2.jpg", allergens: ["Lait", "Gluten"] },
 
-  // ID 54: Végétarien
-  { id: 5401, categoryId: 54, name: "Wrap Végé", description: "Galette, légumes grillés, houmous, feta.", price: 11.50, image: "./vege.jpg", tag: "Végétarien", allergens: ["Gluten", "Lait"] },
+  { id: 5401, categoryId: 54, name: "Wrap Végé", description: "Galette, légumes grillés, houmous, feta.", price: 11.50, image: "./salade3.jpg", tag: "en stock", allergens: ["Gluten", "Lait"] },
 ];
 
 const ProductSelection: React.FC<ProductSelectionProps> = ({ 
@@ -79,19 +70,16 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   
-  // États principaux
   const [currentCategory, setCurrentCategory] = useState<{ id: number; title: string } | null>(null);
   const [subCategory, setSubCategory] = useState<{ id: number; title: string } | null>(null);
   
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // Scroll en haut à chaque changement majeur
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [currentCategory, subCategory]);
 
-  // Initialisation depuis Props ou URL
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const urlCategoryId = searchParams.get('category');
@@ -110,18 +98,15 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
     if (activeId) {
       setCurrentCategory({ id: activeId, title: activeTitle });
-      // Reset subcategory quand on change de catégorie principale
       setSubCategory(null);
     }
   }, [location.search, categoryId, categoryTitle]);
 
-  // Filtrage des produits (dépend de si on est dans une sous-catégorie ou non)
   useEffect(() => {
     if (!currentCategory) return;
 
     let targetId = currentCategory.id;
 
-    // Si on est dans le mode "Boite à lunch" (ID 5) et qu'une sous-catégorie est sélectionnée
     if (currentCategory.id === 5 && subCategory) {
       targetId = subCategory.id;
     }
@@ -130,34 +115,28 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
     setFilteredProducts(products);
   }, [currentCategory, subCategory]);
 
-  // Gestion intelligente du bouton Retour
   const handleBack = () => {
-    // 1. Si on est dans une sous-catégorie (ex: Salade), on revient à la liste des choix Lunch
     if (currentCategory?.id === 5 && subCategory) {
       setSubCategory(null);
       return;
     }
 
-    // 2. Sinon, on revient à l'accueil
     if (onBack) onBack();
     else navigate(-1);
   };
 
-  // Empêcher le scroll si modale ouverte
   useEffect(() => {
     document.body.style.overflow = selectedProduct ? 'hidden' : 'unset';
   }, [selectedProduct]);
 
   if (!currentCategory) return <div className="h-screen flex items-center justify-center">Chargement...</div>;
 
-  // --- RENDU CONDITIONNEL : Afficher le choix des sous-catégories OU la liste des produits ---
   const showSubCategories = currentCategory.id === 5 && !subCategory;
 
   return (
     <div className="min-h-screen py-12 px-6 relative fade-in" style={{ backgroundColor: styles.cream, fontFamily: styles.fontSans, color: styles.text }}>
       <div className="max-w-7xl mx-auto">
         
-        {/* Navigation Breadcrumb */}
         <nav className="flex items-center gap-4 mb-12 text-sm uppercase tracking-widest opacity-60">
           <button onClick={handleBack} className="hover:text-black transition-colors flex items-center gap-2 group">
             <span className="group-hover:-translate-x-1 transition-transform">←</span> Retour
@@ -168,7 +147,6 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
           </span>
         </nav>
 
-        {/* Header */}
         <header className="mb-16 text-center">
           <h1 className="text-5xl md:text-6xl mb-4" style={{ fontFamily: styles.fontScript, color: styles.gold }}>
             {subCategory ? subCategory.title : currentCategory.title}
@@ -180,7 +158,6 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
           </p>
         </header>
         
-        {/* --- CAS 1 : Affichage des Sous-Catégories (Spécifique ID 5) --- */}
         {showSubCategories ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {LUNCH_SUBCATEGORIES.map((sub) => (
@@ -250,7 +227,6 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
         )}
       </div>
 
-      {/* --- MODALE PRODUIT (Inchangée mais toujours fonctionnelle) --- */}
       {selectedProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
