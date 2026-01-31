@@ -3,10 +3,10 @@ import { gsap } from 'gsap';
 import { FiMinus, FiPlus, FiShoppingCart, FiX } from 'react-icons/fi';
 
 const products = [
-  { id: 1, name: "Boîte à lunch", price: 19.95, img: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=500&q=80" },
-  { id: 2, name: "Salade repas", price: 20.95, img: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=500&q=80" },
-  { id: 3, name: "Gâteau croustillant", price: 37.50, img: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=500&q=80" },
-  { id: 4, name: "Tarte citron", price: 29.95, img: "https://images.unsplash.com/photo-1519915028121-7d3463d20b13?auto=format&fit=crop&w=500&q=80" },
+  { id: 1, name: "Boîte à lunch", price: 19.95, img: "./fav1.jpg" },
+  { id: 2, name: "Salade repas", price: 20.95, img: "./fav2.jpg" },
+  { id: 3, name: "Gâteau croustillant", price: 37.50, img: "./fav3.jpg" },
+  { id: 4, name: "Tarte citron", price: 29.95, img: "./fav4.jpg" },
   { id: 5, name: "Plateau sandwich", price: 42.95, img: "https://images.unsplash.com/photo-1554433607-66b5efe9d304?auto=format&fit=crop&w=500&q=80" },
   { id: 6, name: "6 Croissants", price: 16.50, img: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=500&q=80" },
   { id: 7, name: "12 Macarons", price: 24.95, img: "https://images.unsplash.com/photo-1569864358642-9d1684040f43?auto=format&fit=crop&w=500&q=80" },

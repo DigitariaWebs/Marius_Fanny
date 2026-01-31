@@ -98,15 +98,7 @@ const Hero = () => {
             <div className="absolute inset-0 bg-black/10"></div>
           </div>
 
-          <button
-            ref={stickerRef}
-            onClick={handleStickerClick}
-            className="absolute bottom-10 -left-6 md:bottom-20 md:-left-12 w-32 h-32 md:w-40 md:h-40 bg-[#FFB6C1] rounded-full flex items-center justify-center text-bakery-text font-bold text-center uppercase text-xs md:text-sm leading-tight tracking-widest shadow-2xl cursor-pointer hover:bg-pink-300 z-30 group"
-          >
-            <span className="group-hover:scale-90 transition-transform duration-300">
-              Une émotion <br/> à déguster
-            </span>
-          </button>
+       
 
         </div>
       </div>
