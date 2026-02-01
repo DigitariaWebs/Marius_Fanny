@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
+// Importation de tes composants
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import BestSellers from './components/BestSellers';
@@ -13,7 +14,9 @@ import Politique from './components/Politique';
 import Video from './components/Videoclient';
 import GoldenBackground from './components/GoldenBackground';
 import CartDrawer from './components/Cart'; 
+import CategoryShowcase from './components/CategoryShowcase';
 
+// Interface pour le panier
 interface CartItem {
   id: number;
   name: string;
@@ -26,6 +29,7 @@ const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
+  // --- FONCTIONS DU PANIER ---
   const addToCart = (product: any) => {
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id);
@@ -34,9 +38,9 @@ const App: React.FC = () => {
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity: 1, image: product.image || product.img }];
     });
-    setIsCartOpen(true); 
+    setIsCartOpen(true);
   };
 
   const updateQuantity = (id: number, delta: number) => {
@@ -53,14 +57,14 @@ const App: React.FC = () => {
     setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
+  // --- COMPOSANTS DE PAGE ---
   const HomePage: React.FC = () => (
     <>
       <Navbar onCartClick={() => setIsCartOpen(true)} cartCount={cartItems.length} />
       <main className="relative z-10">
         <Hero />
         <section id="shop">
-          {/* CORRECTION ICI : Ajout de la prop onAddToCart */}
-          <Shop onAddToCart={addToCart} />
+          <CategoryShowcase onAddToCart={addToCart} />
         </section>
         <Video />
         <section id="best-sellers">
@@ -69,24 +73,21 @@ const App: React.FC = () => {
         <section id="timeline"><Time /></section>
         <ParallaxSection />
       </main>
-      <section id="footer" className="relative z-10">
-        <Footer />
-      </section>
+      <Footer />
     </>
   );
 
   const ProductsPage: React.FC = () => (
     <>
       <Navbar onCartClick={() => setIsCartOpen(true)} cartCount={cartItems.length} />
-      <main className="py-10 relative z-10">
+      <main className="pt-24 min-h-screen relative z-10">
         <ProductSelection onAddToCart={addToCart} />
       </main>
-      <section id="footer" className="relative z-10">
-        <Footer />
-      </section>
+      <Footer />
     </>
   );
 
+  // --- RENDU PRINCIPAL ---
   return (
     <Router>
       <GoldenBackground />
