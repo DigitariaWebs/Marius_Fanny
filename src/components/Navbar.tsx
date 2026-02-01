@@ -27,9 +27,9 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
     { name: 'La Boutique', id: 'shop' },
     { name: 'Nos Favoris', id: 'best-sellers' },
     { name: 'Notre Histoire', id: 'timeline' },
+    {name: 'Politique de retour', id: 'politique-de-retour' },
   ];
 
-  // Séparé pour le menu mobile si besoin de libellés différents
   const mobileLinks = [
     ...mainLinks,
     { name: 'Politique de retour', id: 'politique-de-retour' },
