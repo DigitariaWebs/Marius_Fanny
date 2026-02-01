@@ -12,9 +12,8 @@ import ProductSelection from './components/ProductSelection';
 import Politique from './components/Politique';
 import Video from './components/Videoclient';
 import GoldenBackground from './components/GoldenBackground';
-import CartDrawer from './components/Cart'; // Importe le panier qu'on a créé
+import CartDrawer from './components/Cart'; 
 
-// Définition de l'interface pour un produit dans le panier
 interface CartItem {
   id: number;
   name: string;
@@ -24,11 +23,9 @@ interface CartItem {
 }
 
 const App: React.FC = () => {
-  // --- LOGIQUE DU PANIER ---
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  // Fonction pour ajouter un produit
   const addToCart = (product: any) => {
     setCartItems(prev => {
       const existing = prev.find(item => item.id === product.id);
@@ -39,10 +36,9 @@ const App: React.FC = () => {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
-    setIsCartOpen(true); // Ouvre le panier automatiquement à l'ajout
+    setIsCartOpen(true); 
   };
 
-  // Fonction pour changer la quantité
   const updateQuantity = (id: number, delta: number) => {
     setCartItems(prev => prev.map(item => {
       if (item.id === id) {
@@ -53,21 +49,21 @@ const App: React.FC = () => {
     }));
   };
 
-  // Fonction pour supprimer
   const removeItem = (id: number) => {
     setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
-  // --- PAGES ---
   const HomePage: React.FC = () => (
     <>
       <Navbar onCartClick={() => setIsCartOpen(true)} cartCount={cartItems.length} />
       <main className="relative z-10">
         <Hero />
-        <section id="shop"><Shop /></section>
+        <section id="shop">
+          {/* CORRECTION ICI : Ajout de la prop onAddToCart */}
+          <Shop onAddToCart={addToCart} />
+        </section>
         <Video />
         <section id="best-sellers">
-           {/* On passe la fonction addToCart à tes composants si nécessaire */}
            <BestSellers onAddToCart={addToCart} />
         </section>
         <section id="timeline"><Time /></section>
@@ -83,7 +79,6 @@ const App: React.FC = () => {
     <>
       <Navbar onCartClick={() => setIsCartOpen(true)} cartCount={cartItems.length} />
       <main className="py-10 relative z-10">
-        {/* On passe la fonction addToCart ici */}
         <ProductSelection onAddToCart={addToCart} />
       </main>
       <section id="footer" className="relative z-10">
@@ -96,7 +91,6 @@ const App: React.FC = () => {
     <Router>
       <GoldenBackground />
       
-      {/* Affichage du Panier sur toutes les pages */}
       <CartDrawer 
         isOpen={isCartOpen} 
         onClose={() => setIsCartOpen(false)} 
