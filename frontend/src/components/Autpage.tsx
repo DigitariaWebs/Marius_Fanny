@@ -61,7 +61,6 @@ const AuthPage: React.FC = () => {
         const { data, error: signInError } = await authClient.signIn.email({
           email,
           password,
-          // Note: rememberMe est géré par Better-Auth si configuré dans le client
         });
 
         if (signInError) throw new Error(signInError.message || 'Connexion échouée');
@@ -87,8 +86,8 @@ const AuthPage: React.FC = () => {
         setIsVerificationSent(true);
 
       } else if (view === 'forgot-password') {
-        // --- CORRECTION CRUCIALE POUR LE BUILD ---
-        const { error: forgotError } = await authClient.forgetPassword.sendForgotPasswordEmail({
+        // --- CORRECTION AVEC CAST POUR LE BUILD ---
+        const { error: forgotError } = await (authClient as any).forgetPassword.sendForgotPasswordEmail({
             email,
             redirectTo: window.location.origin + '/reset-password', 
         });
