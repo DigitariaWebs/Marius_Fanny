@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
+// Components
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import BestSellers from './components/BestSellers';
@@ -16,7 +17,12 @@ import CartDrawer from './components/Cart';
 import AuthPage from './components/Autpage';
 import AdminDashboard from './components/Dashboard';
 import Contact from './components/Contact';
+
+// Pages
 import User from './pages/user';
+import VerifyEmailPage from './pages/Emailverified'; 
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPassword';
 
 interface CartItem {
   id: number;
@@ -57,6 +63,7 @@ const App: React.FC = () => {
     setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
+  // --- Layout Helpers ---
   const HomePage: React.FC = () => (
     <>
       <Navbar onCartClick={() => setIsCartOpen(true)} cartCount={cartItems.length} />
@@ -100,13 +107,21 @@ const App: React.FC = () => {
 
       <div className="min-h-screen relative">
         <Routes>
+          {/* Main Routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/politique-retour" element={<Politique />} />
-          <Route path="/se-connecter" element={<AuthPage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/contact" element={<Contact />} />
+          
+          {/* Auth Routes */}
+          <Route path="/se-connecter" element={<AuthPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          
+          {/* Protected/User Routes */}
           <Route path="/user" element={<User />} />
+          <Route path="/admin" element={<AdminDashboard />} />
         </Routes> 
       </div>
     </Router>
