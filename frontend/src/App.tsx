@@ -23,6 +23,7 @@ import User from './pages/user';
 import VerifyEmailPage from './pages/Emailverified'; 
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPassword';
+import StaffManagement from './pages/Stuff';
 
 interface CartItem {
   id: number;
@@ -118,10 +119,12 @@ const App: React.FC = () => {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
-          
+          <Route path="/panneau" element={<AdminDashboard />} />
+
           {/* Protected/User Routes */}
           <Route path="/user" element={<User />} />
-          <Route path="/panneau" element={<AdminDashboard />} />
+          <Route path="/stuff" element={<StaffManagement />} />
+
         </Routes> 
       </div>
     </Router>
