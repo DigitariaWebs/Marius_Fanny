@@ -61,16 +61,15 @@ const AuthPage: React.FC = () => {
         const { data, error: signInError } = await authClient.signIn.email({
           email,
           password,
-          rememberMe, // Assumes authClient supports this
+          // Note: Si votre configuration Better-Auth ne supporte pas explicitement 'rememberMe'
+          // dans l'appel .email(), vous pouvez le supprimer.
         });
 
         if (signInError) throw new Error(signInError.message || 'Connexion échouée');
 
-        
         const isVerified = data?.user?.emailVerified ?? false; 
         
         if (isVerified) {
-            
             const from = location.state?.from?.pathname || '/user';
             navigate(from);
         } else {
@@ -78,7 +77,6 @@ const AuthPage: React.FC = () => {
         }
 
       } else if (view === 'signup') {
-        // --- LOGIQUE D'INSCRIPTION ---
         const { error: signUpError } = await authClient.signUp.email({
           email,
           password,
@@ -90,8 +88,8 @@ const AuthPage: React.FC = () => {
         setIsVerificationSent(true);
 
       } else if (view === 'forgot-password') {
-        // --- LOGIQUE MOT DE PASSE OUBLIÉ ---
-        const { error: forgotError } = await authClient.forgetPassword({
+        // --- CORRECTION ICI ---
+        const { error: forgotError } = await authClient.forgetPassword.sendForgotPasswordEmail({
             email,
             redirectTo: window.location.origin + '/reset-password', 
         });
@@ -103,7 +101,6 @@ const AuthPage: React.FC = () => {
 
     } catch (err: any) {
       console.error('Auth Error:', err);
-      // Generic network error fallback
       if (err.message === 'Failed to fetch') {
          setError('Erreur réseau. Vérifiez votre connexion.');
       } else {
@@ -149,7 +146,6 @@ const AuthPage: React.FC = () => {
     );
   }
 
-  // --- INTERFACE PRINCIPALE ---
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[#F9F7F2]">
       <div className="absolute inset-0 z-0">
@@ -159,7 +155,6 @@ const AuthPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/40">
           
-          {/* Header */}
           <div className="text-center mb-8">
             <h2
               className="text-5xl mb-2"
@@ -178,7 +173,6 @@ const AuthPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Error Banner */}
             {error && (
               <div
                 className="text-[10px] font-bold uppercase tracking-widest py-3 px-4 rounded-lg border text-center animate-pulse"
@@ -193,7 +187,6 @@ const AuthPage: React.FC = () => {
               </div>
             )}
 
-            {/* Success Banner */}
             {successMessage && (
                <div
                className="text-[10px] font-bold uppercase tracking-widest py-3 px-4 rounded-lg border text-center"
@@ -207,7 +200,6 @@ const AuthPage: React.FC = () => {
              </div>
             )}
 
-            {/* Sign Up Fields: Name */}
             {view === 'signup' && (
               <div className="space-y-1 group">
                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-50 group-focus-within:opacity-100 group-focus-within:text-[#C5A065] transition-all">
@@ -238,7 +230,6 @@ const AuthPage: React.FC = () => {
               />
             </div>
 
-          
             {view !== 'forgot-password' && (
               <div className="space-y-1 group">
                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-50 group-focus-within:opacity-100 group-focus-within:text-[#C5A065] transition-all">
@@ -255,7 +246,6 @@ const AuthPage: React.FC = () => {
               </div>
             )}
 
-            {/* Login Extra: Remember Me & Forgot Password */}
             {view === 'login' && (
               <div className="flex items-center justify-between pt-2">
                 <label className="flex items-center gap-2 cursor-pointer group">
@@ -290,13 +280,12 @@ const AuthPage: React.FC = () => {
               style={{ backgroundColor: styles.text }}
             >
               {loading ? 'CHARGEMENT...' : 
-               view === 'login' ? 'SE CONNECTER' : 
-               view === 'signup' ? 'CRÉER MON COMPTE' : 
-               'ENVOYER LE LIEN'}
+                view === 'login' ? 'SE CONNECTER' : 
+                view === 'signup' ? 'CRÉER MON COMPTE' : 
+                'ENVOYER LE LIEN'}
             </button>
           </form>
 
-          {/* Footer Navigation */}
           <div className="mt-8 text-center border-t border-black/5 pt-6 flex flex-col gap-3">
             {view !== 'login' && (
               <button
