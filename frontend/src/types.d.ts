@@ -17,16 +17,19 @@ export type StaffFormData = Omit<
   "id" | "createdAt" | "updatedAt" | "status"
 >;
 
-// Product Types
+// Product Management specific interface
 export interface Product {
   id: number;
   name: string;
   category: string;
   price: number;
-  stock: number;
-  status: string;
-  sales: number;
-  revenue: number;
+  available: boolean;
+  minOrderQuantity: number;
+  maxOrderQuantity: number;
+  description?: string;
+  image?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Statistics Types
@@ -139,17 +142,6 @@ export interface OrderFormData {
   }[];
   notes?: string;
   depositPaid: boolean;
-}
-
-// Product Rules & Configuration
-export interface ProductRule {
-  id: number;
-  productId: number;
-  cutoffTime: string; // HH:mm format
-  cutoffDays: number; // days before pickup
-  prepTime: number; // hours needed
-  maxQuantityPerOrder: number;
-  maxDailyQuantity: number;
 }
 
 export interface DeliveryZone {

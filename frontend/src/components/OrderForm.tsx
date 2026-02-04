@@ -22,7 +22,15 @@ import {
   CommandList,
 } from "./ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import type { Client, Address } from "../types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import type { Client, Address, Product } from "../types";
+import { TAX_RATE, MOCK_PRODUCTS } from "../data";
 
 interface OrderFormProps {
   onSubmit: (formData: OrderFormData) => void;
@@ -59,13 +67,13 @@ interface OrderFormData {
 
 interface OrderFormItem {
   id: string;
+  productId: number | null;
+  productName: string;
   quantity: number;
-  description: string;
   unitPrice: number;
   amount: number;
+  notes: string;
 }
-
-const TAX_RATE = 0.14975; // QC tax rate (TPS + TVQ)
 
 export default function OrderForm({
   onSubmit,
@@ -81,9 +89,7 @@ export default function OrderForm({
     lastName: initialData?.lastName || "",
     phone: initialData?.phone || "",
     email: initialData?.email || "",
-    items: initialData?.items || [
-      { id: "1", quantity: 1, description: "", unitPrice: 0, amount: 0 },
-    ],
+    items: initialData?.items || [],
     notes: initialData?.notes || "",
     pickupLocation: initialData?.pickupLocation || "Laval",
     deliveryType: initialData?.deliveryType || "pickup",
@@ -184,13 +190,67 @@ export default function OrderForm({
     }));
   };
 
+  const handleProductSelect = (itemId: string, productId: number) => {
+    const product = MOCK_PRODUCTS.find((p) => p.id === productId);
+    if (!product) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id === itemId) {
+          const quantity = Math.max(product.minOrderQuantity, 1);
+          return {
+            ...item,
+            productId: product.id,
+            productName: product.name,
+            quantity,
+            unitPrice: product.price,
+            amount: quantity * product.price,
+          };
+        }
+        return item;
+      }),
+    }));
+  };
+
+  const getAvailableProducts = (currentItemId: string): Product[] => {
+    const selectedProductIds = formData.items
+      .filter((item) => item.id !== currentItemId && item.productId)
+      .map((item) => item.productId);
+
+    return MOCK_PRODUCTS.filter(
+      (product) =>
+        product.available && !selectedProductIds.includes(product.id),
+    );
+  };
+
+  const getProductById = (productId: number | null): Product | null => {
+    if (!productId) return null;
+    return MOCK_PRODUCTS.find((p) => p.id === productId) || null;
+  };
+
+  const validateItemQuantity = (itemId: string, quantity: number) => {
+    const item = formData.items.find((i) => i.id === itemId);
+    if (!item?.productId) return true;
+
+    const product = getProductById(item.productId);
+    if (!product) return true;
+
+    return (
+      quantity >= product.minOrderQuantity &&
+      quantity <= product.maxOrderQuantity
+    );
+  };
+
   const addItem = () => {
     const newItem: OrderFormItem = {
       id: Date.now().toString(),
+      productId: null,
+      productName: "",
       quantity: 1,
-      description: "",
       unitPrice: 0,
       amount: 0,
+      notes: "",
     };
     setFormData((prev) => ({
       ...prev,
@@ -301,11 +361,28 @@ export default function OrderForm({
     }
 
     const hasValidItem = formData.items.some(
-      (item) => item.description.trim() && item.quantity > 0,
+      (item) => item.productId && item.quantity > 0,
     );
     if (!hasValidItem) {
       newErrors.items = "Au moins un article est requis";
     }
+
+    // Validate item quantities against min/max
+    formData.items.forEach((item, index) => {
+      if (item.productId) {
+        const product = getProductById(item.productId);
+        if (product) {
+          if (item.quantity < product.minOrderQuantity) {
+            newErrors[`item_${index}_quantity`] =
+              `Minimum ${product.minOrderQuantity}`;
+          }
+          if (item.quantity > product.maxOrderQuantity) {
+            newErrors[`item_${index}_quantity`] =
+              `Maximum ${product.maxOrderQuantity}`;
+          }
+        }
+      }
+    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -730,82 +807,114 @@ export default function OrderForm({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 text-xs">QTÉ</TableHead>
-                  <TableHead className="text-xs">DESCRIPTION</TableHead>
+                  <TableHead className="text-xs">PRODUIT</TableHead>
+                  <TableHead className="w-24 text-xs">QTÉ</TableHead>
                   <TableHead className="w-28 text-xs">PRIX</TableHead>
                   <TableHead className="w-28 text-xs">MONTANT</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {formData.items.map((item, index) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleItemChange(
-                            item.id,
-                            "quantity",
-                            parseInt(e.target.value) || 1,
-                          )
-                        }
-                        className="h-8 text-sm"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) =>
-                          handleItemChange(
-                            item.id,
-                            "description",
-                            e.target.value,
-                          )
-                        }
-                        className="h-8 text-sm"
-                        placeholder="Description de l'article"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          handleItemChange(
-                            item.id,
-                            "unitPrice",
-                            parseFloat(e.target.value) || 0,
-                          )
-                        }
-                        className="h-8 text-sm"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm font-medium text-gray-700">
-                        ${item.amount.toFixed(2)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {formData.items.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeItem(item.id)}
-                          className="h-8 w-8 text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                {formData.items.map((item, index) => {
+                  const product = item.productId
+                    ? getProductById(item.productId)
+                    : null;
+                  const availableProducts = getAvailableProducts(item.id);
+                  const quantityError = errors[`item_${index}_quantity`];
+
+                  return (
+                    <React.Fragment key={item.id}>
+                      <TableRow>
+                        <TableCell>
+                          <Select
+                            value={item.productId?.toString() || ""}
+                            onValueChange={(value) =>
+                              handleProductSelect(item.id, parseInt(value))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-sm">
+                              <SelectValue placeholder="Sélectionner un produit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableProducts.map((p) => (
+                                <SelectItem key={p.id} value={p.id.toString()}>
+                                  {p.name} - ${p.price.toFixed(2)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {product && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Min: {product.minOrderQuantity} | Max:{" "}
+                              {product.maxOrderQuantity}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={product?.minOrderQuantity || 1}
+                            max={product?.maxOrderQuantity}
+                            value={item.quantity}
+                            onChange={(e) =>
+                              handleItemChange(
+                                item.id,
+                                "quantity",
+                                parseInt(e.target.value) || 1,
+                              )
+                            }
+                            disabled={!item.productId}
+                            className={`h-8 text-sm ${quantityError ? "border-red-500" : ""}`}
+                          />
+                          {quantityError && (
+                            <p className="text-xs text-red-500 mt-1">
+                              {quantityError}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm font-medium text-gray-700">
+                            ${item.unitPrice.toFixed(2)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm font-medium text-gray-700">
+                            ${item.amount.toFixed(2)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeItem(item.id)}
+                            className="h-8 w-8 text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {item.productId && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="bg-gray-50 py-2">
+                            <Textarea
+                              value={item.notes}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  item.id,
+                                  "notes",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Notes pour ce produit (optionnel)"
+                              className="h-16 text-sm resize-none"
+                            />
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

@@ -10,6 +10,7 @@ import {
   Briefcase,
   MoreVertical,
   Edit2,
+  Eye,
 } from "lucide-react";
 import { DataTable } from "./ui/DataTable";
 import { Modal } from "./ui/modal";
@@ -21,67 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import type { Staff, StaffFormData } from "../types";
-
-const MOCK_STAFF: Staff[] = [
-  {
-    id: 1,
-    firstName: "Marie",
-    lastName: "Dubois",
-    email: "marie.dubois@mariusetfanny.com",
-    phone: "514-555-0101",
-    location: "Montreal",
-    department: "customer_service",
-    status: "active",
-    createdAt: "2024-01-15T10:00:00Z",
-    updatedAt: "2024-01-15T10:00:00Z",
-  },
-  {
-    id: 2,
-    firstName: "Jean",
-    lastName: "Tremblay",
-    email: "jean.tremblay@mariusetfanny.com",
-    phone: "450-555-0202",
-    location: "Laval",
-    department: "kitchen_staff",
-    status: "active",
-    createdAt: "2024-01-20T10:00:00Z",
-    updatedAt: "2024-01-20T10:00:00Z",
-  },
-  {
-    id: 3,
-    firstName: "Sophie",
-    lastName: "Laurent",
-    email: "sophie.laurent@mariusetfanny.com",
-    phone: "514-555-0303",
-    location: "Montreal",
-    department: "customer_service",
-    status: "suspended",
-    createdAt: "2024-02-01T10:00:00Z",
-    updatedAt: "2024-02-01T10:00:00Z",
-  },
-  {
-    id: 4,
-    firstName: "Pierre",
-    lastName: "Martin",
-    email: "pierre.martin@mariusetfanny.com",
-    phone: "450-555-0404",
-    location: "Laval",
-    department: "customer_service",
-    status: "active",
-    createdAt: "2024-02-10T10:00:00Z",
-    updatedAt: "2024-02-10T10:00:00Z",
-  },
-];
-
-const LOCATIONS = [
-  { value: "Montreal", label: "Montréal" },
-  { value: "Laval", label: "Laval" },
-];
-
-const DEPARTMENTS = [
-  { value: "customer_service", label: "Service Client" },
-  { value: "kitchen_staff", label: "Personnel de Cuisine" },
-];
+import { MOCK_STAFF, LOCATIONS, DEPARTMENTS } from "../data";
 
 export default function StaffManagement() {
   const [staff, setStaff] = useState<Staff[]>(MOCK_STAFF);

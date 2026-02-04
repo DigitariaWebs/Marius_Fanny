@@ -578,7 +578,7 @@ export default function StaffManagement() {
               />
               <StatsCard
                 title="Revenus"
-                value={`${users.reduce((sum, u) => sum + u.totalSpent, 0).toFixed(2)} €`}
+                value={`${users.reduce((sum, u) => sum + u.totalSpent, 0).toFixed(2)} $`}
                 color="gold"
               />
             </div>
@@ -659,7 +659,7 @@ export default function StaffManagement() {
                         </td>
                         <td className="p-4">
                           <span className="font-semibold text-green-600">
-                            {user.totalSpent.toFixed(2)} €
+                            {user.totalSpent.toFixed(2)} $
                           </span>
                         </td>
                         <td className="p-4">
@@ -725,7 +725,7 @@ export default function StaffManagement() {
                         Total dépensé
                       </p>
                       <p className="font-semibold text-green-600">
-                        {user.totalSpent.toFixed(2)} €
+                        {user.totalSpent.toFixed(2)} $
                       </p>
                     </div>
                   </div>

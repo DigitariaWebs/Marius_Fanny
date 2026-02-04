@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Package,
   LayoutDashboard,
@@ -20,6 +21,7 @@ import StaffManagement from "./StaffManagement";
 import ClientManagement from "./ClientManagement";
 import { OrderManagement } from "./OrderManagement";
 import { ProductManagement } from "./ProductManagement";
+import { authClient } from "../lib/AuthClient";
 
 interface Product {
   id: number;
@@ -206,9 +208,39 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
   const [viewMode, setViewMode] = useState<ViewMode>("overview");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   const gold = "#C5A065";
   const dark = "#2D2A26";
+
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const session = await authClient.getSession();
+        if (!session) {
+          navigate("/se-connecter");
+        }
+      } catch (error) {
+        console.error("Session check error:", error);
+        // Redirect to login on error
+        navigate("/se-connecter");
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await authClient.signOut();
+      navigate("/se-connecter");
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Navigate anyway to ensure user sees login page
+      navigate("/se-connecter");
+    }
+  };
 
   // Calcul des statistiques
   const calculateStats = (): Statistics => {
@@ -373,7 +405,10 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-          <button className="flex items-center gap-3 w-full p-3 rounded-lg text-gray-400 hover:bg-red-900/20 hover:text-red-400 transition-all border border-transparent hover:border-red-800/50">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full p-3 rounded-lg text-gray-400 hover:bg-red-900/20 hover:text-red-400 transition-all border border-transparent hover:border-red-800/50"
+          >
             <LogOut size={20} />
             <span className="font-medium">Déconnexion</span>
           </button>
@@ -417,7 +452,7 @@ export default function AdminDashboard() {
                 />
                 <StatCard
                   title="Chiffre d'affaires"
-                  value={`${stats.totalRevenue.toFixed(2)} €`}
+                  value={`${stats.totalRevenue.toFixed(2)} $`}
                   change={stats.revenueChange}
                   icon={<DollarSign size={24} />}
                   color="green"

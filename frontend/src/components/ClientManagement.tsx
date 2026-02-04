@@ -1,20 +1,24 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Plus,
-  UserCircle,
+  Eye,
+  Edit,
+  Trash2,
+  MoreVertical,
+  UserCheck,
+  UserX,
   Mail,
   Phone,
   MapPin,
-  Edit2,
-  Trash2,
-  Eye,
-  Package,
   Calendar,
+  ShoppingBag,
+  UserCircle,
+  Package,
   DollarSign,
-  MoreVertical,
+  Edit2,
 } from "lucide-react";
-import { Modal } from "./ui/modal";
 import { DataTable } from "./ui/DataTable";
+import { Modal } from "./ui/modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   DropdownMenu,
@@ -23,192 +27,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import type { Client, Address, Order } from "../types";
-
-// Mock data
-const MOCK_CLIENTS: Client[] = [
-  {
-    id: 1,
-    firstName: "Marie",
-    lastName: "Dubois",
-    email: "marie.dubois@example.com",
-    phone: "514-555-0123",
-    status: "active",
-    createdAt: "2024-01-15T10:00:00Z",
-    updatedAt: "2024-01-15T10:00:00Z",
-    addresses: [
-      {
-        id: 1,
-        type: "billing",
-        street: "123 Rue Sainte-Catherine",
-        city: "Montreal",
-        province: "QC",
-        postalCode: "H3B 1A1",
-        isDefault: true,
-      },
-      {
-        id: 2,
-        type: "shipping",
-        street: "123 Rue Sainte-Catherine",
-        city: "Montreal",
-        province: "QC",
-        postalCode: "H3B 1A1",
-        isDefault: true,
-      },
-    ],
-    orders: [
-      {
-        id: 1,
-        orderNumber: "ORD-2024-001",
-        clientId: 1,
-        client: {} as any,
-        orderDate: "2024-01-15T14:30:00Z",
-        pickupDate: "2024-01-18T10:00:00Z",
-        pickupLocation: "Montreal",
-        deliveryType: "pickup",
-        items: [],
-        subtotal: 80.0,
-        taxAmount: 9.99,
-        deliveryFee: 0,
-        total: 89.99,
-        depositAmount: 44.99,
-        depositPaid: true,
-        balancePaid: true,
-        paymentStatus: "paid",
-        status: "completed",
-        source: "online",
-        createdAt: "2024-01-15T14:30:00Z",
-        updatedAt: "2024-01-18T10:00:00Z",
-      },
-      {
-        id: 2,
-        orderNumber: "ORD-2024-045",
-        clientId: 1,
-        client: {} as any,
-        orderDate: "2024-02-03T11:20:00Z",
-        pickupDate: "2024-02-05T15:00:00Z",
-        pickupLocation: "Montreal",
-        deliveryType: "pickup",
-        items: [],
-        subtotal: 110.0,
-        taxAmount: 15.5,
-        deliveryFee: 0,
-        total: 125.5,
-        depositAmount: 62.75,
-        depositPaid: true,
-        balancePaid: true,
-        paymentStatus: "paid",
-        status: "completed",
-        source: "phone",
-        createdAt: "2024-02-03T11:20:00Z",
-        updatedAt: "2024-02-05T15:00:00Z",
-      },
-    ],
-  },
-  {
-    id: 2,
-    firstName: "Jean",
-    lastName: "Tremblay",
-    email: "jean.tremblay@example.com",
-    phone: "514-555-0456",
-    status: "placeholder",
-    createdAt: "2024-02-10T09:30:00Z",
-    updatedAt: "2024-02-10T09:30:00Z",
-    addresses: [],
-    orders: [
-      {
-        id: 3,
-        orderNumber: "ORD-2024-102",
-        clientId: 2,
-        client: {} as any,
-        orderDate: "2024-02-10T09:30:00Z",
-        pickupDate: "2024-02-12T12:00:00Z",
-        pickupLocation: "Laval",
-        deliveryType: "pickup",
-        items: [],
-        subtotal: 40.0,
-        taxAmount: 5.0,
-        deliveryFee: 0,
-        total: 45.0,
-        depositAmount: 22.5,
-        depositPaid: true,
-        balancePaid: true,
-        paymentStatus: "paid",
-        status: "completed",
-        source: "in_store",
-        createdAt: "2024-02-10T09:30:00Z",
-        updatedAt: "2024-02-12T12:00:00Z",
-      },
-    ],
-  },
-  {
-    id: 3,
-    firstName: "Sophie",
-    lastName: "Martin",
-    email: "sophie.martin@example.com",
-    phone: "450-555-0789",
-    status: "active",
-    createdAt: "2024-01-20T16:45:00Z",
-    updatedAt: "2024-01-20T16:45:00Z",
-    addresses: [
-      {
-        id: 3,
-        type: "billing",
-        street: "456 Boulevard des Laurentides",
-        city: "Laval",
-        province: "QC",
-        postalCode: "H7G 2V1",
-        isDefault: true,
-      },
-    ],
-    orders: [
-      {
-        id: 4,
-        orderNumber: "ORD-2024-078",
-        clientId: 3,
-        client: {} as any,
-        orderDate: "2024-02-01T13:15:00Z",
-        pickupDate: "2024-02-15T14:00:00Z",
-        pickupLocation: "Montreal",
-        deliveryType: "delivery",
-        deliveryAddress: {
-          id: 3,
-          type: "shipping",
-          street: "456 Boulevard des Laurentides",
-          city: "Laval",
-          province: "QC",
-          postalCode: "H7G 2V1",
-          isDefault: true,
-        },
-        items: [],
-        subtotal: 185.0,
-        taxAmount: 10.75,
-        deliveryFee: 15.0,
-        total: 210.75,
-        depositAmount: 105.38,
-        depositPaid: true,
-        balancePaid: false,
-        paymentStatus: "deposit_paid",
-        status: "in_production",
-        source: "online",
-        createdAt: "2024-02-01T13:15:00Z",
-        updatedAt: "2024-02-10T09:00:00Z",
-      },
-    ],
-  },
-  {
-    id: 4,
-    firstName: "Pierre",
-    lastName: "Lavoie",
-    email: "pierre.lavoie@example.com",
-    phone: "438-555-0321",
-    status: "placeholder",
-    createdAt: "2024-02-05T11:00:00Z",
-    updatedAt: "2024-02-05T11:00:00Z",
-    addresses: [],
-    orders: [],
-  },
-];
+import type { Client, ClientFormData, Order } from "../types";
+import { MOCK_CLIENTS } from "../data";
 
 function ClientManagement() {
   const [clients, setClients] = useState<Client[]>(MOCK_CLIENTS);
@@ -961,7 +781,7 @@ function ClientManagement() {
               </TabsList>
 
               <TabsContent value="profile" className="space-y-4">
-                <div className="p-6 bg-gradient-to-br from-(--bakery-cream) to-white rounded-xl border border-(--bakery-border)">
+                <div className="p-6 bg-linear-to-br from-(--bakery-cream) to-white rounded-xl border border-(--bakery-border)">
                   <div className="flex items-start justify-between mb-6">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-full bg-(--bakery-gold) bg-opacity-20 flex items-center justify-center">
