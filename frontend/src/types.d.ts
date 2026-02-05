@@ -75,7 +75,7 @@ export type ClientFormData = Omit<
 
 // Order Management Types - VERSION COMPATIBLE STAFF DASHBOARD
 export interface Order {
-  id: string | number;
+  id: string; // Changed from string | number to just string for consistency
   orderNumber: string;
   clientId: number;
   client: Client;
@@ -103,7 +103,7 @@ export interface Order {
     | "ready"
     | "completed"
     | "cancelled"
-    | "delivered"; // AJOUTÉ pour compatibilité staff dashboard
+    | "delivered";
   source: "online" | "phone" | "in_store";
   notes?: string;
   staffId?: number;
@@ -116,7 +116,7 @@ export interface OrderItem {
   id: number;
   orderId: number;
   productId: number;
-  product?: Product; // Optionnel pour compatibilité
+  product?: Product;
   quantity: number;
   unitPrice: number;
   subtotal: number;
@@ -272,6 +272,25 @@ export interface ClientActivity {
   totalSpent: number;
 }
 
+export interface DashboardClient {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address?: string; // Added for staff dashboard compatibility
+}
+
+export interface DashboardOrderItem {
+  product?: {
+    id: string;
+    name: string;
+    price: number;
+  };
+  quantity: number;
+  unitPrice: number;
+}
+
 export interface DashboardOrder {
   id: string;
   orderNumber: string;
@@ -289,4 +308,9 @@ export function isOrder(obj: any): obj is Order {
          typeof obj.id === 'string' && 
          typeof obj.orderNumber === 'string' &&
          obj.client !== undefined;
+}
+
+// Helper function to ensure order.id is always a string
+export function getOrderId(order: Order): string {
+  return typeof order.id === 'string' ? order.id : String(order.id);
 }
