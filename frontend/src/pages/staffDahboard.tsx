@@ -107,34 +107,33 @@ export default function StaffManagement() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Simuler des données pour la démo
-      const mockOrders: Order[] = Array.from({ length: 50 }, (_, i) => ({
-        id: `ORD${1000 + i}`,
-        orderNumber: `ORD${1000 + i}`,
-        client: {
-          id: `CLI${100 + (i % 10)}`,
-          firstName: ["Jean", "Marie", "Pierre", "Sophie", "Luc"][i % 5],
-          lastName: ["Dupont", "Martin", "Bernard", "Petit", "Durand"][i % 5],
-          email: `client${i % 10}@example.com`,
-          phone: `06${Math.floor(Math.random() * 100000000)}`,
-          address: `${Math.floor(Math.random() * 100)} Rue de la Boulangerie, Paris`,
-        },
-        items: [
-          {
-            product: {
-              id: `PROD${(i % 12) + 1}`,
-              name: ["Croissant", "Pain au Chocolat", "Baguette", "Éclair", "Tarte Citron"][i % 5],
-              price: [2.2, 2.4, 3.5, 4.5, 29.95][i % 5],
-            },
-            quantity: Math.floor(Math.random() * 5) + 1,
-            unitPrice: [2.2, 2.4, 3.5, 4.5, 29.95][i % 5],
-          },
-        ],
-        total: Math.random() * 100 + 20,
-        status: ["pending", "in_production", "ready", "delivered", "cancelled"][i % 5] as Order['status'],
-        createdAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-        notes: i % 3 === 0 ? "Livraison avant 10h" : undefined,
-      }));
+const mockOrders: DashboardOrder[] = Array.from({ length: 50 }, (_, i) => ({
+  id: `ORD${1000 + i}`,
+  orderNumber: `ORD${1000 + i}`,
+  client: {
+    id: `CLI${100 + (i % 10)}`,
+    firstName: ["Jean", "Marie", "Pierre", "Sophie", "Luc"][i % 5],
+    lastName: ["Dupont", "Martin", "Bernard", "Petit", "Durand"][i % 5],
+    email: `client${i % 10}@example.com`,
+    phone: `06${Math.floor(Math.random() * 100000000)}`,
+    address: `${Math.floor(Math.random() * 100)} Rue de la Boulangerie, Paris`,
+  },
+  items: [
+    {
+      product: {
+        id: `PROD${(i % 12) + 1}`,
+        name: ["Croissant", "Pain au Chocolat", "Baguette", "Éclair", "Tarte Citron"][i % 5],
+        price: [2.2, 2.4, 3.5, 4.5, 29.95][i % 5],
+      },
+      quantity: Math.floor(Math.random() * 5) + 1,
+      unitPrice: [2.2, 2.4, 3.5, 4.5, 29.95][i % 5],
+    },
+  ],
+  total: Math.random() * 100 + 20,
+  status: ["pending", "in_production", "ready", "delivered", "cancelled"][i % 5] as OrderStatus,
+  createdAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+  notes: i % 3 === 0 ? "Livraison avant 10h" : undefined,
+}));
 
       setOrders(mockOrders);
 

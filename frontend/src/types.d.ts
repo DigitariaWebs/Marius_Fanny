@@ -75,7 +75,7 @@ export type ClientFormData = Omit<
 
 // Order Management Types - VERSION COMPATIBLE STAFF DASHBOARD
 export interface Order {
-  id: string;
+  id: string | number;
   orderNumber: string;
   clientId: number;
   client: Client;
@@ -270,6 +270,17 @@ export interface ClientActivity {
   client: string;
   orders: number;
   totalSpent: number;
+}
+
+export interface DashboardOrder {
+  id: string;
+  orderNumber: string;
+  client: DashboardClient;
+  items: DashboardOrderItem[];
+  total: number;
+  status: "pending" | "in_production" | "ready" | "delivered" | "cancelled";
+  createdAt: string;
+  notes?: string;
 }
 
 // Type guard pour vérifier si un objet est un Order
