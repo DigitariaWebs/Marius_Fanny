@@ -170,3 +170,34 @@ export function sanitizeBody(req: Request, res: Response, next: NextFunction) {
   }
   next();
 }
+
+/**
+ * Validate email field
+ */
+export const validateEmail = (req: Request, res: Response, next: NextFunction) => {
+  const { email } = req.body;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!email || !emailRegex.test(email)) {
+    return res.status(400).json({ message: "Invalid email address" });
+  }
+
+  next();
+};
+
+/**
+ * Validate password field
+ */
+export const validatePassword = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters long" });
+  }
+
+  next();
+};

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { authClient } from "../lib/AuthClient.ts";
 import GoldenBackground from "../components/GoldenBackground.tsx";
 import { Mail, ArrowLeft, ArrowRight } from "lucide-react";
+// Importation de la fonction centralisée qui utilise la bonne URL (/api/auth/forgot_password)
+import { forgotPassword } from "../lib/AuthClient.ts";
 
 const styles = {
   gold: "#C5A065",
@@ -11,28 +12,17 @@ const styles = {
   fontSans: '"Inter", sans-serif',
 };
 
-const ForgotPasswordPage: React.FC = () => {
+interface ForgotPasswordProps {
+  onSuccess?: (message: string) => void;
+  onError?: (error: string) => void;
+}
+
+const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onSuccess, onError }) => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const session = await authClient.getSession();
-        if (session.data) {
-          navigate("/");
-        }
-      } catch (error) {
-        console.error("Session check error:", error);
-        // Continue to forgot password page on error
-      }
-    };
-    checkAuth();
-  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,19 +30,17 @@ const ForgotPasswordPage: React.FC = () => {
     setError(null);
 
     try {
-      // --- CORRECTION AVEC CAST POUR LE BUILD ---
-      const { error } = await (
-        authClient as any
-      ).forgetPassword.sendForgotPasswordEmail({
-        email,
-        redirectTo: window.location.origin + "/reset-password",
-      });
-
-      if (error) throw new Error(error.message);
+      // CORRECTION : Appel de la fonction centralisée au lieu du fetch manuel
+      // Cette fonction pointe vers la route correcte définie dans votre backend
+      await forgotPassword(email);
 
       setIsSuccess(true);
+      if (onSuccess) onSuccess("Un email de réinitialisation a été envoyé.");
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue.");
+      // Récupération propre du message d'erreur
+      const message = err.message || "Une erreur est survenue lors de l'envoi.";
+      setError(message);
+      if (onError) onError(message);
     } finally {
       setLoading(false);
     }
@@ -69,16 +57,11 @@ const ForgotPasswordPage: React.FC = () => {
             <div className="w-20 h-20 bg-[#C5A065]/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <Mail className="text-[#C5A065]" size={40} />
             </div>
-            <h2
-              className="text-3xl mb-4"
-              style={{ fontFamily: styles.fontScript, color: styles.gold }}
-            >
+            <h2 className="text-3xl mb-4" style={{ fontFamily: styles.fontScript, color: styles.gold }}>
               Email Envoyé
             </h2>
             <p className="text-[11px] font-bold uppercase tracking-widest text-stone-500 leading-relaxed mb-8">
-              Si un compte existe pour{" "}
-              <span className="text-[#2D2A26] underline">{email}</span>, vous
-              recevrez un code de réinitialisation.
+              Si un compte existe pour <span className="text-[#2D2A26] underline">{email}</span>, vous recevrez un lien de réinitialisation.
             </p>
             <button
               onClick={() => navigate("/reset-password")}
@@ -107,21 +90,20 @@ const ForgotPasswordPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/40">
           <div className="text-center mb-8">
-            <h2
-              className="text-4xl mb-2"
-              style={{ fontFamily: styles.fontScript, color: styles.gold }}
-            >
+            <h2 className="text-4xl mb-2" style={{ fontFamily: styles.fontScript, color: styles.gold }}>
               Mot de passe oublié ?
             </h2>
             <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mt-4">
-              Entrez votre email pour recevoir le code
+              Entrez votre email pour recevoir le lien
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="text-[10px] font-bold uppercase tracking-widest p-3 rounded bg-red-50 text-red-600 border border-red-200 text-center">
-                {error}
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest text-center">
+                  {error}
+                </p>
               </div>
             )}
 
@@ -150,10 +132,7 @@ const ForgotPasswordPage: React.FC = () => {
           </form>
 
           <div className="mt-8 text-center pt-6 border-t border-black/5">
-            <Link
-              to="/auth"
-              className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 hover:text-[#C5A065] transition-all"
-            >
+            <Link to="/se-connecter" className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 hover:text-[#C5A065] transition-all">
               <ArrowLeft size={14} /> Retour à la connexion
             </Link>
           </div>
@@ -163,4 +142,4 @@ const ForgotPasswordPage: React.FC = () => {
   );
 };
 
-export default ForgotPasswordPage;
+export default ForgotPassword;

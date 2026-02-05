@@ -1,183 +1,83 @@
-import { Request, Response } from "express";
-import { AuthRequest } from "../middleware/auth";
+import { Request, Response, NextFunction } from "express";
 import { User } from "../models/User";
 import { AppError } from "../middleware/errorHandler";
-import { sendVerificationCodeEmail, generateMockVerificationCode } from "../utils/emailService";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
+import bcrypt from "bcrypt";
 
-
-export async function getSession(req: AuthRequest, res: Response) {
+// 1. DEMANDE DE RESET (Envoi de l'email)
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.user || !req.session) {
-      throw new AppError("No active session", 401);
-    }
+    const { email } = req.body;
+    if (!email) return next(new AppError("Email requis", 400));
 
-    res.json({
-      success: true,
-      data: {
-        user: req.user,
-        session: req.session,
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return next(new AppError("Utilisateur non trouvé", 404));
+
+    // Génération du token
+    const token = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // Valide 1h
+    await user.save();
+
+    // Configuration SMTP
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
       },
     });
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError("Failed to get session", 500);
-  }
-}
 
-/**
- * Verify email status
- */
-export async function checkEmailVerification(req: AuthRequest, res: Response) {
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${token}`;
+
+    await transporter.sendMail({
+      from: `"Marius & Fanny" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: "Réinitialisation de mot de passe",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
+          <h2 style="color: #C5A065;">Réinitialisation de mot de passe</h2>
+          <p>Vous avez demandé à changer votre mot de passe.</p>
+          <p>Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe :</p>
+          <a href="${resetLink}" style="background: #C5A065; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Réinitialiser mon mot de passe</a>
+          <p style="margin-top: 20px; font-size: 12px; color: gray;">Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>
+        </div>
+      `,
+    });
+
+    return res.status(200).json({ success: true, message: "Email envoyé" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 2. VALIDATION DU NOUVEAU MOT DE PASSE
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) {
-      throw new AppError("User not authenticated", 401);
-    }
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) return next(new AppError("Données manquantes", 400));
 
-    res.json({
-      success: true,
-      data: {
-        email: req.user.email,
-        emailVerified: req.user.emailVerified,
-      },
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() },
     });
+
+    if (!user) return next(new AppError("Lien invalide ou expiré", 400));
+
+    // Hachage du mot de passe pour Better Auth
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+
+    // Nettoyage
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    
+    await user.save();
+
+    return res.status(200).json({ success: true, message: "Mot de passe modifié avec succès" });
   } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError("Failed to check email verification", 500);
+    next(error);
   }
-}
-
-/**
- * Create user profile after authentication
- * This is called after successful sign-up to create the Mongoose user document
- * Sends a verification email with a mock code
- */
-export async function createUserProfile(req: Request, res: Response) {
-  try {
-    const { email, name } = req.body;
-    console.log(`🔍 [createUserProfile] Starting user creation for email: ${email}, name: ${name}`);
-
-    if (!email || !name) {
-      console.warn(`⚠️ [createUserProfile] Missing required fields - email: ${email}, name: ${name}`);
-      throw new AppError("Email and name are required", 400);
-    }
-
-    console.log(`🔍 [createUserProfile] Checking if user exists with email: ${email}`);
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      console.log(`ℹ️ [createUserProfile] User already exists with email: ${email}`);
-      return res.json({
-        success: true,
-        data: existingUser,
-        message: "User profile already exists",
-      });
-    }
-
-    // Generate mock verification code (6 digits)
-    const verificationCode = generateMockVerificationCode();
-    const expirationTime = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    console.log(`🔐 [createUserProfile] Generated verification code: ${verificationCode}`);
-    console.log(`⏰ [createUserProfile] Verification code expires at: ${expirationTime.toISOString()}`);
-
-    // Create new user profile with verification code
-    console.log(`💾 [createUserProfile] Creating new user in database with email: ${email}`);
-    const user = await User.create({
-      email,
-      name,
-      role: "user",
-      emailVerified: false,
-      emailVerificationCode: verificationCode,
-      emailVerificationExpires: expirationTime,
-    });
-    console.log(`✅ [createUserProfile] User created successfully with ID: ${user._id}`);
-
-    // Send verification email with mock code
-    try {
-      console.log(`📧 [createUserProfile] Starting email send process for: ${email}`);
-      await sendVerificationCodeEmail(email, name);
-      console.log(`📧 [createUserProfile] Verification email sent successfully for user: ${email}`);
-    } catch (emailError) {
-      console.error(`❌ [createUserProfile] Failed to send verification email for ${email}:`, emailError);
-      // Don't throw - user account is created, email sending failure shouldn't block signup
-    }
-
-    console.log(`🎉 [createUserProfile] User profile creation process completed for: ${email}`);
-    res.status(201).json({
-      success: true,
-      data: user,
-      message: "User profile created successfully. Verification email sent.",
-    });
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError("Failed to create user profile", 500);
-  }
-}
-
-/**
- * Sync Better Auth user with Mongoose User model
- * This ensures that authenticated users have a corresponding Mongoose document
- */
-export async function syncUserProfile(req: AuthRequest, res: Response) {
-  try {
-    if (!req.user) {
-      throw new AppError("User not authenticated", 401);
-    }
-
-    let user = await User.findOne({ email: req.user.email });
-
-    if (!user) {
-      // Create user if doesn't exist
-      user = await User.create({
-        email: req.user.email,
-        name: req.user.name,
-        role: "user",
-      });
-
-      return res.status(201).json({
-        success: true,
-        data: user,
-        message: "User profile created and synced",
-      });
-    }
-
-    res.json({
-      success: true,
-      data: user,
-      message: "User profile already synced",
-    });
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError("Failed to sync user profile", 500);
-  }
-}
-
-
-export async function getUserStats(req: AuthRequest, res: Response) {
-  try {
-    if (!req.user) {
-      throw new AppError("User not authenticated", 401);
-    }
-
-    const user = await User.findOne({ email: req.user.email });
-
-    if (!user) {
-      throw new AppError("User profile not found", 404);
-    }
-
-    const stats = {
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      emailVerified: req.user.emailVerified,
-      accountCreated: user.createdAt,
-      lastUpdated: user.updatedAt,
-    };
-
-    res.json({
-      success: true,
-      data: stats,
-    });
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError("Failed to get user stats", 500);
-  }
-}
+};

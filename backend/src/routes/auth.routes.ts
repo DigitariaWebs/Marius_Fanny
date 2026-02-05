@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { toNodeHandler } from "better-auth/node";
-import { auth } from "../config/auth"; // On importe l'instance créée à l'étape 4
+import { forgotPassword, resetPassword } from "../controllers/auth.controller";
 
 const router = Router();
 
-// Cette route unique gère TOUT (login, register, verify-email, etc.)
-router.all("/auth/*", toNodeHandler(auth));
+// L'URL sera /api/auth/forgot_password
+router.post("/forgot_password", forgotPassword);
+router.post("/reset_password", resetPassword);
 
 export default router;

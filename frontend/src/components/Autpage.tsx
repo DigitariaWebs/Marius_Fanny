@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { authClient } from "../lib/AuthClient.ts";
+import { authClient, forgotPassword } from "../lib/AuthClient.ts";
 import GoldenBackground from "./GoldenBackground";
 import { Mail, ArrowLeft, Check, Lock, User } from "lucide-react";
 
@@ -15,7 +15,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const AuthPage: React.FC = () => {
   const [view, setView] = useState<"login" | "signup" | "forgot-password">(
-    "login",
+    "login"
   );
   const [isVerificationSent, setIsVerificationSent] = useState(false);
 
@@ -31,7 +31,6 @@ const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Redirect authenticated users to dashboard
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -41,7 +40,6 @@ const AuthPage: React.FC = () => {
         }
       } catch (error) {
         console.error("Session check error:", error);
-        // Continue to login page on error
       }
     };
     checkAuth();
@@ -76,7 +74,7 @@ const AuthPage: React.FC = () => {
 
     try {
       if (view === "login") {
-        const { data, error: signInError } = await authClient.signIn.email({
+        const { error: signInError } = await authClient.signIn.email({
           email,
           password,
         });
@@ -84,7 +82,6 @@ const AuthPage: React.FC = () => {
         if (signInError)
           throw new Error(signInError.message || "Connexion échouée");
 
-        // Redirect to dashboard on successful login
         const from = (location.state as any)?.from?.pathname || "/dashboard";
         navigate(from);
       } else if (view === "signup") {
@@ -99,22 +96,7 @@ const AuthPage: React.FC = () => {
 
         setIsVerificationSent(true);
       } else if (view === "forgot-password") {
-        // --- CORRECTION AVEC CAST POUR LE BUILD ---
-        const { error: forgotError } = await (
-          authClient as any
-        ).forgetPassword.sendForgotPasswordEmail({
-          email,
-          redirectTo: window.location.origin + "/reset-password",
-        });
-
-        if (forgotError)
-          throw new Error(
-            forgotError.message || "Impossible d'envoyer l'email",
-          );
-
-        setSuccessMessage(
-          "Un lien de réinitialisation a été envoyé à votre adresse email.",
-        );
+        await handleForgotPassword();
       }
     } catch (err: any) {
       console.error("Auth Error:", err);
@@ -125,6 +107,21 @@ const AuthPage: React.FC = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Correction ici : Utilisation de la fonction importée au lieu du fetch manuel
+  const handleForgotPassword = async () => {
+    try {
+      // On utilise la fonction centralisée de AuthClient.ts
+      // Assurez-vous que forgotPassword dans AuthClient pointe vers la bonne URL (/api/forgot_password)
+      await forgotPassword(email);
+
+      setSuccessMessage(
+        "Un lien de réinitialisation a été envoyé à votre adresse email."
+      );
+    } catch (err: any) {
+      throw err; // L'erreur sera attrapée par le bloc try/catch du handleSubmit
     }
   };
 
@@ -285,6 +282,7 @@ const AuthPage: React.FC = () => {
 
                 <button
                   type="button"
+                  /* Correction : Utilisation de switchView au lieu de navigate */
                   onClick={() => switchView("forgot-password")}
                   className="text-[10px] font-bold uppercase tracking-wider text-[#2D2A26]/60 hover:text-[#C5A065] transition-colors"
                 >

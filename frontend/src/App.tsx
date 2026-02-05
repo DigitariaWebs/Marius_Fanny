@@ -22,7 +22,7 @@ import Contact from "./components/Contact";
 import User from "./pages/user";
 import VerifyEmailPage from "./pages/Emailverified";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPassword";
+import ResetPassword from "./pages/ResetPassword";
 import StaffManagement from "./pages/Stuff";
 
 interface CartItem {
@@ -132,11 +132,25 @@ const App: React.FC = () => {
 
           {/* Auth Routes */}
           <Route path="/se-connecter" element={<AuthPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="/forgot_password"
+            element={
+              <ForgotPasswordPage
+                onSuccess={(message: string) => alert(`Success: ${message}`)}
+                onError={(error: string) => alert(`Error: ${error}`)}
+              />
+            }
+          />
+        <Route
+    path="/reset-password/:token" 
+    element={
+      <ResetPassword
+      />
+    }
+  />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
 
-          {/* Protected/User Routes */}
+      
           <Route path="/user" element={<User />} />
           <Route path="/stuff" element={<StaffManagement />} />
         </Routes>

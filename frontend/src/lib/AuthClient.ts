@@ -1,23 +1,30 @@
 import { createAuthClient } from "better-auth/react";
 
-/**
- * Authentication client for better-auth
- *
- * This client connects to the backend API auth endpoints.
- * The baseURL is constructed from VITE_API_URL environment variable
- * with "/api/auth" path appended automatically.
- *
- * Configuration:
- * - Set VITE_API_URL in .env file (e.g., http://localhost:3000)
- * - Defaults to http://localhost:3000 if not set
- * - Auth endpoints will be at: {baseURL}/api/auth/*
- *
- * Available methods:
- * - authClient.signIn.email() - Login with email/password
- * - authClient.signUp.email() - Register new user
- * - authClient.signOut() - Logout current user
- * - authClient.getSession() - Get current session
- */
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 export const authClient = createAuthClient({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
+  baseURL: API_URL, 
 });
+
+export const forgotPassword = async (email: string) => {
+  const response = await fetch(`${API_URL}/api/auth/forgot_password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  const contentType = response.headers.get("content-type");
+  
+  if (!response.ok) {
+    // On essaie de lire le message d'erreur JSON envoyé par ton auth.controller.ts
+    const errorData = contentType?.includes("application/json") 
+      ? await response.json() 
+      : { message: "Route introuvable (404)" };
+      
+    throw new Error(errorData.message || "Une erreur est survenue");
+  }
+
+  return response.json();
+};

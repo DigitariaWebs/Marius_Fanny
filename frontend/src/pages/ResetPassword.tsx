@@ -1,170 +1,108 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { authClient } from "../lib/AuthClient.ts";
-import GoldenBackground from "../components/GoldenBackground.tsx";
-import { Lock, ArrowRight, CheckCircle2 } from "lucide-react";
+import React, { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import GoldenBackground from "../components/GoldenBackground";
+import { ArrowRight, CheckCircle2, Lock } from "lucide-react";
 
-const styles = {
-  gold: "#C5A065",
-  text: "#2D2A26",
-  fontScript: '"Great Vibes", cursive',
-};
-
-const ResetPasswordPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+const ResetPassword = () => {
+  const { token } = useParams(); 
+  const navigate = useNavigate();
+  
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-
-  const navigate = useNavigate();
-
-  // On récupère le token dans l'URL (ex: ?token=abc...)
-  const token = searchParams.get("token");
-
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const session = await authClient.getSession();
-        if (session.data) {
-          navigate("/");
-        }
-      } catch (error) {
-        console.error("Session check error:", error);
-        // Continue to reset password page on error
-      }
-    };
-    checkAuth();
-  }, [navigate]);
+  const [status, setStatus] = useState<{ type: 'error' | 'success', msg: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
     if (password !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas.");
-      return;
-    }
-
-    if (!token) {
-      setError("Le jeton (token) de réinitialisation est manquant.");
-      return;
+      return setStatus({ type: 'error', msg: 'Les mots de passe diffèrent' });
     }
 
     setLoading(true);
-
     try {
-      // CORRECTION ICI : 'newPassword' au lieu de 'password'
-      const { error: resetError } = await authClient.resetPassword({
-        newPassword: password,
-        token: token,
+      const res = await fetch("http://localhost:3000/api/auth/reset_password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, newPassword: password }),
       });
 
-      if (resetError) throw new Error(resetError.message);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
 
-      setIsSuccess(true);
-      setTimeout(() => navigate("/auth"), 3000);
+      setStatus({ type: 'success', msg: 'Mot de passe mis à jour !' });
+      setTimeout(() => navigate("/se-connecter"), 3000);
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue.");
+      setStatus({ type: 'error', msg: err.message });
     } finally {
       setLoading(false);
     }
   };
 
-  if (isSuccess) {
-    return (
-      <div className="relative min-h-screen w-full flex items-center justify-center bg-[#F9F7F2]">
-        <div className="absolute inset-0 z-0">
-          <GoldenBackground />
-        </div>
-        <div className="relative z-10 w-full max-w-md px-6 text-center">
-          <div className="bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/40">
-            <CheckCircle2 className="mx-auto mb-4 text-green-500" size={50} />
-            <h2
-              className="text-3xl mb-4"
-              style={{ fontFamily: styles.fontScript, color: styles.gold }}
-            >
-              Mot de passe modifié
-            </h2>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500">
-              Redirection vers la connexion...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-[#F9F7F2]">
-      <div className="absolute inset-0 z-0">
-        <GoldenBackground />
-      </div>
-      <div className="relative z-10 w-full max-w-md px-6">
-        <div className="bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/40">
+    /* On enveloppe tout dans une div relative avec un z-index élevé 
+       pour être sûr que le contenu passe devant les effets du GoldenBackground
+    */
+    <div className="relative min-h-screen">
+      <GoldenBackground />
+      
+      <div className="relative z-[999] flex items-center justify-center min-h-screen px-4">
+        <div className="bg-white/95 p-8 rounded-2xl shadow-2xl w-full max-w-md backdrop-blur-md">
           <div className="text-center mb-8">
-            <h2
-              className="text-4xl mb-2"
-              style={{ fontFamily: styles.fontScript, color: styles.gold }}
-            >
-              Nouveau mot de passe
-            </h2>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mt-4">
-              Choisissez votre nouveau code secret
-            </p>
+            <h1 className="text-3xl font-serif text-[#C5A065]">Nouveau départ</h1>
+            <p className="text-gray-500 mt-2">Choisissez votre nouveau mot de passe sécurisé</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="text-[10px] font-bold uppercase tracking-widest p-3 rounded bg-red-50 text-red-600 border border-red-200 text-center">
-                {error}
+          {status?.type === 'success' ? (
+            <div className="flex flex-col items-center animate-bounce py-10">
+              <CheckCircle2 size={60} color="#C5A065" />
+              <p className="mt-4 font-medium text-lg text-green-600 text-center">{status.msg}</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
+                <input
+                  type="password"
+                  placeholder="Nouveau mot de passe"
+                  className="w-full pl-10 pr-4 py-3 border-b-2 border-gray-200 focus:border-[#C5A065] outline-none transition-colors bg-transparent"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
-            )}
 
-            <div className="space-y-1 group">
-              <label className="text-[10px] font-black uppercase tracking-widest opacity-50 group-focus-within:text-[#C5A065]">
-                <Lock size={12} className="inline mr-1" /> Nouveau mot de passe
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full py-3 bg-transparent border-b border-black/10 focus:border-[#C5A065] outline-none text-sm"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
+                <input
+                  type="password"
+                  placeholder="Confirmez le mot de passe"
+                  className="w-full pl-10 pr-4 py-3 border-b-2 border-gray-200 focus:border-[#C5A065] outline-none transition-colors bg-transparent"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
 
-            <div className="space-y-1 group">
-              <label className="text-[10px] font-black uppercase tracking-widest opacity-50 group-focus-within:text-[#C5A065]">
-                Confirmer le mot de passe
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full py-3 bg-transparent border-b border-black/10 focus:border-[#C5A065] outline-none text-sm"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+              {status?.type === 'error' && (
+                <p className="text-red-500 text-sm text-center font-medium bg-red-50 p-2 rounded">
+                  {status.msg}
+                </p>
+              )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-lg flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all"
-              style={{ backgroundColor: styles.text }}
-            >
-              {loading ? "MODIFICATION..." : "RÉINITIALISER"}{" "}
-              <ArrowRight size={14} />
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#C5A065] text-white py-4 rounded-full font-bold shadow-lg hover:bg-[#b38f54] transform transition active:scale-95 flex items-center justify-center gap-2"
+              >
+                {loading ? "Chargement..." : "VALIDER"}
+                <ArrowRight size={20} />
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default ResetPasswordPage;
+export default ResetPassword;
