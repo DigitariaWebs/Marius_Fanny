@@ -7,13 +7,14 @@ import {
   deleteOrder,
   validateDelivery,
   getDeliveryZones,
-} from "../controllers/order.controller";
-import { validateBody, validateQuery } from "../middleware/validation";
+} from "../controllers/order.controller.js";
+import { validateBody, validateQuery } from "../middleware/validation.js";
 import {
   createOrderSchema,
   updateOrderSchema,
   validateDeliverySchema,
   orderQuerySchema,
+} from "../schemas/order.schema.js";
 } from "../schemas/order.schema";
 import { requireAuth, requireAdmin } from "../middleware/auth";
 

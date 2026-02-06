@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import { auth } from "../config/auth";
-import { hasRolePermission, UserRole, USER_ROLES } from "../utils/roles";
-import { User } from "../models/User";
+import { auth } from "../config/auth.js";
+import { hasRolePermission, UserRole, USER_ROLES } from "../utils/roles.js";
+import { User } from "../models/User.js";
 
 export interface AuthRequest extends Request {
   user?: {

@@ -3,10 +3,10 @@
  */
 
 // Auth schemas
-export * from "./auth.schema";
+export * from "./auth.schema.js";
 
 // User schemas
-export * from "./user.schema";
+export * from "./user.schema.js";
 
 // Common schemas
 export {
@@ -24,4 +24,4 @@ export {
   type DateRange,
   type IdParam,
   type BulkIds,
-} from "./common.schema";
+} from "./common.schema.js";

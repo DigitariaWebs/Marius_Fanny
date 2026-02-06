@@ -1,16 +1,16 @@
 import { Request, Response } from "express";
-import Order from "../models/Order";
-import type { ApiResponse, PaginatedResponse } from "../types";
+import Order from "../models/Order.js";
+import type { ApiResponse, PaginatedResponse } from "../types.js";
 import type {
   CreateOrderInput,
   UpdateOrderInput,
   OrderQueryParams,
-} from "../schemas/order.schema";
+} from "../schemas/order.schema.js";
 import {
   calculateDeliveryFee,
   validateMinimumOrder,
   getAllDeliveryZones,
-} from "../utils/deliveryZones";
+} from "../utils/deliveryZones.js";
 
 // Tax rate for Quebec (TPS + TVQ)
 const TAX_RATE = 0.14975;

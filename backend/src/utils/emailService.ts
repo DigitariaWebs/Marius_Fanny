@@ -1,4 +1,4 @@
-import { sendVerificationEmail, sendPasswordResetEmail } from './mail';
+import { sendVerificationEmail, sendPasswordResetEmail } from './mail.js';
 
 export interface EmailOptions {
   to: string;

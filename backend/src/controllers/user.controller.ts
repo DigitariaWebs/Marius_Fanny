@@ -1,8 +1,8 @@
 import { Response } from "express";
-import { AuthRequest } from "../middleware/auth";
-import { User } from "../models/User";
-import { AppError } from "../middleware/errorHandler";
-import { canManageUser } from "../utils/roles";
+import { AuthRequest } from "../middleware/auth.js";
+import { User } from "../models/User.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { canManageUser } from "../utils/roles.js";
 
 /**
  * Get current user profile

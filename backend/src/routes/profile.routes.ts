@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { requireAuth, optionalAuth } from "../middleware/auth";
-import { asyncHandler } from "../middleware/errorHandler";
-import { validateBody } from "../middleware/validation";
-import * as authController from "../controllers/auth.controller";
-import { createUserProfileSchema } from "../schemas/user.schema";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
+import { asyncHandler } from "../middleware/errorHandler.js";
+import { validateBody } from "../middleware/validation.js";
+import * as authController from "../controllers/auth.controller.js";
+import { createUserProfileSchema } from "../schemas/user.schema.js";
 
 const router = Router();
 
