@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
@@ -26,6 +26,7 @@ import StaffDashboard from "./pages/staffDahboard";
 import Checkout from "./pages/Checkout";
 
 import { Product } from "./types";
+import { initializeCartSession, loadCart, saveCart } from "./utils/cartPersistence";
 
 interface CartItem {
   id: number;
@@ -84,6 +85,47 @@ const ProductsPage: React.FC<PageProps> = ({
 const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
+  // Initialize cart session and load cart on mount
+  useEffect(() => {
+    console.log('🛒 [CART] Initializing cart session');
+    initializeCartSession();
+    const savedCart = loadCart();
+    if (savedCart.length > 0) {
+      console.log(`🛒 [CART] Loaded ${savedCart.length} items from storage`);
+      setCartItems(savedCart);
+    }
+  }, []);
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      console.log(`💾 [CART] Saving ${cartItems.length} items to storage`);
+      saveCart(cartItems);
+    }
+  }, [cartItems]);
+
+  // Keep cart in sync with storage updates (checkout clears storage)
+  useEffect(() => {
+    const syncCartFromStorage = () => {
+      const savedCart = loadCart();
+      setCartItems(savedCart);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "marius_fanny_cart") {
+        syncCartFromStorage();
+      }
+    };
+
+    window.addEventListener("cart:updated", syncCartFromStorage);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("cart:updated", syncCartFromStorage);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
 
   const addToCart = (product: Product) => {
     setCartItems((prev) => {

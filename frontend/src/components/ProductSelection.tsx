@@ -235,7 +235,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                   {product.tag && <span className="absolute top-3 left-3 bg-[#C5A065] text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest">{product.tag}</span>}
                 </div>
-                <div className="p-6 text-center flex-grow">
+                <div className="p-6 text-center grow">
                   <h3 className="text-xl font-serif mb-2 text-[#2D2A26] group-hover:text-[#C5A065] transition-colors">{product.name}</h3>
                   <p className="text-sm text-stone-500 line-clamp-2 mb-4 font-light">{product.description}</p>
                   <div className="mt-auto pt-4 border-t border-stone-100">
@@ -251,7 +251,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
       {/* --- MODAL PRODUIT --- */}
       {selectedProduct && (
         // z-[9999] assure que le modal est au dessus de tout header/footer
-        <div className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center md:p-4">
+        <div className="fixed inset-0 z-9999 flex items-end md:items-center justify-center md:p-4">
           
           {/* Fond flouté */}
           <div className="absolute inset-0 bg-[#2D2A26]/90 backdrop-blur-md transition-opacity" onClick={() => setSelectedProduct(null)} />
@@ -273,7 +273,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
             {/* Colonne Image (Hauteur réduite sur mobile) */}
             <div className="w-full md:w-1/2 h-56 md:h-auto shrink-0 relative">
                <img src={selectedProduct.image} alt={selectedProduct.name} className="w-full h-full object-cover" />
-               <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent md:hidden"></div>
+               <div className="absolute inset-0 bg-linear-to-t from-white via-transparent to-transparent md:hidden"></div>
             </div>
 
             {/* Colonne Contenu */}
@@ -342,7 +342,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                 <div className="flex gap-4 md:p-12 md:pt-0">
                   <div className="flex items-center border border-stone-200 rounded-lg h-14">
                     <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-4 h-full hover:bg-stone-50 text-xl text-stone-500">-</button>
-                    <span className="px-2 font-bold min-w-[30px] text-center">{quantity}</span>
+                    <span className="px-2 font-bold min-w-7.5 text-center">{quantity}</span>
                     <button onClick={() => setQuantity(quantity + 1)} className="px-4 h-full hover:bg-stone-50 text-xl text-stone-500">+</button>
                   </div>
                   <button 

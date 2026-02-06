@@ -76,7 +76,7 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) => {
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
               
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
+              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
 
               <div className="absolute inset-0 p-8 flex flex-col justify-end">
                 <h3 className="text-white text-2xl font-semibold tracking-wide uppercase transition-transform duration-500 group-hover:-translate-y-2">
@@ -86,7 +86,7 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) => {
                   className="h-1 w-0 group-hover:w-16 transition-all duration-500" 
                   style={{ backgroundColor: styles.gold }} 
                 />
-                <span className="text-white/0 group-hover:text-white/100 text-xs uppercase tracking-[0.2em] mt-4 transition-all duration-500">
+                <span className="text-white/0 group-hover:text-white text-xs uppercase tracking-[0.2em] mt-4 transition-all duration-500">
                   Voir la sélection →
                 </span>
               </div>

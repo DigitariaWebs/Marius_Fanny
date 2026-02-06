@@ -20,6 +20,7 @@ import {
   calculateDeliveryFee,
   DELIVERY_ZONES,
 } from "../utils/deliveryZones";
+import { authClient } from "../lib/AuthClient";
 
 interface CartItem {
   id: number;
@@ -91,7 +92,7 @@ const CartDrawer: React.FC<CartProps> = ({
     }
   };
 
-  const handleProceedToPayment = () => {
+  const handleProceedToPayment = async () => {
     // Validate postal code and minimum order before navigating to checkout
     if (!selectedPostalCode) {
       alert("Veuillez sélectionner un code postal pour la livraison.");
@@ -102,6 +103,36 @@ const CartDrawer: React.FC<CartProps> = ({
       alert(
         `Minimum de commande non atteint. Il manque ${minimumOrderValidation.shortfall.toFixed(2)}$ pour ${minimumOrderValidation.postalCode}.`,
       );
+      return;
+    }
+
+    // Check if user is authenticated
+    console.log('🔐 [CART] Checking authentication status...');
+    try {
+      const session = await authClient.getSession();
+      
+      if (!session.data) {
+        console.log('⚠️ [CART] User not authenticated, redirecting to login');
+        // Save checkout intent to localStorage
+        localStorage.setItem('checkout_intent', JSON.stringify({
+          items: items,
+          postalCode: selectedPostalCode,
+          deliveryFee: delivery,
+          subtotal: subtotal,
+          total: total,
+          timestamp: Date.now()
+        }));
+        
+        alert('Vous devez être connecté pour passer une commande. Votre panier sera conservé.');
+        onClose();
+        navigate('/se-connecter');
+        return;
+      }
+
+      console.log('✅ [CART] User authenticated, proceeding to checkout');
+    } catch (error) {
+      console.error('❌ [CART] Error checking authentication:', error);
+      alert('Erreur lors de la vérification de la connexion. Veuillez réessayer.');
       return;
     }
 
