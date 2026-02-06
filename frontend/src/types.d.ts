@@ -146,7 +146,6 @@ export interface OrderFormData {
   depositPaid: boolean;
 }
 
-// Version simplifiée pour le staff dashboard
 export interface SimplifiedOrder {
   id: string;
   orderNumber: string;
@@ -300,6 +299,20 @@ export interface DashboardOrder {
   createdAt: string;
   notes?: string;
 }
+interface UserWithRole {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  email: string;
+  emailVerified: boolean;
+  name: string;
+  image?: string | null;
+  role?: string;  
+  user_metadata?: {
+    [key: string]: any;
+  }; // ajout si tu utilises user_metadata
+}
+
 
 // Type guard pour vérifier si un objet est un Order
 export function isOrder(obj: any): obj is Order {
