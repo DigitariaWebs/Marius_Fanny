@@ -82,6 +82,22 @@ const AuthPage: React.FC = () => {
         if (signInError)
           throw new Error(signInError.message || "Connexion échouée");
 
+        // Check for checkout intent
+        const checkoutIntent = localStorage.getItem('checkout_intent');
+        if (checkoutIntent) {
+          try {
+            const intent = JSON.parse(checkoutIntent);
+            // Clear the intent
+            localStorage.removeItem('checkout_intent');
+            console.log('🛒 [AUTH] Restoring checkout intent and redirecting to checkout');
+            // Navigate to checkout with saved state
+            navigate('/checkout', { state: intent });
+            return;
+          } catch (e) {
+            console.error('Error parsing checkout intent:', e);
+          }
+        }
+
         const from = (location.state as any)?.from?.pathname || "/dashboard";
         navigate(from);
       } else if (view === "signup") {

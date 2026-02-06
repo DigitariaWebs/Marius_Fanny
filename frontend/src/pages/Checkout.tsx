@@ -61,7 +61,7 @@ const Checkout: React.FC = () => {
     setShowPaymentForm(true);
   };
 
-  const handlePaymentSuccess = (paymentResult: any) => {
+  const handlePaymentSuccess = async (paymentResult: any) => {
     const amount = paymentResult.amountMoney?.amount
       ? Number(paymentResult.amountMoney.amount) / 100
       : 0;
@@ -72,19 +72,82 @@ const Checkout: React.FC = () => {
       `✅ [CHECKOUT] Payment successful! ID: ${paymentId}, Status: ${status}, Amount: ${amount}$`
     );
 
-    // Show success message
-    const successMessage =
-      `🎉 Paiement réussi!\n\n` +
-      `📄 ID de transaction: ${paymentId}\n` +
-      `💰 Montant: ${amount}$ CAD\n` +
-      `📊 Statut: ${status}\n\n` +
-      `Votre commande a été confirmée. Vous recevrez un email de confirmation sous peu.`;
+    // Save order to backend
+    try {
+      console.log('💾 [CHECKOUT] Saving order to backend...');
+      
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      
+      // Prepare order data
+      const orderData = {
+        clientInfo: {
+          firstName: customerName.split(' ')[0] || customerName,
+          lastName: customerName.split(' ').slice(1).join(' ') || '',
+          email: customerEmail,
+          phone: '', // Would need to add phone field to checkout
+        },
+        deliveryType: state.postalCode ? 'delivery' : 'pickup',
+        deliveryAddress: state.postalCode ? {
+          street: '', // Would need to add address fields
+          city: '',
+          province: 'QC',
+          postalCode: state.postalCode,
+        } : undefined,
+        pickupLocation: 'Laval', // Default, could be from state
+        items: state.items.map(item => ({
+          productId: item.id,
+          productName: item.name,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          amount: item.price * item.quantity,
+        })),
+        depositPaid: true, // Full payment upfront
+        notes: `Square Payment ID: ${paymentId}`,
+      };
 
-    alert(successMessage);
+      const response = await fetch(`${API_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies for auth
+        body: JSON.stringify(orderData),
+      });
 
-    // Redirect to home page
-    console.log("🏠 [CHECKOUT] Redirecting to home page");
-    navigate("/");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save order');
+      }
+
+      const result = await response.json();
+      console.log('✅ [CHECKOUT] Order saved successfully:', result);
+
+      // Clear cart from localStorage
+      localStorage.removeItem('marius_fanny_cart');
+      
+      // Show success message
+      const successMessage =
+        `🎉 Paiement réussi!\n\n` +
+        `📄 Numéro de commande: ${result.data.orderNumber}\n` +
+        `💰 Montant: ${amount}$ CAD\n` +
+        `📊 Statut: ${status}\n\n` +
+        `Votre commande a été confirmée. Vous recevrez un email de confirmation sous peu.`;
+
+      alert(successMessage);
+
+      // Redirect to home page
+      console.log("🏠 [CHECKOUT] Redirecting to home page");
+      navigate("/");
+    } catch (error) {
+      console.error('❌ [CHECKOUT] Failed to save order:', error);
+      alert(
+        `⚠️ Le paiement a réussi, mais nous avons rencontré un problème lors de l'enregistrement de votre commande.\n\n` +
+        `ID de paiement: ${paymentId}\n\n` +
+        `Veuillez contacter le support avec cet ID de paiement.`
+      );
+      // Still redirect but user should contact support
+      navigate("/");
+    }
   };
 
   const handlePaymentError = (error: any) => {

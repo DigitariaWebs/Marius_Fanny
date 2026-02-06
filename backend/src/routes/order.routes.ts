@@ -15,6 +15,7 @@ import {
   validateDeliverySchema,
   orderQuerySchema,
 } from "../schemas/order.schema";
+import { requireAuth, requireAdmin } from "../middleware/auth";
 
 const router = Router();
 
@@ -34,34 +35,37 @@ router.post(
 
 /**
  * Order management routes
- * Note: Authentication middleware should be added in the main routes file
+ * Authentication required for creating and managing orders
  */
 
-// Create a new order
+// Create a new order (requires authentication)
 router.post(
   "/",
+  requireAuth,
   validateBody(createOrderSchema),
   createOrder,
 );
 
-// Get all orders with pagination and filters
+// Get all orders with pagination and filters (requires authentication)
 router.get(
   "/",
+  requireAuth,
   validateQuery(orderQuerySchema),
   getOrders,
 );
 
-// Get a single order by ID
-router.get("/:id", getOrderById);
+// Get a single order by ID (requires authentication)
+router.get("/:id", requireAuth, getOrderById);
 
-// Update an order (admin/superuser only)
+// Update an order (admin only)
 router.patch(
   "/:id",
+  requireAdmin,
   validateBody(updateOrderSchema),
   updateOrder,
 );
 
 // Delete an order (admin only)
-router.delete("/:id", deleteOrder);
+router.delete("/:id", requireAdmin, deleteOrder);
 
 export default router;

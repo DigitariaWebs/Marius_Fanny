@@ -64,7 +64,7 @@ const UserProfile: React.FC = () => {
               
               {/* En-tête Profil */}
               <div className="bg-[#2D2A26] p-8 text-center relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#C5A065] to-transparent"></div>
+                <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-[#C5A065] to-transparent"></div>
                 <div className="w-24 h-24 bg-white rounded-full mx-auto mb-4 flex items-center justify-center border-4 border-[#C5A065] relative z-10">
                   <User size={40} className="text-[#2D2A26]" />
                 </div>
@@ -141,7 +141,7 @@ const UserProfile: React.FC = () => {
                             <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                           </div>
                           
-                          <div className="flex-grow">
+                          <div className="grow">
                             <h4 className="font-serif text-[#2D2A26] text-lg">{item.name}</h4>
                             <p className="text-xs text-stone-400">Quantité: {item.quantity}</p>
                           </div>
