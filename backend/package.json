@@ -8,6 +8,7 @@
     "devv": "nodemon --exec tsx src/index.ts",
     "dev:node": "tsx watch src/index.ts",
     "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
     "start": "bun dist/index.js"
   },
   "devDependencies": {

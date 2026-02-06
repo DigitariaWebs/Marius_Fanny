@@ -136,7 +136,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
   const handleAddToCart = () => {
     if (selectedProduct) {
-      let productToAdd = { ...selectedProduct };
+      const productToAdd = { ...selectedProduct };
 
       if (selectedProduct.id === 101 || selectedProduct.id === 103) {
         if (cakeSize === '12') {

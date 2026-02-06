@@ -112,17 +112,11 @@ const AuthPage: React.FC = () => {
 
   // Correction ici : Utilisation de la fonction importée au lieu du fetch manuel
   const handleForgotPassword = async () => {
-    try {
-      // On utilise la fonction centralisée de AuthClient.ts
-      // Assurez-vous que forgotPassword dans AuthClient pointe vers la bonne URL (/api/auth-password/forgot_password)
-      await forgotPassword(email);
+    await forgotPassword(email);
 
-      setSuccessMessage(
-        "Un lien de réinitialisation a été envoyé à votre adresse email."
-      );
-    } catch (err: any) {
-      throw err; // L'erreur sera attrapée par le bloc try/catch du handleSubmit
-    }
+    setSuccessMessage(
+      "Un lien de réinitialisation a été envoyé à votre adresse email."
+    );
   };
 
   if (isVerificationSent) {

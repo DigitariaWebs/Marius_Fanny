@@ -6,7 +6,6 @@ import {
   Minus,
   ShoppingBag,
   CreditCard,
-  Loader2,
   MapPin,
   AlertCircle,
 } from "lucide-react";
@@ -19,7 +18,6 @@ import {
 } from "./ui/select";
 import {
   calculateDeliveryFee,
-  validateMinimumOrder,
   DELIVERY_ZONES,
 } from "../utils/deliveryZones";
 

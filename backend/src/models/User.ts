@@ -4,6 +4,7 @@ export interface IUser extends Document {
   email: string;
   name: string;
   role: "user" | "superuser" | "admin";
+  password?: string;
   emailVerified: boolean;
   emailVerificationCode?: string;
   emailVerificationExpires?: Date;

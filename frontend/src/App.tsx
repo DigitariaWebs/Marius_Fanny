@@ -25,6 +25,8 @@ import StaffManagement from "./pages/Stuff";
 import StaffDashboard from "./pages/staffDahboard";
 import Checkout from "./pages/Checkout";
 
+import { Product } from "./types";
+
 interface CartItem {
   id: number;
   name: string;
@@ -33,11 +35,57 @@ interface CartItem {
   quantity: number;
 }
 
+interface PageProps {
+  onCartClick: () => void;
+  cartCount: number;
+  onAddToCart: (product: any) => void;
+}
+
+const HomePage: React.FC<PageProps> = ({
+  onCartClick,
+  cartCount,
+  onAddToCart,
+}) => (
+  <>
+    <Navbar onCartClick={onCartClick} cartCount={cartCount} />
+    <main className="relative z-10">
+      <Hero />
+      <section id="shop">
+        <Shop onAddToCart={onAddToCart} />
+      </section>
+
+      <section id="best-sellers">
+        <BestSellers onAddToCart={onAddToCart} />
+      </section>
+      <Video />
+      <section id="timeline">
+        <Time />
+      </section>
+      <ParallaxSection />
+    </main>
+    <Footer />
+  </>
+);
+
+const ProductsPage: React.FC<PageProps> = ({
+  onCartClick,
+  cartCount,
+  onAddToCart,
+}) => (
+  <>
+    <Navbar onCartClick={onCartClick} cartCount={cartCount} />
+    <main className="pt-24 min-h-screen relative z-10">
+      <ProductSelection onAddToCart={onAddToCart} />
+    </main>
+    <Footer />
+  </>
+);
+
 const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  const addToCart = (product: any) => {
+  const addToCart = (product: Product) => {
     setCartItems((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -53,10 +101,7 @@ const App: React.FC = () => {
       console.log(
         `🛒 [CART] Added new item: ${product.name} (Price: ${product.price}$)`,
       );
-      return [
-        ...prev,
-        { ...product, quantity: 1, image: product.image || product.img },
-      ];
+      return [...prev, { ...product, quantity: 1, image: product.image || "" }];
     });
     setIsCartOpen(true);
   };
@@ -84,44 +129,6 @@ const App: React.FC = () => {
     setCartItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const HomePage: React.FC = () => (
-    <>
-      <Navbar
-        onCartClick={() => setIsCartOpen(true)}
-        cartCount={cartItems.length}
-      />
-      <main className="relative z-10">
-        <Hero />
-        <section id="shop">
-          <Shop onAddToCart={addToCart} />
-        </section>
-
-        <section id="best-sellers">
-          <BestSellers onAddToCart={addToCart} />
-        </section>
-        <Video />
-        <section id="timeline">
-          <Time />
-        </section>
-        <ParallaxSection />
-      </main>
-      <Footer />
-    </>
-  );
-
-  const ProductsPage: React.FC = () => (
-    <>
-      <Navbar
-        onCartClick={() => setIsCartOpen(true)}
-        cartCount={cartItems.length}
-      />
-      <main className="pt-24 min-h-screen relative z-10">
-        <ProductSelection onAddToCart={addToCart} />
-      </main>
-      <Footer />
-    </>
-  );
-
   return (
     <Router>
       <GoldenBackground />
@@ -137,8 +144,26 @@ const App: React.FC = () => {
       <div className="min-h-screen relative">
         <Routes>
           {/* Main Routes */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/products" element={<ProductsPage />} />
+          <Route
+            path="/"
+            element={
+              <HomePage
+                onCartClick={() => setIsCartOpen(true)}
+                cartCount={cartItems.length}
+                onAddToCart={addToCart}
+              />
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <ProductsPage
+                onCartClick={() => setIsCartOpen(true)}
+                cartCount={cartItems.length}
+                onAddToCart={addToCart}
+              />
+            }
+          />
           <Route path="/politique-retour" element={<Politique />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/dashboard" element={<AdminDashboard />} />

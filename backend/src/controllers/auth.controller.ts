@@ -81,3 +81,83 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+
+// Get current session info
+export const getSession = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Assuming req.user is set by requireAuth middleware
+    const user = req.user;
+    if (!user) return next(new AppError("Non authentifié", 401));
+
+    return res.status(200).json({ success: true, user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Check email verification status
+export const checkEmailVerification = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return next(new AppError("Non authentifié", 401));
+
+    return res.status(200).json({ success: true, emailVerified: user.emailVerified });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Sync Better Auth user with Mongoose User model
+export const syncUserProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return next(new AppError("Non authentifié", 401));
+
+    // Sync logic here if needed
+    return res.status(200).json({ success: true, message: "Profil synchronisé" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get user stats for dashboard
+export const getUserStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+    if (!user) return next(new AppError("Non authentifié", 401));
+
+    // Dummy stats
+    const stats = {
+      totalOrders: 0,
+      totalSpent: 0,
+      lastOrder: null,
+    };
+
+    return res.status(200).json({ success: true, stats });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Create user profile after authentication
+export const createUserProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, name } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return next(new AppError("Utilisateur existe déjà", 400));
+
+    const user = new User({
+      email,
+      name,
+      role: "user",
+      emailVerified: false,
+    });
+
+    await user.save();
+
+    return res.status(201).json({ success: true, user });
+  } catch (error) {
+    next(error);
+  }
+};
