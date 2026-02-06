@@ -4,21 +4,21 @@ import {
   requireRole,
   requireSuperuser,
   requireAdmin,
-} from "../middleware/auth";
-import { asyncHandler } from "../middleware/errorHandler";
+} from "../middleware/auth.js";
+import { asyncHandler } from "../middleware/errorHandler.js";
 import {
   validateBody,
   validateQuery,
   validateParams,
-} from "../middleware/validation";
-import * as userController from "../controllers/user.controller";
+} from "../middleware/validation.js";
+import * as userController from "../controllers/user.controller.js";
 import {
   updateCurrentUserSchema,
   updateUserSchema,
   searchUsersSchema,
   paginationSchema,
   userIdParamSchema,
-} from "../schemas/user.schema";
+} from "../schemas/user.schema.js";
 
 const router = Router();
 

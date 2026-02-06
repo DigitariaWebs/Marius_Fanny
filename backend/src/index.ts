@@ -3,11 +3,11 @@ import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import { toNodeHandler } from "better-auth/node";
-import { getAuth } from "./config/auth";
-import apiRoutes from "./routes";
-import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
-import { sanitizeBody } from "./middleware/validation";
-import { validateSquareConfig } from "./config/square";
+import { getAuth } from "./config/auth.js";
+import apiRoutes from "./routes/index.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { sanitizeBody } from "./middleware/validation.js";
+import { validateSquareConfig } from "./config/square.js";
 
 // DNS configuration for MongoDB Atlas SRV record resolution
 import dns from "node:dns";
@@ -101,6 +101,12 @@ app.get("/", (req, res) => {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  // Server startup message removed
-});
+// Export for programmatic use
+export default app;
+
+// Only start server when running locally (not imported as module)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+}

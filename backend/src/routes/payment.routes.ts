@@ -10,13 +10,13 @@ import {
   listPayments,
   refundPayment,
   getSquareConfig,
-} from "../controllers/payment.controller";
-import { validateBody, validateQuery } from "../middleware/validation";
+} from "../controllers/payment.controller.js";
+import { validateBody, validateQuery } from "../middleware/validation.js";
 import {
   createPaymentSchema,
   refundPaymentSchema,
   listPaymentsSchema,
-} from "../schemas/payment.schema";
+} from "../schemas/payment.schema.js";
 
 const router = Router();
 

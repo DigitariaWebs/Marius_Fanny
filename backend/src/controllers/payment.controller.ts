@@ -6,7 +6,7 @@
 import { Request, Response } from "express";
 import { randomUUID } from "crypto";
 import { SquareError } from "square";
-import squareClient, { squareConfig } from "../config/square";
+import squareClient, { squareConfig } from "../config/square.js";
 
 /**
  * Create a Square payment

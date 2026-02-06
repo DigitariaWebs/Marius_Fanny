@@ -1,11 +1,11 @@
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import bcrypt from "bcryptjs";
-import { connectMongoDB } from "./db";
+import { connectMongoDB } from "./db.js";
 import {
   sendVerificationCodeEmail,
   generateMockVerificationCode,
-} from "../utils/emailService";
+} from "../utils/emailService.js";
 
 // Initialize MongoDB connection for better-auth with error handling
 let authInstance: ReturnType<typeof betterAuth> | null = null;
