@@ -3,13 +3,16 @@ import { emailOTPClient } from "better-auth/client/plugins";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+// Ensure API_URL has protocol
+export const normalizedApiUrl = API_URL.startsWith('http') ? API_URL : `https://${API_URL}`;
+
 export const authClient = createAuthClient({
-  baseURL: API_URL,
+  baseURL: normalizedApiUrl,
   plugins: [emailOTPClient()],
 });
 
 export const forgotPassword = async (email: string) => {
-  const response = await fetch(`${API_URL}/api/auth-password/forgot_password`, {
+  const response = await fetch(`${normalizedApiUrl}/api/auth-password/forgot_password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

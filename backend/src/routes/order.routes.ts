@@ -14,8 +14,8 @@ import {
   updateOrderSchema,
   validateDeliverySchema,
   orderQuerySchema,
-} from "../schemas/order.schema";
-import { requireAuth, requireAdmin } from "../middleware/auth";
+} from "../schemas/order.schema.js";
+import { requireAuth, requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -39,20 +39,10 @@ router.post(
  */
 
 // Create a new order (requires authentication)
-router.post(
-  "/",
-  requireAuth,
-  validateBody(createOrderSchema),
-  createOrder,
-);
+router.post("/", requireAuth, validateBody(createOrderSchema), createOrder);
 
 // Get all orders with pagination and filters (requires authentication)
-router.get(
-  "/",
-  requireAuth,
-  validateQuery(orderQuerySchema),
-  getOrders,
-);
+router.get("/", requireAuth, validateQuery(orderQuerySchema), getOrders);
 
 // Get a single order by ID (requires authentication)
 router.get("/:id", requireAuth, getOrderById);

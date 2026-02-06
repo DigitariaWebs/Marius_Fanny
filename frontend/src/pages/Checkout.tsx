@@ -4,7 +4,7 @@ import { ArrowLeft, CreditCard, MapPin, ShoppingBag } from "lucide-react";
 import SquarePaymentForm from "../components/SquarePaymentForm";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { authClient } from "../lib/AuthClient";
+import { authClient, normalizedApiUrl } from "../lib/AuthClient";
 import { clearCart } from "../utils/cartPersistence";
 
 interface CartItem {
@@ -47,9 +47,7 @@ const Checkout: React.FC = () => {
     const loadUserData = async () => {
       try {
         console.log("👤 [CHECKOUT] Loading user data for contact information...");
-        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-        
-        const response = await fetch(`${API_URL}/api/users/me`, {
+        const response = await fetch(`${normalizedApiUrl}/api/users/me`, {
           credentials: 'include',
         });
 
@@ -124,8 +122,6 @@ const Checkout: React.FC = () => {
     try {
       console.log("💾 [CHECKOUT] Saving order to backend...");
 
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
       // Prepare order data
       const nameParts = customerName.trim().split(" ");
       const firstName = nameParts[0] || customerName;
@@ -160,7 +156,7 @@ const Checkout: React.FC = () => {
         notes: `Square Payment ID: ${paymentId}`,
       };
 
-      const response = await fetch(`${API_URL}/api/orders`, {
+      const response = await fetch(`${normalizedApiUrl}/api/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

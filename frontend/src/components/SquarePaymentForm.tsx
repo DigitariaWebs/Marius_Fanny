@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { PaymentForm, CreditCard } from "react-square-web-payments-sdk";
+import { normalizedApiUrl } from "../lib/AuthClient";
 
 interface SquarePaymentFormProps {
   amount: number;
@@ -39,8 +40,7 @@ export default function SquarePaymentForm({
     const fetchSquareConfig = async () => {
       try {
         console.log("🔧 [FRONTEND] Fetching Square payment configuration...");
-        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-        const response = await fetch(`${API_URL}/api/payments/config`);
+        const response = await fetch(`${normalizedApiUrl}/api/payments/config`);
         const data = await response.json();
 
         if (data.success) {
@@ -51,28 +51,33 @@ export default function SquarePaymentForm({
               {
                 hasApplicationId: !!data.data.applicationId,
                 hasLocationId: !!data.data.locationId,
-              }
+              },
             );
             onPaymentError(
               new Error(
-                "Payment configuration is incomplete. Please contact support."
-              )
+                "Payment configuration is incomplete. Please contact support.",
+              ),
             );
             return;
           }
 
-          console.log("✅ [FRONTEND] Square configuration loaded successfully", {
-            applicationId: `${data.data.applicationId.substring(0, 10)}...`,
-            locationId: `${data.data.locationId.substring(0, 10)}...`,
-            environment: data.data.environment,
-          });
+          console.log(
+            "✅ [FRONTEND] Square configuration loaded successfully",
+            {
+              applicationId: `${data.data.applicationId.substring(0, 10)}...`,
+              locationId: `${data.data.locationId.substring(0, 10)}...`,
+              environment: data.data.environment,
+            },
+          );
           setSquareConfig(data.data);
         } else {
           console.error(
             "❌ [FRONTEND] Failed to fetch Square config:",
             data.error,
           );
-          onPaymentError(new Error(data.error || "Failed to load payment configuration"));
+          onPaymentError(
+            new Error(data.error || "Failed to load payment configuration"),
+          );
         }
       } catch (error) {
         console.error("💥 [FRONTEND] Error fetching Square config:", error);
@@ -109,7 +114,6 @@ export default function SquarePaymentForm({
       console.log(
         "💳 [FRONTEND] Card tokenized successfully, processing payment...",
       );
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
       const paymentData = {
         sourceId: token.token,
@@ -122,11 +126,11 @@ export default function SquarePaymentForm({
         `💰 [FRONTEND] Sending payment request: ${amount} CAD for ${customerEmail || "Guest"}`,
       );
       console.log(
-        `🔧 [FRONTEND] Payment endpoint: ${API_URL}/api/payments/create`,
+        `🔧 [FRONTEND] Payment endpoint: ${normalizedApiUrl}/api/payments/create`,
       );
 
       // Send payment token to backend
-      const response = await fetch(`${API_URL}/api/payments/create`, {
+      const response = await fetch(`${normalizedApiUrl}/api/payments/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
