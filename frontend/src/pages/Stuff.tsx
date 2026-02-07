@@ -261,8 +261,8 @@ export default function StaffDashboard() {
               ) : (
                 <>
                   <StatCard title="En attente" value={stats.pending} icon={<Clock className="w-6 h-6 text-orange-600" />} color="bg-orange-50" />
-                  <StatCard title="Confirmées" value={stats.confirmed} icon={<CheckCircle className="w-6 h-6 text-blue-600" />} color="bg-blue-50" />
-                  <StatCard title="Prêtes" value={stats.ready} icon={<Package className="w-6 h-6 text-green-600" />} color="bg-green-50" />
+                  <StatCard title="Confirmées" value={(stats as any).confirmed ?? 0} icon={<CheckCircle className="w-6 h-6 text-blue-600" />} color="bg-blue-50" />
+                  <StatCard title="Prêtes"     value={(stats as any).ready ?? 0} icon={<Package className="w-6 h-6 text-green-600" />} color="bg-green-50" />
                   <StatCard title="Temps moy." value={stats.avgTime} icon={<TrendingUp className="w-6 h-6 text-purple-600" />} color="bg-purple-50" />
                 </>
               )}
