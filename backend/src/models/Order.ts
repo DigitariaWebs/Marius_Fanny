@@ -23,6 +23,16 @@ export interface IClientInfo {
   phone: string;
 }
 
+export interface IOrderChange {
+  changedAt: Date;
+  changedBy?: string; // User ID who made the change
+  field: string; // Field that was changed
+  oldValue: any;
+  newValue: any;
+  changeType: "created" | "updated" | "status_changed" | "payment_updated" | "items_modified";
+  notes?: string;
+}
+
 export interface IOrder extends Document {
   orderNumber: string;
   userId?: string; // Reference to better-auth user
@@ -42,7 +52,7 @@ export interface IOrder extends Document {
   depositPaidAt?: Date;
   balancePaid: boolean;
   balancePaidAt?: Date;
-  paymentType: "full" | "deposit" | "invoice"; // Payment option chosen by customer
+  paymentType: "full" | "deposit"; // Payment option chosen by customer
   paymentStatus: "unpaid" | "deposit_paid" | "paid";
   squarePaymentId?: string; // Square payment ID for tracking
   squareInvoiceId?: string; // Square invoice ID for invoice payments
@@ -55,6 +65,7 @@ export interface IOrder extends Document {
     | "cancelled"
     | "delivered";
   notes?: string;
+  changeHistory: IOrderChange[]; // Track all changes to the order
   createdAt: Date;
   updatedAt: Date;
 }
@@ -238,7 +249,7 @@ const OrderSchema = new Schema<IOrder>(
     },
     paymentType: {
       type: String,
-      enum: ["full", "deposit", "invoice"],
+      enum: ["full", "deposit"],
       required: true,
       default: "full",
       index: true,
@@ -275,6 +286,24 @@ const OrderSchema = new Schema<IOrder>(
       type: String,
       trim: true,
     },
+    changeHistory: {
+      type: [
+        {
+          changedAt: { type: Date, required: true },
+          changedBy: { type: String },
+          field: { type: String, required: true },
+          oldValue: { type: Schema.Types.Mixed },
+          newValue: { type: Schema.Types.Mixed },
+          changeType: {
+            type: String,
+            enum: ["created", "updated", "status_changed", "payment_updated", "items_modified"],
+            required: true,
+          },
+          notes: { type: String },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -305,6 +334,18 @@ OrderSchema.pre("validate", async function () {
     }
 
     this.orderNumber = `MF-${dateStr}-${sequence.toString().padStart(4, "0")}`;
+  }
+  
+  // Add creation entry to change history for new orders
+  if (this.isNew) {
+    this.changeHistory = [{
+      changedAt: new Date(),
+      field: "order",
+      oldValue: null,
+      newValue: "created",
+      changeType: "created",
+      notes: "Order created"
+    }];
   }
 });
 

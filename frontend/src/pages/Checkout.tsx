@@ -31,7 +31,7 @@ const Checkout: React.FC = () => {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [paymentOption, setPaymentOption] = useState<"full" | "deposit" | "invoice">("full");
+  const [paymentOption, setPaymentOption] = useState<"full" | "deposit">("full");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [isLoadingUserData, setIsLoadingUserData] = useState(true);
 
@@ -98,12 +98,6 @@ const Checkout: React.FC = () => {
 
     if (customerPhone.replace(/\D/g, "").length < 7) {
       alert("Le numéro de téléphone doit contenir au moins 7 chiffres.");
-      return;
-    }
-
-    // For invoice option, create order directly without payment
-    if (paymentOption === "invoice") {
-      handleInvoiceOrder();
       return;
     }
 
@@ -207,137 +201,6 @@ const Checkout: React.FC = () => {
       );
       // Still redirect but user should contact support
       navigate("/");
-    }
-  };
-
-  const handleInvoiceOrder = async () => {
-    console.log("🧾 [CHECKOUT] Creating order with invoice payment option...");
-
-    try {
-      // Prepare order data
-      const nameParts = customerName.trim().split(" ");
-      const firstName = nameParts[0] || customerName;
-      const lastName =
-        nameParts.length > 1 ? nameParts.slice(1).join(" ") : "N/A";
-
-      const orderData = {
-        clientInfo: {
-          firstName: firstName,
-          lastName: lastName,
-          email: customerEmail,
-          phone: customerPhone,
-        },
-        deliveryType: state.postalCode ? "delivery" : "pickup",
-        deliveryAddress: state.postalCode
-          ? {
-              street: "À déterminer",
-              city: "À déterminer",
-              province: "QC",
-              postalCode: state.postalCode,
-            }
-          : undefined,
-        pickupLocation: "Laval",
-        items: state.items.map((item) => ({
-          productId: item.id,
-          productName: item.name,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          amount: item.price * item.quantity,
-        })),
-        paymentType: "invoice",
-        depositPaid: false,
-        notes: "Paiement par facture Square",
-      };
-
-      // Create order first
-      const orderResponse = await fetch(`${normalizedApiUrl}/api/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(orderData),
-      });
-
-      if (!orderResponse.ok) {
-        const errorData = await orderResponse.json();
-        throw new Error(errorData.error || "Failed to create order");
-      }
-
-      const orderResult = await orderResponse.json();
-      console.log("✅ [CHECKOUT] Order created:", orderResult.data);
-
-      // Create Square invoice
-      const invoiceData = {
-        orderId: orderResult.data.orderNumber,
-        customerEmail: customerEmail,
-        customerName: customerName,
-        items: state.items.map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        })),
-        deliveryFee: state.deliveryFee,
-        taxAmount: orderResult.data.taxAmount,
-        total: state.total,
-        notes: `Commande ${orderResult.data.orderNumber}`,
-      };
-
-      const invoiceResponse = await fetch(
-        `${normalizedApiUrl}/api/payments/invoice`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify(invoiceData),
-        }
-      );
-
-      if (!invoiceResponse.ok) {
-        const errorData = await invoiceResponse.json();
-        throw new Error(errorData.error || "Failed to create invoice");
-      }
-
-      const invoiceResult = await invoiceResponse.json();
-      console.log("✅ [CHECKOUT] Invoice created:", invoiceResult.data);
-
-      // Update order with invoice ID
-      await fetch(
-        `${normalizedApiUrl}/api/orders/${orderResult.data._id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            squareInvoiceId: invoiceResult.data.invoiceId,
-          }),
-        }
-      );
-
-      // Clear cart
-      clearCart();
-
-      // Show success message
-      const successMessage =
-        `🎉 Commande créée avec succès!\n\n` +
-        `📄 Numéro de commande: ${orderResult.data.orderNumber}\n` +
-        `🧾 Une facture vous a été envoyée par email à ${customerEmail}\n` +
-        `💰 Montant total: ${state.total.toFixed(2)}$ CAD\n\n` +
-        `Vous pouvez payer la facture en cliquant sur le lien dans l'email.`;
-
-      alert(successMessage);
-      navigate("/");
-    } catch (error: any) {
-      console.error("❌ [CHECKOUT] Failed to create invoice order:", error);
-      alert(
-        `⚠️ Une erreur est survenue lors de la création de votre commande.\n\n` +
-          `Erreur: ${error.message}\n\n` +
-          `Veuillez réessayer ou contacter le support.`
-      );
     }
   };
 
@@ -477,7 +340,7 @@ const Checkout: React.FC = () => {
                             name="paymentOption"
                             value="full"
                             checked={paymentOption === "full"}
-                            onChange={(e) => setPaymentOption(e.target.value as "full" | "deposit" | "invoice")}
+                            onChange={(e) => setPaymentOption(e.target.value as "full" | "deposit")}
                             className="mt-1"
                           />
                           <div className="flex-1">
@@ -496,7 +359,7 @@ const Checkout: React.FC = () => {
                             name="paymentOption"
                             value="deposit"
                             checked={paymentOption === "deposit"}
-                            onChange={(e) => setPaymentOption(e.target.value as "full" | "deposit" | "invoice")}
+                            onChange={(e) => setPaymentOption(e.target.value as "full" | "deposit")}
                             className="mt-1"
                           />
                           <div className="flex-1">
@@ -510,24 +373,7 @@ const Checkout: React.FC = () => {
                           </div>
                         </label>
 
-                        <label className="flex items-start gap-3 p-4 border-2 border-stone-200 rounded-lg cursor-pointer hover:border-[#C5A065] transition-colors">
-                          <input
-                            type="radio"
-                            name="paymentOption"
-                            value="invoice"
-                            checked={paymentOption === "invoice"}
-                            onChange={(e) => setPaymentOption(e.target.value as "full" | "deposit" | "invoice")}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-[#2D2A26]">
-                              🧾 Payer plus tard (Facture)
-                            </div>
-                            <div className="text-sm text-stone-500">
-                              Recevez une facture Square par email pour payer plus tard
-                            </div>
-                          </div>
-                        </label>
+
                       </div>
                     </div>
 
@@ -536,7 +382,7 @@ const Checkout: React.FC = () => {
                       className="w-full bg-[#2D2A26] text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-[#C5A065] transition-all shadow-lg"
                     >
                       <CreditCard size={18} />
-                      {paymentOption === "invoice" ? "Créer la commande" : "Continuer au paiement"}
+                      Continuer au paiement
                     </button>
                   </form>
                 </div>
@@ -630,11 +476,6 @@ const Checkout: React.FC = () => {
                     <div className="flex justify-between text-lg font-medium text-[#C5A065] pt-2 border-t border-stone-200">
                       <span>Acompte (50%)</span>
                       <span>{(state.total * 0.5).toFixed(2)} $</span>
-                    </div>
-                  )}
-                  {paymentOption === "invoice" && (
-                    <div className="text-sm text-stone-500 pt-2 border-t border-stone-200">
-                      Une facture vous sera envoyée pour le montant total
                     </div>
                   )}
                 </div>

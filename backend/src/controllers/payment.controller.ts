@@ -453,7 +453,7 @@ export const createInvoice = async (req: Request, res: Response) => {
       quantity: item.quantity.toString(),
       itemType: "ITEM",
       basePriceMoney: {
-        amount: BigInt(Math.round(item.unitPrice * 100)),
+        amount: Math.round(item.unitPrice * 100),
         currency: "CAD",
       },
     }));
@@ -465,7 +465,7 @@ export const createInvoice = async (req: Request, res: Response) => {
         quantity: "1",
         itemType: "ITEM",
         basePriceMoney: {
-          amount: BigInt(Math.round(deliveryFee * 100)),
+          amount: Math.round(deliveryFee * 100),
           currency: "CAD",
         },
       });
@@ -517,7 +517,9 @@ export const createInvoice = async (req: Request, res: Response) => {
     };
 
     const response = await squareClient.invoices.create(invoiceRequest);
-    const invoice = response.invoice;
+    console.log(`📦 [INVOICE] Response structure:`, Object.keys(response));
+    console.log(`📦 [INVOICE] Full response:`, JSON.stringify(response, null, 2));
+    const invoice = (response as any).invoice;
     const processingTime = Date.now() - startTime;
 
     console.log(
@@ -552,7 +554,15 @@ export const createInvoice = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     const processingTime = Date.now() - startTime;
-    console.error(`❌ [INVOICE] Invoice creation failed after ${processingTime}ms:`, error);
+    console.error(`❌ [INVOICE] Invoice creation failed after ${processingTime}ms`);
+    console.error(`📋 [INVOICE] Error details:`, {
+      message: error.message,
+      statusCode: error.statusCode,
+      errorCode: error.errorCode,
+      body: error.body,
+      response: error.response,
+      fullError: error
+    });
 
     if (error instanceof SquareError) {
       console.error(`🚨 [INVOICE] SquareError:`, error.body);
@@ -582,7 +592,7 @@ export const getInvoice = async (req: Request, res: Response) => {
     const response = await squareClient.invoices.get({
       invoiceId,
     });
-    const invoice = response.invoice;
+    const invoice = (response as any).invoice;
 
     console.log(
       `✅ [INVOICE] Invoice retrieved: ${invoiceId}, Status: ${invoice?.status}`,

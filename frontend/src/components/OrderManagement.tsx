@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import OrderForm from "./OrderForm";
+import OrderChangeHistory from "./OrderChangeHistory";
 import type { Order } from "../types";
 
 export function OrderManagement() {
@@ -579,13 +580,14 @@ export function OrderManagement() {
 
             {/* Tabs */}
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="w-full grid grid-cols-4">
+              <TabsList className="w-full grid grid-cols-5">
                 <TabsTrigger value="details">Détails</TabsTrigger>
                 <TabsTrigger value="items">
                   Articles ({selectedOrder.items.length})
                 </TabsTrigger>
                 <TabsTrigger value="payments">Paiements</TabsTrigger>
                 <TabsTrigger value="delivery">Livraison</TabsTrigger>
+                <TabsTrigger value="history">Historique</TabsTrigger>
               </TabsList>
 
               <TabsContent value="details" className="space-y-4">
@@ -964,6 +966,13 @@ export function OrderManagement() {
                       )}
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="history" className="space-y-4">
+                <OrderChangeHistory 
+                  orderId={selectedOrder.id} 
+                  orderNumber={selectedOrder.orderNumber}
+                />
               </TabsContent>
             </Tabs>
           </div>

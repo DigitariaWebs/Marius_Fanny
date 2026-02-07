@@ -7,6 +7,7 @@ import {
   deleteOrder,
   validateDelivery,
   getDeliveryZones,
+  getOrderHistory,
 } from "../controllers/order.controller.js";
 import { validateBody, validateQuery } from "../middleware/validation.js";
 import {
@@ -46,6 +47,9 @@ router.get("/", requireAuth, validateQuery(orderQuerySchema), getOrders);
 
 // Get a single order by ID (requires authentication)
 router.get("/:id", requireAuth, getOrderById);
+
+// Get order change history (requires authentication)
+router.get("/:id/history", requireAuth, getOrderHistory);
 
 // Update an order (admin only)
 router.patch(

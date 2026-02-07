@@ -60,8 +60,8 @@ export const createOrderSchema = z
       ),
     notes: z.string().optional(),
     paymentType: z
-      .enum(["full", "deposit", "invoice"], {
-        message: "Le type de paiement doit être full, deposit ou invoice",
+      .enum(["full", "deposit"], {
+        message: "Le type de paiement doit être full ou deposit",
       })
       .default("full"),
     depositPaid: z.boolean().optional().default(false),
@@ -83,6 +83,12 @@ export const createOrderSchema = z
 
 // Update order schema - for PATCH /api/orders/:id
 export const updateOrderSchema = z.object({
+  clientInfo: clientInfoSchema.optional(),
+  pickupDate: z.string().datetime().optional(),
+  pickupLocation: z.enum(["Montreal", "Laval"]).optional(),
+  deliveryType: z.enum(["pickup", "delivery"]).optional(),
+  deliveryAddress: addressSchema.optional(),
+  items: z.array(orderItemSchema).optional(),
   status: z
     .enum([
       "pending",

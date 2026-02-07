@@ -79,10 +79,6 @@ export const createOrder = async (
       // Deposit payment made
       depositPaid = true;
       balancePaid = false;
-    } else if (orderData.paymentType === "invoice") {
-      // Invoice - no payment yet
-      depositPaid = false;
-      balancePaid = false;
     }
 
     // Create order
@@ -276,6 +272,10 @@ export const getOrderById = async (
  * Update an order
  * PATCH /api/orders/:id
  */
+/**
+ * Update an order
+ * PATCH /api/orders/:id
+ */
 export const updateOrder = async (
   req: Request<{ id: string }, {}, UpdateOrderInput>,
   res: Response<ApiResponse>,
@@ -299,27 +299,221 @@ export const updateOrder = async (
     }
 
     const updateData = req.body;
+    const changes: any[] = [];
+    const userId = req.user?.id;
 
-    // Update fields
-    if (updateData.status !== undefined) order.status = updateData.status;
-    if (updateData.notes !== undefined) order.notes = updateData.notes;
+    // Track and update client info
+    if (updateData.clientInfo) {
+      const oldClientInfo = { ...order.clientInfo };
+      order.clientInfo = updateData.clientInfo;
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "clientInfo",
+        oldValue: oldClientInfo,
+        newValue: updateData.clientInfo,
+        changeType: "updated",
+        notes: "Client information updated"
+      });
+    }
 
-    // Handle payment updates
-    if (updateData.depositPaid !== undefined) {
+    // Track and update pickup date
+    if (updateData.pickupDate) {
+      const oldPickupDate = order.pickupDate;
+      order.pickupDate = new Date(updateData.pickupDate);
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "pickupDate",
+        oldValue: oldPickupDate,
+        newValue: order.pickupDate,
+        changeType: "updated",
+        notes: "Pickup date changed"
+      });
+    }
+
+    // Track and update pickup location
+    if (updateData.pickupLocation) {
+      const oldLocation = order.pickupLocation;
+      order.pickupLocation = updateData.pickupLocation;
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "pickupLocation",
+        oldValue: oldLocation,
+        newValue: updateData.pickupLocation,
+        changeType: "updated",
+        notes: "Pickup location changed"
+      });
+    }
+
+    // Track and update delivery type
+    if (updateData.deliveryType) {
+      const oldDeliveryType = order.deliveryType;
+      order.deliveryType = updateData.deliveryType;
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "deliveryType",
+        oldValue: oldDeliveryType,
+        newValue: updateData.deliveryType,
+        changeType: "updated",
+        notes: "Delivery type changed"
+      });
+    }
+
+    // Track and update delivery address
+    if (updateData.deliveryAddress) {
+      const oldAddress = order.deliveryAddress;
+      order.deliveryAddress = updateData.deliveryAddress;
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "deliveryAddress",
+        oldValue: oldAddress,
+        newValue: updateData.deliveryAddress,
+        changeType: "updated",
+        notes: "Delivery address updated"
+      });
+    }
+
+    // Track and update items - recalculate totals if items changed
+    if (updateData.items) {
+      const oldItems = [...order.items];
+      order.items = updateData.items;
+      
+      // Recalculate totals
+      const subtotal = updateData.items.reduce((sum, item) => sum + item.amount, 0);
+      const taxAmount = subtotal * TAX_RATE;
+      let deliveryFee = order.deliveryFee;
+
+      // Recalculate delivery fee if needed
+      if (order.deliveryType === "delivery" && order.deliveryAddress) {
+        const deliveryInfo = calculateDeliveryFee(order.deliveryAddress.postalCode);
+        deliveryFee = deliveryInfo.fee;
+      }
+
+      const total = subtotal + taxAmount + deliveryFee;
+      const depositAmount = total * 0.5;
+
+      order.subtotal = subtotal;
+      order.taxAmount = taxAmount;
+      order.deliveryFee = deliveryFee;
+      order.total = total;
+      order.depositAmount = depositAmount;
+
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "items",
+        oldValue: oldItems,
+        newValue: updateData.items,
+        changeType: "items_modified",
+        notes: `Order items modified. New total: ${total.toFixed(2)}$`
+      });
+    }
+
+    // Track and update status
+    if (updateData.status !== undefined && updateData.status !== order.status) {
+      const oldStatus = order.status;
+      order.status = updateData.status;
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "status",
+        oldValue: oldStatus,
+        newValue: updateData.status,
+        changeType: "status_changed",
+        notes: `Status changed from ${oldStatus} to ${updateData.status}`
+      });
+    }
+
+    // Track and update notes
+    if (updateData.notes !== undefined) {
+      const oldNotes = order.notes;
+      order.notes = updateData.notes;
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "notes",
+        oldValue: oldNotes,
+        newValue: updateData.notes,
+        changeType: "updated",
+        notes: "Order notes updated"
+      });
+    }
+
+    // Track payment updates
+    if (updateData.depositPaid !== undefined && updateData.depositPaid !== order.depositPaid) {
+      const oldDepositPaid = order.depositPaid;
       order.depositPaid = updateData.depositPaid;
       if (updateData.depositPaid && !order.depositPaidAt) {
         order.depositPaidAt = new Date();
       }
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "depositPaid",
+        oldValue: oldDepositPaid,
+        newValue: updateData.depositPaid,
+        changeType: "payment_updated",
+        notes: updateData.depositPaid ? "Deposit marked as paid" : "Deposit payment reverted"
+      });
     }
 
-    if (updateData.balancePaid !== undefined) {
+    if (updateData.balancePaid !== undefined && updateData.balancePaid !== order.balancePaid) {
+      const oldBalancePaid = order.balancePaid;
       order.balancePaid = updateData.balancePaid;
       if (updateData.balancePaid && !order.balancePaidAt) {
         order.balancePaidAt = new Date();
       }
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "balancePaid",
+        oldValue: oldBalancePaid,
+        newValue: updateData.balancePaid,
+        changeType: "payment_updated",
+        notes: updateData.balancePaid ? "Balance marked as paid" : "Balance payment reverted"
+      });
+    }
+
+    if (updateData.squarePaymentId && updateData.squarePaymentId !== order.squarePaymentId) {
+      const oldPaymentId = order.squarePaymentId;
+      order.squarePaymentId = updateData.squarePaymentId;
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "squarePaymentId",
+        oldValue: oldPaymentId,
+        newValue: updateData.squarePaymentId,
+        changeType: "payment_updated",
+        notes: "Square payment ID updated"
+      });
+    }
+
+    if (updateData.squareInvoiceId && updateData.squareInvoiceId !== order.squareInvoiceId) {
+      const oldInvoiceId = order.squareInvoiceId;
+      order.squareInvoiceId = updateData.squareInvoiceId;
+      changes.push({
+        changedAt: new Date(),
+        changedBy: userId,
+        field: "squareInvoiceId",
+        oldValue: oldInvoiceId,
+        newValue: updateData.squareInvoiceId,
+        changeType: "payment_updated",
+        notes: "Square invoice ID updated"
+      });
+    }
+
+    // Add all changes to order history
+    if (changes.length > 0) {
+      order.changeHistory.push(...changes);
     }
 
     await order.save();
+
+    console.log(`✅ Order ${order.orderNumber} updated with ${changes.length} changes`);
 
     res.json({
       success: true,
@@ -331,6 +525,54 @@ export const updateOrder = async (
     res.status(500).json({
       success: false,
       error: "Erreur lors de la mise à jour de la commande",
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Get order change history
+ * GET /api/orders/:id/history
+ */
+export const getOrderHistory = async (
+  req: Request<{ id: string }>,
+  res: Response<ApiResponse>,
+) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: "Commande non trouvée",
+      });
+    }
+
+    // Check if user has permission to view this order's history
+    if (
+      req.user &&
+      req.user.role !== "admin" &&
+      req.user.role !== "superuser" &&
+      order.userId !== req.user.id
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: "Accès non autorisé à l'historique de cette commande",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        orderNumber: order.orderNumber,
+        changeHistory: order.changeHistory || [],
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching order history:", error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur lors de la récupération de l'historique",
       message: error.message,
     });
   }
