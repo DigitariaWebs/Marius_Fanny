@@ -21,6 +21,14 @@ async function initializeAuth() {
       database: mongodbAdapter(db, {
         client, 
       }),
+      advanced: {
+        useSecureCookies: true,
+        defaultCookieAttributes: {
+          sameSite: "none",
+          secure: true,
+          partitioned: true,
+        },
+      },
       user: {
         additionalFields: {
           role: {
@@ -58,7 +66,10 @@ async function initializeAuth() {
           },
         }),
       ],
-      trustedOrigins: [process.env.FRONTEND_URL || "http://localhost:5173"],
+      trustedOrigins: [
+        process.env.FRONTEND_URL || "http://localhost:5173",
+        // Add production frontend URLs if different
+      ],
       secret:
         process.env.BETTER_AUTH_SECRET ||
         "your-secret-key-change-in-production",
@@ -92,8 +103,18 @@ async function initializeAuth() {
     // Return a minimal auth instance that will fail gracefully
     return betterAuth({
       baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+      advanced: {
+        useSecureCookies: true,
+        defaultCookieAttributes: {
+          sameSite: "none",
+          secure: true,
+          partitioned: true,
+        },
+      },
       secret: process.env.BETTER_AUTH_SECRET || "your-secret-key-change-in-production",
-      trustedOrigins: [process.env.FRONTEND_URL || "http://localhost:5173"],
+      trustedOrigins: [
+        process.env.FRONTEND_URL || "http://localhost:5173",
+      ],
     });
   }
 }

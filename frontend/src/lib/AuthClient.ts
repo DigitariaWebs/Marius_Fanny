@@ -8,6 +8,9 @@ export const normalizedApiUrl = API_URL.startsWith('http') ? API_URL : `https://
 
 export const authClient = createAuthClient({
   baseURL: normalizedApiUrl,
+  fetchOptions: {
+    credentials: 'include', // Important: Send cookies with cross-origin requests
+  },
   plugins: [emailOTPClient()],
   user: {
     additionalFields: {

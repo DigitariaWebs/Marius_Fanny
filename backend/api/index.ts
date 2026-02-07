@@ -56,9 +56,11 @@ const initializeApp = async () => {
     );
 
     // Better Auth routes
+    // IMPORTANT: Use app.all() NOT app.use() to preserve the full URL path.
+    // app.use("/api/auth", ...) strips the prefix, breaking Better Auth's basePath routing.
     let authHandler: any = null;
 
-    app.use("/api/auth", async (req, res, next) => {
+    app.all("/api/auth/*", async (req, res) => {
       try {
         if (!authHandler) {
           const auth = await getAuth();

@@ -22,10 +22,11 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
 
   const { data: session } = authClient.useSession();
   const isLoggedIn = !!session?.user;
+  const user = session?.user as any;
   const role =
-    session?.user?.role ||
-    (session?.user as any)?.user_metadata?.role ||
-    (session?.user as any)?.app_metadata?.role ||
+    user?.role ||
+    user?.user_metadata?.role ||
+    user?.app_metadata?.role ||
     "client";
 
   const sidebarRef = useRef<HTMLDivElement>(null);
