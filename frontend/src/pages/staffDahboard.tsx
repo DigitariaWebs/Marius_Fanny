@@ -74,7 +74,7 @@ interface Staff {
   email: string;
   phone: string;
   location: string;
-  role: 'kitchen_staff' | 'customer_service';
+  role: 'kitchen_staff' | 'customer_service' | 'delivery_driver';
   status: string;
   createdAt: string;
   updatedAt: string;

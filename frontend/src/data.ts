@@ -63,6 +63,7 @@ export const LOCATIONS = [
 export const DEPARTMENTS = [
   { value: "customer_service", label: "Service Client" },
   { value: "kitchen_staff", label: "Personnel de Cuisine" },
+  { value: "delivery_driver", label: "Livreur" },
 ];
 
 // ✅ CORRECTION: Client IDs sont des numbers, Address IDs sont des numbers, mais Order IDs sont des strings

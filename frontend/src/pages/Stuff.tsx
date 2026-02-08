@@ -18,6 +18,7 @@ import {
   X,
   Settings,
   Activity,
+  Truck,
 } from "lucide-react";
 import { authClient } from "../lib/AuthClient";
 
@@ -29,7 +30,7 @@ interface Staff {
   email: string;
   phone: string;
   location: string;
-  role: "kitchen_staff" | "customer_service";
+  role: "kitchen_staff" | "customer_service" | "delivery_driver";
   status: "active" | "busy" | "offline";
   createdAt: string;
   updatedAt: string;
@@ -74,16 +75,58 @@ export default function StaffDashboard() {
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notifications] = useState<Notification[]>([
-    { id: "1", type: "new_ticket", message: "Nouveau ticket: Commande CMD-2045 nécessite attention", time: "Il y a 5 min", isRead: false },
-    { id: "2", type: "alert", message: "Stock faible: Farine T55", time: "Il y a 15 min", isRead: false },
-    { id: "3", type: "info", message: "Réunion d'équipe demain à 9h", time: "Il y a 1h", isRead: true },
+    {
+      id: "1",
+      type: "new_ticket",
+      message: "Nouveau ticket: Commande CMD-2045 nécessite attention",
+      time: "Il y a 5 min",
+      isRead: false,
+    },
+    {
+      id: "2",
+      type: "alert",
+      message: "Stock faible: Farine T55",
+      time: "Il y a 15 min",
+      isRead: false,
+    },
+    {
+      id: "3",
+      type: "info",
+      message: "Réunion d'équipe demain à 9h",
+      time: "Il y a 1h",
+      isRead: true,
+    },
   ]);
 
   const [recentActivities] = useState<RecentActivity[]>([
-    { id: "1", type: "order_assigned", description: "Commande CMD-2050 assignée", time: "Il y a 10 min", icon: <Package className="w-4 h-4" /> },
-    { id: "2", type: "dish_prepared", description: "Plats préparés pour CMD-2048", time: "Il y a 25 min", icon: <CheckCircle className="w-4 h-4" /> },
-    { id: "3", type: "ticket_closed", description: "Ticket #1234 résolu", time: "Il y a 45 min", icon: <MessageSquare className="w-4 h-4" /> },
-    { id: "4", type: "status_changed", description: "Statut changé: Disponible", time: "Il y a 2h", icon: <Activity className="w-4 h-4" /> },
+    {
+      id: "1",
+      type: "order_assigned",
+      description: "Commande CMD-2050 assignée",
+      time: "Il y a 10 min",
+      icon: <Package className="w-4 h-4" />,
+    },
+    {
+      id: "2",
+      type: "dish_prepared",
+      description: "Plats préparés pour CMD-2048",
+      time: "Il y a 25 min",
+      icon: <CheckCircle className="w-4 h-4" />,
+    },
+    {
+      id: "3",
+      type: "ticket_closed",
+      description: "Ticket #1234 résolu",
+      time: "Il y a 45 min",
+      icon: <MessageSquare className="w-4 h-4" />,
+    },
+    {
+      id: "4",
+      type: "status_changed",
+      description: "Statut changé: Disponible",
+      time: "Il y a 2h",
+      icon: <Activity className="w-4 h-4" />,
+    },
   ]);
 
   // ----- CHECK AUTH -----
@@ -99,7 +142,8 @@ export default function StaffDashboard() {
 
         const sUser: UserWithRole = session.data.user;
 
-        const userRole = sUser.user_metadata?.role || sUser.role || "kitchen_staff";
+        const userRole =
+          sUser.user_metadata?.role || sUser.role || "kitchen_staff";
 
         const userData: Staff = {
           id: Number(sUser.id),
@@ -108,7 +152,10 @@ export default function StaffDashboard() {
           email: sUser.email,
           phone: "514-555-0100",
           location: "Montreal",
-          role: userRole as "kitchen_staff" | "customer_service",
+          role: userRole as
+            | "kitchen_staff"
+            | "customer_service"
+            | "delivery_driver",
           status: "active",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -141,6 +188,8 @@ export default function StaffDashboard() {
 
     if (user.role === "kitchen_staff") {
       navigate("/staff/production");
+    } else if (user.role === "delivery_driver") {
+      navigate("/staff/delivery");
     } else {
       navigate("/staff/commandes");
     }
@@ -161,14 +210,31 @@ export default function StaffDashboard() {
   const stats =
     user.role === "kitchen_staff"
       ? { pending: 12, inProgress: 8, completed: 45, avgTime: "25 min" }
-      : { pending: 7, confirmed: 18, ready: 23, avgTime: "15 min" };
+      : user.role === "delivery_driver"
+        ? { pending: 5, inTransit: 12, delivered: 38, avgTime: "35 min" }
+        : { pending: 7, confirmed: 18, ready: 23, avgTime: "15 min" };
 
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
 
   const statusConfig = {
-    active: { label: "Disponible", color: "bg-green-500", textColor: "text-green-700", bgColor: "bg-green-50" },
-    busy: { label: "Occupé", color: "bg-yellow-500", textColor: "text-yellow-700", bgColor: "bg-yellow-50" },
-    offline: { label: "Hors ligne", color: "bg-gray-500", textColor: "text-gray-700", bgColor: "bg-gray-50" },
+    active: {
+      label: "Disponible",
+      color: "bg-green-500",
+      textColor: "text-green-700",
+      bgColor: "bg-green-50",
+    },
+    busy: {
+      label: "Occupé",
+      color: "bg-yellow-500",
+      textColor: "text-yellow-700",
+      bgColor: "bg-yellow-50",
+    },
+    offline: {
+      label: "Hors ligne",
+      color: "bg-gray-500",
+      textColor: "text-gray-700",
+      bgColor: "bg-gray-50",
+    },
   };
 
   // ----- RENDER -----
@@ -187,23 +253,47 @@ export default function StaffDashboard() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          <NavItem icon={<Activity className="w-5 h-5" />} label="Tableau de bord" active />
-          <NavItem 
-            icon={user.role === "kitchen_staff" ? <ChefHat className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />} 
-            label={user.role === "kitchen_staff" ? "Production" : "Commandes"} 
-            onClick={navigateToRole} 
+          <NavItem
+            icon={<Activity className="w-5 h-5" />}
+            label="Tableau de bord"
+            active
           />
-          <NavItem 
-            icon={<Calendar className="w-5 h-5" />} 
-            label="Planning" 
+          <NavItem
+            icon={
+              user.role === "kitchen_staff" ? (
+                <ChefHat className="w-5 h-5" />
+              ) : user.role === "delivery_driver" ? (
+                <Truck className="w-5 h-5" />
+              ) : (
+                <ShoppingCart className="w-5 h-5" />
+              )
+            }
+            label={
+              user.role === "kitchen_staff"
+                ? "Production"
+                : user.role === "delivery_driver"
+                  ? "Livraisons"
+                  : "Commandes"
+            }
+            onClick={navigateToRole}
+          />
+          <NavItem
+            icon={<Calendar className="w-5 h-5" />}
+            label="Planning"
             onClick={() => navigate("/staff/planning")}
           />
-          <NavItem icon={<MessageSquare className="w-5 h-5" />} label="Messages" />
+          <NavItem
+            icon={<MessageSquare className="w-5 h-5" />}
+            label="Messages"
+          />
           <NavItem icon={<Settings className="w-5 h-5" />} label="Paramètres" />
         </nav>
 
         <div className="p-4 border-t border-gray-800">
-          <button onClick={handleLogout} className="flex items-center gap-3 w-full p-3 rounded-lg text-gray-400 hover:bg-gray-800/50 hover:text-white transition-all">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full p-3 rounded-lg text-gray-400 hover:bg-gray-800/50 hover:text-white transition-all"
+          >
             <LogOut className="w-5 h-5" />
             <span className="font-medium text-sm">Déconnexion</span>
           </button>
@@ -216,12 +306,23 @@ export default function StaffDashboard() {
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="lg:hidden p-2 hover:bg-gray-100 rounded-lg">
-                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="w-6 h-6" />
+                ) : (
+                  <Menu className="w-6 h-6" />
+                )}
               </button>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Bonjour, {user.firstName}!</h2>
-                <p className="text-sm text-gray-500">Voici votre activité d'aujourd'hui</p>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Bonjour, {user.firstName}!
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Voici votre activité d'aujourd'hui
+                </p>
               </div>
             </div>
 
@@ -229,14 +330,24 @@ export default function StaffDashboard() {
               <div className="relative">
                 <button className="relative p-2 hover:bg-gray-100 rounded-lg">
                   <Bell className="w-6 h-6 text-gray-600" />
-                  {unreadNotifications > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}
+                  {unreadNotifications > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
                 </button>
               </div>
 
               <div className="flex items-center gap-3">
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${statusConfig[user.status].bgColor}`}>
-                  <div className={`w-2 h-2 rounded-full ${statusConfig[user.status].color}`} />
-                  <span className={`text-xs font-medium ${statusConfig[user.status].textColor}`}>{statusConfig[user.status].label}</span>
+                <div
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${statusConfig[user.status].bgColor}`}
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full ${statusConfig[user.status].color}`}
+                  />
+                  <span
+                    className={`text-xs font-medium ${statusConfig[user.status].textColor}`}
+                  >
+                    {statusConfig[user.status].label}
+                  </span>
                 </div>
                 <div className="w-10 h-10 bg-[#C5A065] rounded-full flex items-center justify-center">
                   <UserCircle className="w-6 h-6 text-white" />
@@ -253,17 +364,84 @@ export default function StaffDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {user.role === "kitchen_staff" ? (
                 <>
-                  <StatCard title="En attente" value={stats.pending ?? 0} icon={<Clock className="w-6 h-6 text-orange-600" />} color="bg-orange-50" />
-                  <StatCard title="En cours" value={(stats as any).inProgress ?? 0} icon={<ChefHat className="w-6 h-6 text-blue-600" />} color="bg-blue-50" />
-                  <StatCard title="Terminées" value={(stats as any).completed ?? 0}icon={<CheckCircle className="w-6 h-6 text-green-600" />} color="bg-green-50" />
-                  <StatCard title="Temps moy."  value={stats.avgTime ?? "0 min"}  icon={<TrendingUp className="w-6 h-6 text-purple-600" />} color="bg-purple-50" />
+                  <StatCard
+                    title="En attente"
+                    value={stats.pending ?? 0}
+                    icon={<Clock className="w-6 h-6 text-orange-600" />}
+                    color="bg-orange-50"
+                  />
+                  <StatCard
+                    title="En cours"
+                    value={(stats as any).inProgress ?? 0}
+                    icon={<ChefHat className="w-6 h-6 text-blue-600" />}
+                    color="bg-blue-50"
+                  />
+                  <StatCard
+                    title="Terminées"
+                    value={(stats as any).completed ?? 0}
+                    icon={<CheckCircle className="w-6 h-6 text-green-600" />}
+                    color="bg-green-50"
+                  />
+                  <StatCard
+                    title="Temps moy."
+                    value={stats.avgTime ?? "0 min"}
+                    icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
+                    color="bg-purple-50"
+                  />
+                </>
+              ) : user.role === "delivery_driver" ? (
+                <>
+                  <StatCard
+                    title="En attente"
+                    value={stats.pending ?? 0}
+                    icon={<Clock className="w-6 h-6 text-orange-600" />}
+                    color="bg-orange-50"
+                  />
+                  <StatCard
+                    title="En livraison"
+                    value={(stats as any).inTransit ?? 0}
+                    icon={<Truck className="w-6 h-6 text-blue-600" />}
+                    color="bg-blue-50"
+                  />
+                  <StatCard
+                    title="Livrées"
+                    value={(stats as any).delivered ?? 0}
+                    icon={<CheckCircle className="w-6 h-6 text-green-600" />}
+                    color="bg-green-50"
+                  />
+                  <StatCard
+                    title="Temps moy."
+                    value={stats.avgTime ?? "0 min"}
+                    icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
+                    color="bg-purple-50"
+                  />
                 </>
               ) : (
                 <>
-                  <StatCard title="En attente" value={stats.pending} icon={<Clock className="w-6 h-6 text-orange-600" />} color="bg-orange-50" />
-                  <StatCard title="Confirmées" value={(stats as any).confirmed ?? 0} icon={<CheckCircle className="w-6 h-6 text-blue-600" />} color="bg-blue-50" />
-                  <StatCard title="Prêtes"     value={(stats as any).ready ?? 0} icon={<Package className="w-6 h-6 text-green-600" />} color="bg-green-50" />
-                  <StatCard title="Temps moy." value={stats.avgTime} icon={<TrendingUp className="w-6 h-6 text-purple-600" />} color="bg-purple-50" />
+                  <StatCard
+                    title="En attente"
+                    value={stats.pending}
+                    icon={<Clock className="w-6 h-6 text-orange-600" />}
+                    color="bg-orange-50"
+                  />
+                  <StatCard
+                    title="Confirmées"
+                    value={(stats as any).confirmed ?? 0}
+                    icon={<CheckCircle className="w-6 h-6 text-blue-600" />}
+                    color="bg-blue-50"
+                  />
+                  <StatCard
+                    title="Prêtes"
+                    value={(stats as any).ready ?? 0}
+                    icon={<Package className="w-6 h-6 text-green-600" />}
+                    color="bg-green-50"
+                  />
+                  <StatCard
+                    title="Temps moy."
+                    value={stats.avgTime}
+                    icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
+                    color="bg-purple-50"
+                  />
                 </>
               )}
             </div>
@@ -271,13 +449,22 @@ export default function StaffDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* ACTIVITÉS */}
               <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Activité récente</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">
+                  Activité récente
+                </h3>
                 <div className="space-y-4">
                   {recentActivities.map((activity) => (
-                    <div key={activity.id} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                      <div className="p-2 bg-gray-100 rounded-lg">{activity.icon}</div>
+                    <div
+                      key={activity.id}
+                      className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <div className="p-2 bg-gray-100 rounded-lg">
+                        {activity.icon}
+                      </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{activity.description}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {activity.description}
+                        </p>
                         <p className="text-xs text-gray-500">{activity.time}</p>
                       </div>
                     </div>
@@ -287,11 +474,18 @@ export default function StaffDashboard() {
 
               {/* NOTIFICATIONS */}
               <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Notifications</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-4">
+                  Notifications
+                </h3>
                 <div className="space-y-3">
                   {notifications.map((notif) => (
-                    <div key={notif.id} className={`p-3 rounded-lg ${notif.isRead ? "bg-gray-50" : "bg-blue-50"}`}>
-                      <p className="text-sm font-medium text-gray-900">{notif.message}</p>
+                    <div
+                      key={notif.id}
+                      className={`p-3 rounded-lg ${notif.isRead ? "bg-gray-50" : "bg-blue-50"}`}
+                    >
+                      <p className="text-sm font-medium text-gray-900">
+                        {notif.message}
+                      </p>
                       <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
                     </div>
                   ))}

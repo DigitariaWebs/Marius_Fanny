@@ -14,6 +14,8 @@ let authInstance: ReturnType<typeof betterAuth> | null = null;
 async function initializeAuth() {
   try {
     const { client, db } = await connectMongoDB();
+
+    const isProduction = process.env.NODE_ENV === "production";
     
     return betterAuth({
       baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
@@ -22,11 +24,11 @@ async function initializeAuth() {
         client, 
       }),
       advanced: {
-        useSecureCookies: true,
+        useSecureCookies: isProduction,
         defaultCookieAttributes: {
-          sameSite: "none",
-          secure: true,
-          partitioned: true,
+          sameSite: isProduction ? "none" : "lax",
+          secure: isProduction,
+          partitioned: isProduction,
         },
       },
       user: {
@@ -100,15 +102,16 @@ async function initializeAuth() {
     });
   } catch (error) {
     console.error("❌ Failed to initialize auth:", error);
+    const isProduction = process.env.NODE_ENV === "production";
     // Return a minimal auth instance that will fail gracefully
     return betterAuth({
       baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
       advanced: {
-        useSecureCookies: true,
+        useSecureCookies: isProduction,
         defaultCookieAttributes: {
-          sameSite: "none",
-          secure: true,
-          partitioned: true,
+          sameSite: isProduction ? "none" : "lax",
+          secure: isProduction,
+          partitioned: isProduction,
         },
       },
       secret: process.env.BETTER_AUTH_SECRET || "your-secret-key-change-in-production",

@@ -6,6 +6,8 @@ export const getRedirectPath = (role: string) => {
       return "/staff/production";
     case "customer_service":
       return "/staff/commandes";
+    case "deliveryDriver":
+      return "/staff/delivery";
     case "client":
     default:
       return "/";

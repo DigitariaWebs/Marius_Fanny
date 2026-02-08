@@ -1,9 +1,19 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { authClient } from "../lib/AuthClient";
 import GoldenBackground from "./GoldenBackground";
-import { 
-  User, Package, LogOut, Search, ChevronLeft, ChevronRight,
-  Eye, Clock, CheckCircle, Truck
+import {
+  User,
+  Package,
+  LogOut,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Clock,
+  CheckCircle,
+  Truck,
+  ArrowLeft,
 } from "lucide-react";
 
 interface OrderItem {
@@ -42,64 +52,73 @@ interface Order {
 }
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const statusConfig: Record<string, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
-    pending: { 
-      bg: "bg-yellow-100", 
-      text: "text-yellow-800", 
+  const statusConfig: Record<
+    string,
+    { bg: string; text: string; icon: React.ReactNode; label: string }
+  > = {
+    pending: {
+      bg: "bg-yellow-100",
+      text: "text-yellow-800",
       icon: <Clock size={14} />,
-      label: "En attente" 
+      label: "En attente",
     },
-    confirmed: { 
-      bg: "bg-blue-100", 
-      text: "text-blue-800", 
+    confirmed: {
+      bg: "bg-blue-100",
+      text: "text-blue-800",
       icon: <CheckCircle size={14} />,
-      label: "Confirmée" 
+      label: "Confirmée",
     },
-    processing: { 
-      bg: "bg-purple-100", 
-      text: "text-purple-800", 
+    processing: {
+      bg: "bg-purple-100",
+      text: "text-purple-800",
       icon: <Package size={14} />,
-      label: "En préparation" 
+      label: "En préparation",
     },
-    shipped: { 
-      bg: "bg-indigo-100", 
-      text: "text-indigo-800", 
+    shipped: {
+      bg: "bg-indigo-100",
+      text: "text-indigo-800",
       icon: <Truck size={14} />,
-      label: "Expédiée" 
+      label: "Expédiée",
     },
-    delivered: { 
-      bg: "bg-green-100", 
-      text: "text-green-800", 
+    delivered: {
+      bg: "bg-green-100",
+      text: "text-green-800",
       icon: <CheckCircle size={14} />,
-      label: "Livrée" 
+      label: "Livrée",
     },
-    cancelled: { 
-      bg: "bg-red-100", 
-      text: "text-red-800", 
+    cancelled: {
+      bg: "bg-red-100",
+      text: "text-red-800",
       icon: <LogOut size={14} />,
-      label: "Annulée" 
+      label: "Annulée",
     },
   };
 
   const config = statusConfig[status] || statusConfig.pending;
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-bold ${config.bg} ${config.text} flex items-center gap-1.5 w-fit transition-all duration-300`}>
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-bold ${config.bg} ${config.text} flex items-center gap-1.5 w-fit transition-all duration-300`}
+    >
       {config.icon}
       {config.label}
     </span>
   );
 };
 
-const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number; color: string }> = 
-  ({ icon, label, value, color }) => (
-    <div className="bg-white/70 backdrop-blur-md p-5 rounded-2xl border border-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-      <div className={`p-2.5 ${color} rounded-lg w-fit mb-3`}>
-        {icon}
-      </div>
-      <p className="text-xs font-bold opacity-60 uppercase tracking-widest mb-1">{label}</p>
-      <p className="text-xl font-bold text-stone-800">{value}</p>
-    </div>
-  );
+const StatCard: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  color: string;
+}> = ({ icon, label, value, color }) => (
+  <div className="bg-white/70 backdrop-blur-md p-5 rounded-2xl border border-white shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+    <div className={`p-2.5 ${color} rounded-lg w-fit mb-3`}>{icon}</div>
+    <p className="text-xs font-bold opacity-60 uppercase tracking-widest mb-1">
+      {label}
+    </p>
+    <p className="text-xl font-bold text-stone-800">{value}</p>
+  </div>
+);
 
 const Dashboard: React.FC = () => {
   const [userInfo, setUserInfo] = useState<any>(null);
@@ -115,21 +134,25 @@ const Dashboard: React.FC = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
 
+  const navigate = useNavigate();
+
   const ITEMS_PER_PAGE = 10;
 
-  const formatDate = (date: string) => new Date(date).toLocaleDateString("fr-FR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString("fr-FR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
 
-  const formatAmount = (amount: number) => `${amount.toFixed(2).replace(".", ",")} $`;
+  const formatAmount = (amount: number) =>
+    `${amount.toFixed(2).replace(".", ",")} $`;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Récupérer l'utilisateur
         const session = await authClient.getSession();
         if (session.data?.user) {
@@ -151,25 +174,31 @@ const Dashboard: React.FC = () => {
 
         // Récupérer les commandes depuis l'API backend
         console.log("📡 Récupération des commandes depuis le backend...");
-        
+
         const apiUrl = "http://localhost:3000/api/orders?limit=100";
         console.log(`🔗 Appel: ${apiUrl}`);
-        
+
         const response = await fetch(apiUrl, {
-          credentials: 'include',
+          credentials: "include",
           headers: {
-            'Content-Type': 'application/json',
-          }
+            "Content-Type": "application/json",
+          },
         });
 
-        console.log(`📊 Status: ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
-        
+        console.log(
+          `📊 Status: ${response.status}, Content-Type: ${response.headers.get("content-type")}`,
+        );
+
         // Lire le contenu en texte d'abord
         const responseText = await response.text();
         console.log("📄 Réponse brute:", responseText.substring(0, 300));
 
         // Vérifier si c'est du HTML
-        if (responseText.includes('<!') || responseText.includes('<html') || responseText.includes('<!DOCTYPE')) {
+        if (
+          responseText.includes("<!") ||
+          responseText.includes("<html") ||
+          responseText.includes("<!DOCTYPE")
+        ) {
           console.error("🔴 HTML reçu:", responseText.substring(0, 150));
           throw new Error("Page HTML reçue au lieu de JSON");
         }
@@ -182,11 +211,11 @@ const Dashboard: React.FC = () => {
         // Parser le JSON
         const data = JSON.parse(responseText);
         console.log("✅ Réponse API:", data);
-        
+
         const fetchedOrders = data.data?.items || data.data || [];
         setOrders(fetchedOrders);
         setError(null);
-        
+
         console.log(`✅ ${fetchedOrders.length} commande(s) chargée(s)`);
       } catch (err: any) {
         console.error("❌ Erreur complète:", err);
@@ -206,8 +235,12 @@ const Dashboard: React.FC = () => {
       result = result.filter(
         (order) =>
           order._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.clientInfo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.clientInfo?.email?.toLowerCase().includes(searchTerm.toLowerCase())
+          order.clientInfo?.name
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          order.clientInfo?.email
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -220,7 +253,9 @@ const Dashboard: React.FC = () => {
     result.sort((a, b) => {
       switch (sortBy) {
         case "date":
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
         case "amount":
           return b.total - a.total;
         default:
@@ -236,7 +271,7 @@ const Dashboard: React.FC = () => {
   const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE);
   const paginatedOrders = filteredOrders.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    currentPage * ITEMS_PER_PAGE,
   );
 
   // Statistiques pertinentes pour le client
@@ -257,7 +292,9 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="relative z-10 text-center">
           <div className="w-12 h-12 border-4 border-[#C5A065]/30 border-t-[#C5A065] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-stone-500 font-light">Chargement de vos commandes...</p>
+          <p className="text-stone-500 font-light">
+            Chargement de vos commandes...
+          </p>
         </div>
       </div>
     );
@@ -272,8 +309,8 @@ const Dashboard: React.FC = () => {
       <div className="relative z-10 max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 
-            className="text-4xl md:text-5xl mb-2 font-light" 
+          <h1
+            className="text-4xl md:text-5xl mb-2 font-light"
             style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}
           >
             Mon Espace Personnel
@@ -291,11 +328,15 @@ const Dashboard: React.FC = () => {
               <div className="p-2.5 bg-[#C5A065]/10 rounded-lg text-[#C5A065]">
                 <User size={20} />
               </div>
-              <h3 className="font-bold uppercase tracking-widest text-xs">Mon Profil</h3>
+              <h3 className="font-bold uppercase tracking-widest text-xs">
+                Mon Profil
+              </h3>
             </div>
             <div className="space-y-2 text-xs text-stone-600">
               <div>
-                <span className="font-bold opacity-50 uppercase text-[9px] block">Email</span>
+                <span className="font-bold opacity-50 uppercase text-[9px] block">
+                  Email
+                </span>
                 <p className="truncate">{userInfo?.email}</p>
               </div>
             </div>
@@ -317,7 +358,12 @@ const Dashboard: React.FC = () => {
           <StatCard
             icon={<CheckCircle size={20} className="text-amber-600" />}
             label="Statut Dernière"
-            value={stats.lastOrderStatus === "N/A" ? "—" : stats.lastOrderStatus.charAt(0).toUpperCase() + stats.lastOrderStatus.slice(1)}
+            value={
+              stats.lastOrderStatus === "N/A"
+                ? "—"
+                : stats.lastOrderStatus.charAt(0).toUpperCase() +
+                  stats.lastOrderStatus.slice(1)
+            }
             color="bg-amber-100"
           />
         </div>
@@ -335,7 +381,10 @@ const Dashboard: React.FC = () => {
             <h2 className="text-2xl font-bold text-stone-800">Mes Commandes</h2>
             {orders.length > 0 && (
               <p className="text-sm text-stone-500">
-                <span className="font-bold text-[#C5A065]">{filteredOrders.length}</span> commande(s)
+                <span className="font-bold text-[#C5A065]">
+                  {filteredOrders.length}
+                </span>{" "}
+                commande(s)
               </p>
             )}
           </div>
@@ -345,8 +394,12 @@ const Dashboard: React.FC = () => {
               <div className="w-20 h-20 bg-stone-50 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-300">
                 <Package size={40} />
               </div>
-              <p className="text-stone-500 font-light italic text-lg">Aucune commande pour le moment</p>
-              <p className="text-stone-400 text-sm mt-2">Commencez vos achats dès maintenant !</p>
+              <p className="text-stone-500 font-light italic text-lg">
+                Aucune commande pour le moment
+              </p>
+              <p className="text-stone-400 text-sm mt-2">
+                Commencez vos achats dès maintenant !
+              </p>
             </div>
           ) : (
             <>
@@ -354,7 +407,10 @@ const Dashboard: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {/* Recherche */}
                 <div className="relative lg:col-span-2">
-                  <Search className="absolute left-3 top-3 text-stone-400" size={18} />
+                  <Search
+                    className="absolute left-3 top-3 text-stone-400"
+                    size={18}
+                  />
                   <input
                     type="text"
                     placeholder="Rechercher par ID, nom, email..."
@@ -395,23 +451,46 @@ const Dashboard: React.FC = () => {
                 <table className="w-full text-sm">
                   <thead className="border-b border-stone-200">
                     <tr>
-                      <th className="text-left py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">Commande</th>
-                      <th className="text-left py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">Date</th>
-                      <th className="text-left py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">Articles</th>
-                      <th className="text-right py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">Montant</th>
-                      <th className="text-left py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">Statut</th>
-                      <th className="text-center py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">Action</th>
+                      <th className="text-left py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">
+                        Commande
+                      </th>
+                      <th className="text-left py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="text-left py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">
+                        Articles
+                      </th>
+                      <th className="text-right py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">
+                        Montant
+                      </th>
+                      <th className="text-left py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">
+                        Statut
+                      </th>
+                      <th className="text-center py-3 px-4 font-bold text-stone-700 text-xs uppercase tracking-wider">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {paginatedOrders.map((order) => (
-                      <tr key={order._id} className="hover:bg-stone-50/50 transition-colors duration-200">
+                      <tr
+                        key={order._id}
+                        className="hover:bg-stone-50/50 transition-colors duration-200"
+                      >
                         <td className="py-3 px-4">
-                          <span className="font-mono font-bold text-[#C5A065]">{order._id.slice(-6).toUpperCase()}</span>
+                          <span className="font-mono font-bold text-[#C5A065]">
+                            {order._id.slice(-6).toUpperCase()}
+                          </span>
                         </td>
-                        <td className="py-3 px-4 text-stone-600">{formatDate(order.createdAt)}</td>
-                        <td className="py-3 px-4 text-stone-600">{order.items.length} article(s)</td>
-                        <td className="py-3 px-4 text-right font-bold text-stone-800">{formatAmount(order.total)}</td>
+                        <td className="py-3 px-4 text-stone-600">
+                          {formatDate(order.createdAt)}
+                        </td>
+                        <td className="py-3 px-4 text-stone-600">
+                          {order.items.length} article(s)
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-stone-800">
+                          {formatAmount(order.total)}
+                        </td>
                         <td className="py-3 px-4">
                           <StatusBadge status={order.status} />
                         </td>
@@ -443,25 +522,29 @@ const Dashboard: React.FC = () => {
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  
+
                   <div className="flex gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                          currentPage === page
-                            ? "bg-[#C5A065] text-white"
-                            : "border border-stone-200 hover:bg-stone-50"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                            currentPage === page
+                              ? "bg-[#C5A065] text-white"
+                              : "border border-stone-200 hover:bg-stone-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ),
+                    )}
                   </div>
 
                   <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
                     disabled={currentPage === totalPages}
                     className="p-2 rounded-lg border border-stone-200 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -475,12 +558,20 @@ const Dashboard: React.FC = () => {
 
         {/* Modal Détails */}
         {showDetails && selectedOrder && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDetails(false)}>
-            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowDetails(false)}
+          >
+            <div
+              className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="p-6 md:p-8">
                 {/* Header Modal */}
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl font-bold text-stone-800">Détails Commande</h3>
+                  <h3 className="text-2xl font-bold text-stone-800">
+                    Détails Commande
+                  </h3>
                   <button
                     onClick={() => setShowDetails(false)}
                     className="text-stone-400 hover:text-stone-600 text-2xl w-8 h-8 flex items-center justify-center"
@@ -493,35 +584,53 @@ const Dashboard: React.FC = () => {
                 <div className="space-y-4 mb-6">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">ID Commande</p>
-                      <p className="font-mono font-bold text-[#C5A065]">{selectedOrder._id}</p>
+                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">
+                        ID Commande
+                      </p>
+                      <p className="font-mono font-bold text-[#C5A065]">
+                        {selectedOrder._id}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">Date</p>
-                      <p className="font-bold text-stone-800">{formatDate(selectedOrder.createdAt)}</p>
+                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">
+                        Date
+                      </p>
+                      <p className="font-bold text-stone-800">
+                        {formatDate(selectedOrder.createdAt)}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">Statut</p>
+                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">
+                        Statut
+                      </p>
                       <StatusBadge status={selectedOrder.status} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">Type Livraison</p>
+                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-1">
+                        Type Livraison
+                      </p>
                       <p className="font-bold text-stone-800">
-                        {selectedOrder.deliveryType === "delivery" ? "Livraison" : "Retrait"}
+                        {selectedOrder.deliveryType === "delivery"
+                          ? "Livraison"
+                          : "Retrait"}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="mb-6">
-                  <h4 className="text-sm font-bold text-stone-800 mb-3 uppercase tracking-widest">Articles</h4>
+                  <h4 className="text-sm font-bold text-stone-800 mb-3 uppercase tracking-widest">
+                    Articles
+                  </h4>
                   <div className="space-y-2 bg-stone-50 p-4 rounded-lg">
                     {selectedOrder.items.map((item, idx) => (
                       <div key={idx} className="flex justify-between text-sm">
                         <span className="text-stone-600">
                           {item.name} × {item.quantity}
                         </span>
-                        <span className="font-bold text-stone-800">{formatAmount(item.amount)}</span>
+                        <span className="font-bold text-stone-800">
+                          {formatAmount(item.amount)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -531,35 +640,48 @@ const Dashboard: React.FC = () => {
                 <div className="space-y-2 mb-6 bg-stone-50 p-4 rounded-lg">
                   <div className="flex justify-between text-sm">
                     <span className="text-stone-600">Sous-total</span>
-                    <span className="text-stone-800">{formatAmount(selectedOrder.subtotal)}</span>
+                    <span className="text-stone-800">
+                      {formatAmount(selectedOrder.subtotal)}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-stone-600">Taxes</span>
-                    <span className="text-stone-800">{formatAmount(selectedOrder.taxAmount)}</span>
+                    <span className="text-stone-800">
+                      {formatAmount(selectedOrder.taxAmount)}
+                    </span>
                   </div>
                   {selectedOrder.deliveryFee > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-stone-600">Livraison</span>
-                      <span className="text-stone-800">{formatAmount(selectedOrder.deliveryFee)}</span>
+                      <span className="text-stone-800">
+                        {formatAmount(selectedOrder.deliveryFee)}
+                      </span>
                     </div>
                   )}
                   <div className="border-t border-stone-200 pt-2 flex justify-between">
                     <span className="font-bold text-stone-800">Total</span>
-                    <span className="text-lg font-bold text-[#C5A065]">{formatAmount(selectedOrder.total)}</span>
+                    <span className="text-lg font-bold text-[#C5A065]">
+                      {formatAmount(selectedOrder.total)}
+                    </span>
                   </div>
                 </div>
 
                 {/* Adresse Livraison */}
-                {selectedOrder.deliveryType === "delivery" && selectedOrder.deliveryAddress && (
-                  <div className="mb-6 p-4 bg-stone-50 rounded-lg">
-                    <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-2">Adresse Livraison</p>
-                    <p className="text-sm text-stone-700">
-                      {selectedOrder.deliveryAddress.street && `${selectedOrder.deliveryAddress.street}, `}
-                      {selectedOrder.deliveryAddress.city && `${selectedOrder.deliveryAddress.city}, `}
-                      {selectedOrder.deliveryAddress.postalCode}
-                    </p>
-                  </div>
-                )}
+                {selectedOrder.deliveryType === "delivery" &&
+                  selectedOrder.deliveryAddress && (
+                    <div className="mb-6 p-4 bg-stone-50 rounded-lg">
+                      <p className="text-xs font-bold opacity-50 uppercase tracking-widest mb-2">
+                        Adresse Livraison
+                      </p>
+                      <p className="text-sm text-stone-700">
+                        {selectedOrder.deliveryAddress.street &&
+                          `${selectedOrder.deliveryAddress.street}, `}
+                        {selectedOrder.deliveryAddress.city &&
+                          `${selectedOrder.deliveryAddress.city}, `}
+                        {selectedOrder.deliveryAddress.postalCode}
+                      </p>
+                    </div>
+                  )}
 
                 {/* Bouton Fermeture */}
                 <button
@@ -573,21 +695,39 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Bouton Déconnexion */}
-        <button 
-          onClick={() => setShowConfirmLogout(true)}
-          className="mt-10 flex items-center gap-2 mx-auto text-xs font-black uppercase tracking-widest text-red-800/50 hover:text-red-800 transition-all"
-        >
-          <LogOut size={14} /> Se déconnecter
-        </button>
+        {/* Boutons Actions */}
+        <div className="mt-10 flex gap-13 justify-center">
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#2D2A26] hover:text-[#C5A065] transition-all"
+          >
+            <ArrowLeft size={14} /> Retour à l'accueil
+          </button>
+          <button
+            onClick={() => setShowConfirmLogout(true)}
+            className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-red-800/50 hover:text-red-800 transition-all"
+          >
+            <LogOut size={14} /> Se déconnecter
+          </button>
+        </div>
 
         {/* Modal Confirmation Déconnexion */}
         {showConfirmLogout && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowConfirmLogout(false)}>
-            <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-2xl font-bold text-stone-800 mb-2">Êtes-vous sûr ?</h3>
-              <p className="text-stone-500 mb-6">Voulez-vous vraiment vous déconnecter de votre compte ?</p>
-              
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowConfirmLogout(false)}
+          >
+            <div
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-2xl font-bold text-stone-800 mb-2">
+                Êtes-vous sûr ?
+              </h3>
+              <p className="text-stone-500 mb-6">
+                Voulez-vous vraiment vous déconnecter de votre compte ?
+              </p>
+
               <div className="flex gap-4">
                 <button
                   onClick={() => setShowConfirmLogout(false)}
@@ -597,7 +737,9 @@ const Dashboard: React.FC = () => {
                 </button>
                 <button
                   onClick={() => {
-                    authClient.signOut().then(() => window.location.href = "/");
+                    authClient
+                      .signOut()
+                      .then(() => (window.location.href = "/"));
                   }}
                   className="flex-1 px-4 py-3 rounded-lg bg-red-600 text-white font-bold uppercase tracking-widest text-xs hover:bg-red-700 transition-all"
                 >

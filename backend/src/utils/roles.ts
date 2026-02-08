@@ -7,6 +7,7 @@ export const USER_ROLES = {
   STAFF: "staff",
   CUSTOMER_SERVICE: "customerService",
   ADMIN: "admin",
+  DELIVERY_DRIVER: "deliveryDriver",
 } as const;
 
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
@@ -17,8 +18,9 @@ export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 const ROLE_HIERARCHY: Record<UserRole, number> = {
   user: 1,
   staff: 2,
-  customerService: 3,
-  admin: 4,
+  deliveryDriver: 3,
+  customerService: 4,
+  admin: 5,
 };
 
 /**

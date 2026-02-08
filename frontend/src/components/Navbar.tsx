@@ -30,43 +30,24 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  const { data: session, isPending } = authClient.useSession();
+
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const session = await authClient.getSession();
-        console.log("📋 Session complète:", session);
-        const user = session.data?.user;
-        
-        setIsLoggedIn(!!user);
+    const user = session?.user;
+    setIsLoggedIn(!!user);
 
-        if (user) {
-          console.log("👤 User object:", user);
-          const userWithRole = user as any;
-          console.log("🔍 user.role:", userWithRole.role);
-          console.log("🔍 user.user_metadata:", userWithRole.user_metadata);
-          console.log("🔍 user.app_metadata:", userWithRole.app_metadata);
-          
-          const detectedRole = 
-            userWithRole.role || 
-            userWithRole.user_metadata?.role || 
-            userWithRole.app_metadata?.role || 
-            "client";
-          
-          console.log("✅ Rôle final détecté:", detectedRole);
-          setRole(detectedRole);
-        } else {
-          console.log("❌ Pas d'utilisateur connecté");
-        }
-      } catch (error) {
-        console.error("❌ Session check error:", error);
-        setIsLoggedIn(false);
-      }
-    };
-
-    checkAuth();
-    const interval = setInterval(checkAuth, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    if (user) {
+      const userWithRole = user as any;
+      const detectedRole =
+        userWithRole.role ||
+        userWithRole.user_metadata?.role ||
+        userWithRole.app_metadata?.role ||
+        "client";
+      setRole(detectedRole);
+    } else {
+      setRole("client");
+    }
+  }, [session]);
 
   // Fermer le menu profil au clic extérieur
   useEffect(() => {
@@ -118,7 +99,7 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
       } else if (role === "client") {
         console.log("➡️ Navigation vers /mon-compte (client)");
         navigate("/mon-compte");
-      } else if (role === "kitchen_staff" || role === "customer_service") {
+      } else if (role === "kitchen_staff" || role === "customer_service" || role === "deliveryDriver") {
         console.log("➡️ Navigation vers /staff/dashboard (staff)");
         navigate("/staff/dashboard");
       }
@@ -183,7 +164,7 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
   const getDashboardButtonText = () => {
     if (role === "client") return "Mon Compte";
     if (role === "admin") return "Dashboard Admin";
-    if (role === "kitchen_staff" || role === "customer_service") return "Dashboard Staff";
+    if (role === "kitchen_staff" || role === "customer_service" || role === "deliveryDriver") return "Dashboard Staff";
     return "Dashboard";
   };
 
@@ -230,7 +211,8 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
               )}
             </button>
 
-            {isLoggedIn ? (
+            {!isPending ? (
+              isLoggedIn ? (
               <div className="relative" ref={profileMenuRef}>
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -279,14 +261,20 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
                   </div>
                 )}
               </div>
+              ) : (
+                <button
+                  onClick={() => handleAnchorClick("se-connecter")}
+                  className="px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white rounded-full transition-all hover:opacity-90"
+                  style={{ backgroundColor: styles.gold }}
+                >
+                  Se Connecter
+                </button>
+              )
             ) : (
-              <button
-                onClick={() => handleAnchorClick("se-connecter")}
-                className="px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white rounded-full transition-all hover:opacity-90"
-                style={{ backgroundColor: styles.gold }}
-              >
-                Se Connecter
-              </button>
+              <div
+                className="h-9 w-28 rounded-full bg-stone-200/70 animate-pulse"
+                aria-hidden="true"
+              />
             )}
           </div>
 
@@ -326,7 +314,8 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
 
           <div className="h-px bg-[#C5A065] my-3" />
 
-          {isLoggedIn ? (
+          {!isPending ? (
+            isLoggedIn ? (
             <>
               {role === "admin" && (
                 <button
@@ -363,17 +352,23 @@ const Navbar: React.FC<NavbarProps> = ({ onCartClick, cartCount }) => {
                 Déconnexion
               </button>
             </>
+            ) : (
+              <button 
+                onClick={() => {
+                  handleAnchorClick("se-connecter");
+                  setIsOpen(false);
+                }}
+                className="w-full px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white rounded-full" 
+                style={{ backgroundColor: styles.text, fontFamily: styles.fontSans }}
+              >
+                Se Connecter
+              </button>
+            )
           ) : (
-            <button 
-              onClick={() => {
-                handleAnchorClick("se-connecter");
-                setIsOpen(false);
-              }}
-              className="w-full px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white rounded-full" 
-              style={{ backgroundColor: styles.text, fontFamily: styles.fontSans }}
-            >
-              Se Connecter
-            </button>
+            <div
+              className="h-9 w-full rounded-full bg-stone-200/70 animate-pulse"
+              aria-hidden="true"
+            />
           )}
         </div>
       </div>

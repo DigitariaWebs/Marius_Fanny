@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, CreditCard, MapPin, ShoppingBag } from "lucide-react";
+import { ArrowLeft, CreditCard, MapPin, ShoppingBag, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import SquarePaymentForm from "../components/SquarePaymentForm";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -18,6 +19,8 @@ interface CartItem {
 interface CheckoutState {
   items: CartItem[];
   postalCode: string;
+  deliveryType: "pickup" | "delivery";
+  pickupLocation?: "Montreal" | "Laval";
   deliveryFee: number;
   subtotal: number;
   total: number;
@@ -31,14 +34,34 @@ const Checkout: React.FC = () => {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [paymentOption, setPaymentOption] = useState<"full" | "deposit">("full");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [isLoadingUserData, setIsLoadingUserData] = useState(true);
+  const [paymentResultModal, setPaymentResultModal] = useState<{
+    isOpen: boolean;
+    type: "details" | "warning";
+    title: string;
+    content: React.ReactNode;
+    onClose: () => void;
+  }>({
+    isOpen: false,
+    type: "details",
+    title: "",
+    content: null,
+    onClose: () => {},
+  });
 
   useEffect(() => {
+    console.log("🛒 [CHECKOUT] Component mounted, state:", state);
     if (!state || !state.items || state.items.length === 0) {
       console.log("⚠️ [CHECKOUT] No checkout data, redirecting to home");
       navigate("/");
+    } else {
+      console.log("✅ [CHECKOUT] Valid checkout data received:", {
+        itemsCount: state.items.length,
+        deliveryType: state.deliveryType,
+        pickupLocation: state.pickupLocation,
+        total: state.total,
+      });
     }
   }, [state, navigate]);
 
@@ -46,23 +69,29 @@ const Checkout: React.FC = () => {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        console.log("👤 [CHECKOUT] Loading user data for contact information...");
+        console.log(
+          "👤 [CHECKOUT] Loading user data for contact information...",
+        );
         const response = await fetch(`${normalizedApiUrl}/api/users/me`, {
-          credentials: 'include',
+          credentials: "include",
         });
 
         if (response.ok) {
           const result = await response.json();
           const user = result.data;
-          
+
           // Pre-populate contact information from user account
           setCustomerName(user.name || "");
           setCustomerEmail(user.email || "");
           setCustomerPhone(user.profile?.phoneNumber || "");
-          
-          console.log("✅ [CHECKOUT] User data loaded and contact fields pre-populated");
+
+          console.log(
+            "✅ [CHECKOUT] User data loaded and contact fields pre-populated",
+          );
         } else {
-          console.log("⚠️ [CHECKOUT] Could not load user data, user may need to fill contact info manually");
+          console.log(
+            "⚠️ [CHECKOUT] Could not load user data, user may need to fill contact info manually",
+          );
         }
       } catch (error) {
         console.error("❌ [CHECKOUT] Failed to load user data:", error);
@@ -102,7 +131,7 @@ const Checkout: React.FC = () => {
     }
 
     console.log(
-      `💳 [CHECKOUT] Customer info collected, showing payment form for ${customerName} (${customerEmail}, ${customerPhone}), payment type: ${paymentOption}`,
+      `💳 [CHECKOUT] Customer info collected, showing payment form for ${customerName} (${customerEmail}, ${customerPhone}), payment type: full`,
     );
     setShowPaymentForm(true);
   };
@@ -115,7 +144,7 @@ const Checkout: React.FC = () => {
     const status = paymentResult.status;
 
     console.log(
-      `✅ [CHECKOUT] Payment successful! ID: ${paymentId}, Status: ${status}, Amount: ${amount}$, Payment Type: ${paymentOption}`,
+      `✅ [CHECKOUT] Payment successful! ID: ${paymentId}, Status: ${status}, Amount: ${amount}$, Payment Type: full`,
     );
 
     // Save order to backend
@@ -135,16 +164,20 @@ const Checkout: React.FC = () => {
           email: customerEmail,
           phone: customerPhone,
         },
-        deliveryType: state.postalCode ? "delivery" : "pickup",
-        deliveryAddress: state.postalCode
-          ? {
-              street: "À déterminer", // Temporary placeholder
-              city: "À déterminer", // Temporary placeholder
-              province: "QC",
-              postalCode: state.postalCode,
-            }
-          : undefined,
-        pickupLocation: "Laval", // Default, could be from state
+        deliveryType: state.deliveryType,
+        deliveryAddress:
+          state.deliveryType === "delivery" && state.postalCode
+            ? {
+                street: "À déterminer", // Temporary placeholder
+                city: "À déterminer", // Temporary placeholder
+                province: "QC",
+                postalCode: state.postalCode,
+              }
+            : undefined,
+        pickupLocation:
+          state.deliveryType === "pickup"
+            ? state.pickupLocation || "Laval"
+            : undefined,
         items: state.items.map((item) => ({
           productId: item.id,
           productName: item.name,
@@ -152,7 +185,7 @@ const Checkout: React.FC = () => {
           unitPrice: item.price,
           amount: item.price * item.quantity,
         })),
-        paymentType: paymentOption,
+        paymentType: "full",
         depositPaid: true, // Payment was made
         squarePaymentId: paymentId,
         notes: `Square Payment ID: ${paymentId}`,
@@ -179,28 +212,72 @@ const Checkout: React.FC = () => {
       clearCart();
 
       // Show success message
-      const successMessage =
-        `🎉 Paiement réussi!\n\n` +
-        `📄 Numéro de commande: ${result.data.orderNumber}\n` +
-        `💰 Montant: ${amount}$ CAD\n` +
-        `📊 Statut: ${status}\n` +
-        `💳 Type de paiement: ${paymentOption === "full" ? "Paiement complet" : "Acompte (50%)"}\n\n` +
-        `Votre commande a été confirmée. Vous recevrez un email de confirmation sous peu.`;
-
-      alert(successMessage);
-
-      // Redirect to home page
-      console.log("🏠 [CHECKOUT] Redirecting to home page");
-      navigate("/");
+      setPaymentResultModal({
+        isOpen: true,
+        type: "details",
+        title: "Paiement réussi!",
+        content: (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 text-green-700 bg-green-50 p-4 rounded-lg border border-green-200">
+              <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Commande confirmée</p>
+                <p>Nous livrons vos produits directement à la réception.</p>
+              </div>
+            </div>
+            <div className="space-y-2 text-stone-600 bg-stone-50 p-4 rounded-lg">
+              <p>
+                <span className="font-medium">Numéro de commande:</span>{" "}
+                {result.data.orderNumber}
+              </p>
+              <p>
+                <span className="font-medium">Montant:</span> {amount}$ CAD
+              </p>
+              <p>
+                <span className="font-medium">Statut:</span> {status}
+              </p>
+            </div>
+            <p className="text-stone-500 text-sm">
+              Votre commande a été confirmée. Vous recevrez un email de
+              confirmation sous peu.
+            </p>
+          </div>
+        ),
+        onClose: () => {
+          console.log("🏠 [CHECKOUT] Redirecting to home page");
+          navigate("/");
+        },
+      });
     } catch (error) {
       console.error("❌ [CHECKOUT] Failed to save order:", error);
-      alert(
-        `⚠️ Le paiement a réussi, mais nous avons rencontré un problème lors de l'enregistrement de votre commande.\n\n` +
-          `ID de paiement: ${paymentId}\n\n` +
-          `Veuillez contacter le support avec cet ID de paiement.`,
-      );
-      // Still redirect but user should contact support
-      navigate("/");
+      setPaymentResultModal({
+        isOpen: true,
+        type: "warning",
+        title: "Attention requise",
+        content: (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 text-amber-700 bg-amber-50 p-4 rounded-lg border border-amber-200">
+              <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Problème d'enregistrement</p>
+                <p>
+                  Le paiement a été effectué, mais l'enregistrement de la
+                  commande a échoué.
+                </p>
+              </div>
+            </div>
+            <div className="text-stone-600">
+              <p>
+                Veuillez contacter le support avec cet identifiant de paiement :
+              </p>
+              <code className="block mt-2 bg-stone-100 p-2 rounded text-sm text-stone-800">
+                {paymentId}
+              </code>
+            </div>
+          </div>
+        ),
+        onClose: () => navigate("/"),
+      });
     }
   };
 
@@ -229,12 +306,22 @@ const Checkout: React.FC = () => {
       }
     }
 
-    alert(
-      errorMessage +
-        "\n\nVeuillez réessayer ou contacter le support si le problème persiste.",
-    );
-
-    setShowPaymentForm(false);
+    setPaymentResultModal({
+      isOpen: true,
+      type: "warning",
+      title: "Échec du paiement",
+      content: (
+        <div className="space-y-4">
+          <p className="text-red-600 font-medium">{errorMessage}</p>
+          <p className="text-stone-600 text-sm">
+            Veuillez réessayer ou contacter le support si le problème persiste.
+          </p>
+        </div>
+      ),
+      onClose: () => {
+        setShowPaymentForm(false);
+      },
+    });
   };
 
   return (
@@ -328,55 +415,6 @@ const Checkout: React.FC = () => {
                       />
                     </div>
 
-                    {/* Payment Options */}
-                    <div className="pt-4 border-t border-stone-200">
-                      <label className="block text-sm text-stone-600 mb-3 font-medium">
-                        Options de paiement *
-                      </label>
-                      <div className="space-y-3">
-                        <label className="flex items-start gap-3 p-4 border-2 border-stone-200 rounded-lg cursor-pointer hover:border-[#C5A065] transition-colors">
-                          <input
-                            type="radio"
-                            name="paymentOption"
-                            value="full"
-                            checked={paymentOption === "full"}
-                            onChange={(e) => setPaymentOption(e.target.value as "full" | "deposit")}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-[#2D2A26]">
-                              💳 Paiement complet
-                            </div>
-                            <div className="text-sm text-stone-500">
-                              Payez le montant total maintenant ({state.total.toFixed(2)}$ CAD)
-                            </div>
-                          </div>
-                        </label>
-
-                        <label className="flex items-start gap-3 p-4 border-2 border-stone-200 rounded-lg cursor-pointer hover:border-[#C5A065] transition-colors">
-                          <input
-                            type="radio"
-                            name="paymentOption"
-                            value="deposit"
-                            checked={paymentOption === "deposit"}
-                            onChange={(e) => setPaymentOption(e.target.value as "full" | "deposit")}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-[#2D2A26]">
-                              💰 Acompte (50%)
-                            </div>
-                            <div className="text-sm text-stone-500">
-                              Payez 50% maintenant ({(state.total * 0.5).toFixed(2)}$ CAD), 
-                              le reste lors du ramassage/livraison
-                            </div>
-                          </div>
-                        </label>
-
-
-                      </div>
-                    </div>
-
                     <button
                       type="submit"
                       className="w-full bg-[#2D2A26] text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-[#C5A065] transition-all shadow-lg"
@@ -392,12 +430,11 @@ const Checkout: React.FC = () => {
                     Informations de paiement
                   </h2>
                   <p className="text-sm text-stone-500 mb-4">
-                    {paymentOption === "full"
-                      ? `Montant à payer: ${state.total.toFixed(2)}$ CAD (Paiement complet)`
-                      : `Montant à payer: ${(state.total * 0.5).toFixed(2)}$ CAD (Acompte 50%)`}
+                    Montant à payer: {state.total.toFixed(2)}$ CAD (Paiement
+                    complet)
                   </p>
                   <SquarePaymentForm
-                    amount={paymentOption === "full" ? state.total : state.total * 0.5}
+                    amount={state.total}
                     onPaymentSuccess={handlePaymentSuccess}
                     onPaymentError={handlePaymentError}
                     customerEmail={customerEmail}
@@ -424,8 +461,15 @@ const Checkout: React.FC = () => {
                   </h2>
                 </div>
                 <p className="text-stone-600">
-                  Code postal:{" "}
-                  <span className="font-bold">{state.postalCode}</span>
+                  {state.deliveryType === "pickup"
+                    ? "Récupération"
+                    : "Livraison"}
+                  :{" "}
+                  <span className="font-bold">
+                    {state.deliveryType === "pickup"
+                      ? `${state.pickupLocation || "Laval"}`
+                      : state.postalCode}
+                  </span>
                 </p>
                 <p className="text-stone-600 text-sm mt-2">
                   Frais de livraison: {state.deliveryFee.toFixed(2)} $
@@ -472,12 +516,6 @@ const Checkout: React.FC = () => {
                       {state.total.toFixed(2)} $
                     </span>
                   </div>
-                  {paymentOption === "deposit" && (
-                    <div className="flex justify-between text-lg font-medium text-[#C5A065] pt-2 border-t border-stone-200">
-                      <span>Acompte (50%)</span>
-                      <span>{(state.total * 0.5).toFixed(2)} $</span>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -489,6 +527,21 @@ const Checkout: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        open={paymentResultModal.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            paymentResultModal.onClose();
+            setPaymentResultModal((prev) => ({ ...prev, isOpen: false }));
+          }
+        }}
+        type={paymentResultModal.type}
+        title={paymentResultModal.title}
+        closable={true}
+      >
+        {paymentResultModal.content}
+      </Modal>
 
       <Footer />
     </>

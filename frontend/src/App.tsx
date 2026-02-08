@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 // Components
@@ -25,6 +25,10 @@ import VerifyEmailPage from "./pages/Emailverified";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPassword from "./pages/ResetPassword";
 import StaffManagement from "./pages/Stuff";
+import Checkout from "./pages/Checkout";
+
+// Utils
+import { loadCart, saveCart } from "./utils/cartPersistence";
 
 interface CartItem {
   id: number;
@@ -34,24 +38,105 @@ interface CartItem {
   quantity: number;
 }
 
+interface HomePageProps {
+  onCartClick: () => void;
+  cartCount: number;
+  onAddToCart: (product: any) => void;
+}
+
+const HomePage: React.FC<HomePageProps> = ({
+  onCartClick,
+  cartCount,
+  onAddToCart,
+}) => (
+  <>
+    <Navbar onCartClick={onCartClick} cartCount={cartCount} />
+    <main className="relative z-10">
+      <Hero />
+      <section id="shop">
+        <Shop onAddToCart={onAddToCart} />
+      </section>
+
+      <section id="best-sellers">
+        <BestSellers onAddToCart={onAddToCart} />
+      </section>
+      <Video />
+      <section id="timeline">
+        <Time />
+      </section>
+      <ParallaxSection />
+    </main>
+    <Footer />
+  </>
+);
+
+interface ProductsPageProps {
+  onCartClick: () => void;
+  cartCount: number;
+  onAddToCart: (product: any) => void;
+}
+
+const ProductsPage: React.FC<ProductsPageProps> = ({
+  onCartClick,
+  cartCount,
+  onAddToCart,
+}) => (
+  <>
+    <Navbar onCartClick={onCartClick} cartCount={cartCount} />
+    <main className="pt-24 min-h-screen relative z-10">
+      <ProductSelection onAddToCart={onAddToCart} />
+    </main>
+    <Footer />
+  </>
+);
+
 const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    // Initialize cart state directly from localStorage
+    const persistedCart = loadCart();
+    console.log('🚀 [APP] Initializing cart from localStorage:', persistedCart);
+    return persistedCart;
+  });
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    console.log('💾 [APP] Saving cart to localStorage:', cartItems);
+    saveCart(cartItems);
+  }, [cartItems]);
+
+  // Listen for cart updates from other components
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      console.log('🔄 [APP] Cart updated event received, reloading cart');
+      const updatedCart = loadCart();
+      setCartItems(updatedCart);
+    };
+
+    window.addEventListener('cart:updated', handleCartUpdate);
+    return () => window.removeEventListener('cart:updated', handleCartUpdate);
+  }, []);
 
   const addToCart = (product: any) => {
+    console.log('➕ [APP] Adding to cart:', product);
     setCartItems((prev) => {
+      console.log('📦 [APP] Previous cart:', prev);
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
-        return prev.map((item) =>
+        const newCart = prev.map((item) =>
           item.id === product.id
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         );
+        console.log('🔄 [APP] Updated existing item, new cart:', newCart);
+        return newCart;
       }
-      return [
+      const newCart = [
         ...prev,
         { ...product, quantity: 1, image: product.image || product.img },
       ];
+      console.log('🆕 [APP] Added new item, new cart:', newCart);
+      return newCart;
     });
     setIsCartOpen(true);
   };
@@ -72,44 +157,6 @@ const App: React.FC = () => {
     setCartItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const HomePage: React.FC = () => (
-    <>
-      <Navbar
-        onCartClick={() => setIsCartOpen(true)}
-        cartCount={cartItems.length}
-      />
-      <main className="relative z-10">
-        <Hero />
-        <section id="shop">
-          <Shop onAddToCart={addToCart} />
-        </section>
-
-        <section id="best-sellers">
-          <BestSellers onAddToCart={addToCart} />
-        </section>
-        <Video />
-        <section id="timeline">
-          <Time />
-        </section>
-        <ParallaxSection />
-      </main>
-      <Footer />
-    </>
-  );
-
-  const ProductsPage: React.FC = () => (
-    <>
-      <Navbar
-        onCartClick={() => setIsCartOpen(true)}
-        cartCount={cartItems.length}
-      />
-      <main className="pt-24 min-h-screen relative z-10">
-        <ProductSelection onAddToCart={addToCart} />
-      </main>
-      <Footer />
-    </>
-  );
-
   return (
     <Router>
       <GoldenBackground />
@@ -125,8 +172,27 @@ const App: React.FC = () => {
       <div className="min-h-screen relative">
         <Routes>
           {/* Main Routes */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/products" element={<ProductsPage />} />
+          <Route
+            path="/"
+            element={
+              <HomePage
+                onCartClick={() => setIsCartOpen(true)}
+                cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                onAddToCart={addToCart}
+              />
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <ProductsPage
+                onCartClick={() => setIsCartOpen(true)}
+                cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                onAddToCart={addToCart}
+              />
+            }
+          />
+          <Route path="/checkout" element={<Checkout />} />
           <Route path="/politique-retour" element={<Politique />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/dashboard" element={<AdminDashboard />} />
@@ -143,16 +209,9 @@ const App: React.FC = () => {
               />
             }
           />
-        <Route
-    path="/reset-password/:token" 
-    element={
-      <ResetPassword
-      />
-    }
-  />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
 
-      
           <Route path="/user" element={<User />} />
           <Route path="/stuff" element={<StaffManagement />} />
         </Routes>

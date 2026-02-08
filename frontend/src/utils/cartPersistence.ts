@@ -1,6 +1,6 @@
 /**
  * Cart Persistence Utility
- * Manages cart storage that persists across tabs but clears when browser closes
+ * Manages cart storage that persists across page reloads but clears when browser closes
  */
 
 export interface CartItem {
@@ -12,32 +12,17 @@ export interface CartItem {
 }
 
 const CART_STORAGE_KEY = 'marius_fanny_cart';
-const SESSION_MARKER_KEY = 'marius_fanny_session';
-
-/**
- * Initialize cart session
- * Clears cart if this is a new browser session
- */
-export const initializeCartSession = (): void => {
-  // Check if this is a new browser session
-  const hasSession = sessionStorage.getItem(SESSION_MARKER_KEY);
-  
-  if (!hasSession) {
-    // New browser session - clear old cart
-    localStorage.removeItem(CART_STORAGE_KEY);
-    // Mark this session
-    sessionStorage.setItem(SESSION_MARKER_KEY, 'active');
-  }
-};
 
 /**
  * Save cart to localStorage
  */
 export const saveCart = (items: CartItem[]): void => {
   try {
+    console.log('💾 [PERSISTENCE] Saving cart:', items);
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    console.log('✅ [PERSISTENCE] Cart saved to localStorage');
   } catch (error) {
-    console.error('Failed to save cart:', error);
+    console.error('❌ [PERSISTENCE] Failed to save cart:', error);
   }
 };
 
@@ -47,11 +32,15 @@ export const saveCart = (items: CartItem[]): void => {
 export const loadCart = (): CartItem[] => {
   try {
     const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+    console.log('📖 [PERSISTENCE] Raw localStorage data:', savedCart);
     if (savedCart) {
-      return JSON.parse(savedCart);
+      const parsed = JSON.parse(savedCart);
+      console.log('✅ [PERSISTENCE] Loaded cart from localStorage:', parsed);
+      return parsed;
     }
+    console.log('ℹ️ [PERSISTENCE] No cart found in localStorage');
   } catch (error) {
-    console.error('Failed to load cart:', error);
+    console.error('❌ [PERSISTENCE] Failed to load cart:', error);
   }
   return [];
 };
@@ -72,4 +61,13 @@ export const clearCart = (): void => {
 export const getCartCount = (): number => {
   const cart = loadCart();
   return cart.reduce((sum, item) => sum + item.quantity, 0);
+};
+
+/**
+ * Initialize cart session (deprecated - cart now persists across reloads)
+ * @deprecated Use loadCart() directly instead
+ */
+export const initializeCartSession = (): void => {
+  // Cart now persists across page reloads by default
+  // Only clears when browser is closed (localStorage behavior)
 };

@@ -47,6 +47,12 @@ const CartDrawer: React.FC<CartProps> = ({
 }) => {
   const navigate = useNavigate();
   const [selectedPostalCode, setSelectedPostalCode] = useState<string>("");
+  const [deliveryType, setDeliveryType] = useState<"pickup" | "delivery">(
+    "pickup",
+  );
+  const [pickupLocation, setPickupLocation] = useState<"Montreal" | "Laval">(
+    "Laval",
+  );
   const [deliveryZoneInfo, setDeliveryZoneInfo] = useState<{
     fee: number;
     minimumOrder: number;
@@ -68,18 +74,22 @@ const CartDrawer: React.FC<CartProps> = ({
     (sum, item) => sum + item.price * item.quantity,
     0,
   );
-  const delivery = deliveryZoneInfo?.isValid ? deliveryZoneInfo.fee : 0;
+  const delivery =
+    deliveryType === "delivery" && deliveryZoneInfo?.isValid
+      ? deliveryZoneInfo.fee
+      : 0;
   const total = subtotal + delivery;
 
   // Validate minimum order
-  const minimumOrderValidation = deliveryZoneInfo?.isValid
-    ? {
-        isValid: subtotal >= deliveryZoneInfo.minimumOrder,
-        shortfall: Math.max(0, deliveryZoneInfo.minimumOrder - subtotal),
-        postalCode: selectedPostalCode,
-        minimumOrder: deliveryZoneInfo.minimumOrder,
-      }
-    : null;
+  const minimumOrderValidation =
+    deliveryType === "delivery" && deliveryZoneInfo?.isValid
+      ? {
+          isValid: subtotal >= deliveryZoneInfo.minimumOrder,
+          shortfall: Math.max(0, deliveryZoneInfo.minimumOrder - subtotal),
+          postalCode: selectedPostalCode,
+          minimumOrder: deliveryZoneInfo.minimumOrder,
+        }
+      : null;
 
   const handlePostalCodeChange = (postalCode: string) => {
     setSelectedPostalCode(postalCode);
@@ -93,8 +103,12 @@ const CartDrawer: React.FC<CartProps> = ({
   };
 
   const handleProceedToPayment = async () => {
-    // Validate postal code and minimum order before navigating to checkout
-    if (!selectedPostalCode) {
+    console.log("🛒 [CART] handleProceedToPayment called", {
+      deliveryType,
+      pickupLocation,
+      itemsCount: items.length,
+    });
+    if (deliveryType === "delivery" && !selectedPostalCode) {
       alert("Veuillez sélectionner un code postal pour la livraison.");
       return;
     }
@@ -107,32 +121,45 @@ const CartDrawer: React.FC<CartProps> = ({
     }
 
     // Check if user is authenticated
-    console.log('🔐 [CART] Checking authentication status...');
+    console.log("🔐 [CART] Checking authentication status...");
     try {
-      const session = await authClient.getSession();
-      
+      const session = await authClient.getSession({
+        query: { disableCookieCache: true },
+      });
+      console.log("🔐 [CART] Session result:", session);
+
       if (!session.data) {
-        console.log('⚠️ [CART] User not authenticated, redirecting to login');
+        console.log("⚠️ [CART] User not authenticated, redirecting to login");
         // Save checkout intent to localStorage
-        localStorage.setItem('checkout_intent', JSON.stringify({
-          items: items,
-          postalCode: selectedPostalCode,
-          deliveryFee: delivery,
-          subtotal: subtotal,
-          total: total,
-          timestamp: Date.now()
-        }));
-        
-        alert('Vous devez être connecté pour passer une commande. Votre panier sera conservé.');
+        localStorage.setItem(
+          "checkout_intent",
+          JSON.stringify({
+            items: items,
+            postalCode: selectedPostalCode,
+            deliveryType: deliveryType,
+            pickupLocation:
+              deliveryType === "pickup" ? pickupLocation : undefined,
+            deliveryFee: delivery,
+            subtotal: subtotal,
+            total: total,
+            timestamp: Date.now(),
+          }),
+        );
+
+        alert(
+          "Vous devez être connecté pour passer une commande. Votre panier sera conservé.",
+        );
         onClose();
-        navigate('/se-connecter');
+        navigate("/se-connecter");
         return;
       }
 
-      console.log('✅ [CART] User authenticated, proceeding to checkout');
+      console.log("✅ [CART] User authenticated, proceeding to checkout");
     } catch (error) {
-      console.error('❌ [CART] Error checking authentication:', error);
-      alert('Erreur lors de la vérification de la connexion. Veuillez réessayer.');
+      console.error("❌ [CART] Error checking authentication:", error);
+      alert(
+        "Erreur lors de la vérification de la connexion. Veuillez réessayer.",
+      );
       return;
     }
 
@@ -141,14 +168,19 @@ const CartDrawer: React.FC<CartProps> = ({
     );
 
     // Navigate to checkout page with order data
+    const checkoutState = {
+      items: items,
+      postalCode: selectedPostalCode,
+      deliveryType: deliveryType,
+      pickupLocation: deliveryType === "pickup" ? pickupLocation : undefined,
+      deliveryFee: delivery,
+      subtotal: subtotal,
+      total: total,
+    };
+    console.log("📦 [CART] Checkout state:", checkoutState);
+
     navigate("/checkout", {
-      state: {
-        items: items,
-        postalCode: selectedPostalCode,
-        deliveryFee: delivery,
-        subtotal: subtotal,
-        total: total,
-      },
+      state: checkoutState,
     });
 
     // Close the cart drawer
@@ -255,8 +287,72 @@ const CartDrawer: React.FC<CartProps> = ({
               ))
             )}
 
-            {/* Postal Code Input */}
+            {/* Delivery Type Selection */}
             {items.length > 0 && (
+              <div className="bg-white p-4 rounded-lg border border-stone-200">
+                <label className="flex items-center gap-2 text-sm font-medium text-[#2D2A26] mb-3">
+                  <ShoppingBag size={16} className="text-[#C5A065]" />
+                  Mode de récupération:
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setDeliveryType("pickup")}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                      deliveryType === "pickup"
+                        ? "bg-[#C5A065] text-white border-[#C5A065]"
+                        : "bg-white text-[#2D2A26] border-stone-300 hover:border-[#C5A065]"
+                    }`}
+                  >
+                    Ramassage
+                  </button>
+                  <button
+                    onClick={() => setDeliveryType("delivery")}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                      deliveryType === "delivery"
+                        ? "bg-[#C5A065] text-white border-[#C5A065]"
+                        : "bg-white text-[#2D2A26] border-stone-300 hover:border-[#C5A065]"
+                    }`}
+                  >
+                    Livraison
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Pickup Location Selection */}
+            {items.length > 0 && deliveryType === "pickup" && (
+              <div className="bg-white p-4 rounded-lg border border-stone-200">
+                <label className="flex items-center gap-2 text-sm font-medium text-[#2D2A26] mb-3">
+                  <MapPin size={16} className="text-[#C5A065]" />
+                  Lieu de ramassage:
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPickupLocation("Laval")}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                      pickupLocation === "Laval"
+                        ? "bg-[#C5A065] text-white border-[#C5A065]"
+                        : "bg-white text-[#2D2A26] border-stone-300 hover:border-[#C5A065]"
+                    }`}
+                  >
+                    Laval
+                  </button>
+                  <button
+                    onClick={() => setPickupLocation("Montreal")}
+                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                      pickupLocation === "Montreal"
+                        ? "bg-[#C5A065] text-white border-[#C5A065]"
+                        : "bg-white text-[#2D2A26] border-stone-300 hover:border-[#C5A065]"
+                    }`}
+                  >
+                    Montréal
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Postal Code Input */}
+            {items.length > 0 && deliveryType === "delivery" && (
               <div className="bg-white p-4 rounded-lg border border-stone-200">
                 <label className="flex items-center gap-2 text-sm font-medium text-[#2D2A26] mb-2">
                   <MapPin size={16} className="text-[#C5A065]" />
@@ -355,15 +451,25 @@ const CartDrawer: React.FC<CartProps> = ({
               <button
                 onClick={handleProceedToPayment}
                 disabled={
-                  !deliveryZoneInfo?.isValid ||
-                  (minimumOrderValidation !== null &&
-                    !minimumOrderValidation.isValid)
+                  deliveryType === "delivery" &&
+                  (!deliveryZoneInfo?.isValid ||
+                    (minimumOrderValidation !== null &&
+                      !minimumOrderValidation.isValid))
                 }
-                className="w-full bg-[#2D2A26] text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-[#C5A065] transition-all shadow-lg mt-4 group disabled:opacity-70 disabled:cursor-not-allowed"
+                className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all shadow-lg mt-4 group ${
+                  deliveryType === "delivery" &&
+                  (!deliveryZoneInfo?.isValid ||
+                    (minimumOrderValidation !== null &&
+                      !minimumOrderValidation.isValid))
+                    ? "bg-stone-400 text-stone-600 cursor-not-allowed"
+                    : "bg-[#2D2A26] text-white hover:bg-[#C5A065]"
+                }`}
                 title={
-                  !deliveryZoneInfo?.isValid
+                  deliveryType === "delivery" && !deliveryZoneInfo?.isValid
                     ? "Veuillez entrer un code postal valide"
-                    : minimumOrderValidation && !minimumOrderValidation.isValid
+                    : deliveryType === "delivery" &&
+                        minimumOrderValidation &&
+                        !minimumOrderValidation.isValid
                       ? "Montant minimum non atteint"
                       : ""
                 }

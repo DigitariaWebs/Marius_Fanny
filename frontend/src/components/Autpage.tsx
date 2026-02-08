@@ -45,7 +45,9 @@ const AuthPage: React.FC = () => {
         return;
       }
 
-      const session = await authClient.getSession();
+      const session = await authClient.getSession({
+        query: { disableCookieCache: true },
+      });
       
       const user = session?.data?.user as UserWithRole; 
       
@@ -65,7 +67,9 @@ const AuthPage: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const session = await authClient.getSession();
+        const session = await authClient.getSession({
+          query: { disableCookieCache: true },
+        });
         if (session.data?.user) {
           handleRoleBasedRedirect();
         }
