@@ -83,6 +83,8 @@ export interface Order {
   pickupDate: string;
   pickupLocation: "Montreal" | "Laval";
   deliveryType: "pickup" | "delivery";
+  deliveryDate?: string;
+  deliveryTimeSlot?: string;
   deliveryAddress?: Address;
   deliverySlot?: string;
   items: OrderItem[];
@@ -136,6 +138,8 @@ export interface OrderFormData {
   pickupDate: string;
   pickupLocation: "Montreal" | "Laval";
   deliveryType: "pickup" | "delivery";
+  deliveryDate?: string;
+  deliveryTimeSlot?: string;
   deliveryAddressId?: number;
   deliverySlot?: string;
   items: {

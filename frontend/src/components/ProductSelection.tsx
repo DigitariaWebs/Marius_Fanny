@@ -81,7 +81,7 @@ const ALL_PRODUCTS: Product[] = [
     price: 3.5,
     image: "./pain1.jpg",
     allergens: ["Gluten (Blé)"],
-    preparationTimeHours: 2,
+    preparationTimeHours: 24,
   },
   {
     id: 202,
@@ -91,7 +91,7 @@ const ALL_PRODUCTS: Product[] = [
     price: 5.95,
     image: "./pain2.jpg",
     allergens: ["Gluten (Blé)"],
-    preparationTimeHours: 4,
+    preparationTimeHours: 24,
   },
   {
     id: 301,
@@ -102,7 +102,7 @@ const ALL_PRODUCTS: Product[] = [
     image: "./croi1.jpg",
     tag: "Matin",
     allergens: ["Gluten", "Lait"],
-    preparationTimeHours: 2,
+    preparationTimeHours: 24,
   },
   {
     id: 5101,
@@ -112,7 +112,7 @@ const ALL_PRODUCTS: Product[] = [
     price: 12.5,
     image: "./boite.jpg",
     allergens: ["Gluten", "Lait"],
-    preparationTimeHours: 1,
+    preparationTimeHours: 24,
   },
   {
     id: 5201,
@@ -122,7 +122,7 @@ const ALL_PRODUCTS: Product[] = [
     price: 14.0,
     image: "./salade1.jpg",
     allergens: ["Lait", "Gluten", "Oeufs"],
-    preparationTimeHours: 1,
+    preparationTimeHours: 24,
   },
   {
     id: 5301,
@@ -133,7 +133,7 @@ const ALL_PRODUCTS: Product[] = [
     price: 22.0,
     image: "./salade2.jpg",
     allergens: ["Lait", "Gluten"],
-    preparationTimeHours: 2,
+    preparationTimeHours: 48,
   },
   {
     id: 5401,
@@ -144,7 +144,7 @@ const ALL_PRODUCTS: Product[] = [
     image: "./salade3.jpg",
     tag: "Végé",
     allergens: ["Gluten", "Lait"],
-    preparationTimeHours: 1,
+    preparationTimeHours: 24,
   },
 ];
 

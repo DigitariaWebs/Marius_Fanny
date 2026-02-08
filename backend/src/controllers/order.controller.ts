@@ -90,6 +90,8 @@ export const createOrder = async (
         : undefined,
       pickupLocation: orderData.pickupLocation,
       deliveryType: orderData.deliveryType,
+      deliveryDate: orderData.deliveryDate,
+      deliveryTimeSlot: orderData.deliveryTimeSlot,
       deliveryAddress: orderData.deliveryAddress,
       items: orderData.items,
       subtotal,

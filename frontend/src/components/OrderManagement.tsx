@@ -665,6 +665,37 @@ export function OrderManagement() {
                             </p>
                           </div>
                         </div>
+                        {selectedOrder.deliveryDate && (
+                          <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
+                            <Calendar className="w-5 h-5 text-(--bakery-gold)" />
+                            <div>
+                              <p className="text-xs text-(--bakery-text-secondary)">
+                                Date de livraison
+                              </p>
+                              <p className="text-sm font-medium text-(--bakery-text)">
+                                {new Date(selectedOrder.deliveryDate).toLocaleDateString('fr-CA', { 
+                                  weekday: 'long', 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric' 
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {selectedOrder.deliveryTimeSlot && (
+                          <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
+                            <Clock className="w-5 h-5 text-(--bakery-gold)" />
+                            <div>
+                              <p className="text-xs text-(--bakery-text-secondary)">
+                                Créneau horaire
+                              </p>
+                              <p className="text-sm font-medium text-(--bakery-text)">
+                                {selectedOrder.deliveryTimeSlot}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, CreditCard, MapPin, ShoppingBag, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, CreditCard, MapPin, ShoppingBag, CheckCircle2, AlertTriangle, Calendar, Clock } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import SquarePaymentForm from "../components/SquarePaymentForm";
 import Navbar from "../components/Navbar";
@@ -35,7 +35,14 @@ const Checkout: React.FC = () => {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryTimeFrom, setDeliveryTimeFrom] = useState("");
+  const [deliveryTimeTo, setDeliveryTimeTo] = useState("");
+  const [dateValidationError, setDateValidationError] = useState("");
+  const [timeSlotError, setTimeSlotError] = useState("");
+  const [currentStep, setCurrentStep] = useState<
+    "contact" | "delivery" | "payment"
+  >("contact");
   const [isLoadingUserData, setIsLoadingUserData] = useState(true);
   const [paymentResultModal, setPaymentResultModal] = useState<{
     isOpen: boolean;
@@ -50,6 +57,171 @@ const Checkout: React.FC = () => {
     content: null,
     onClose: () => {},
   });
+
+  // Delivery time slots configuration - removed predefined slots for flexible selection
+  const availableHours = [
+    "08:00",
+    "08:30",
+    "09:00",
+    "09:30",
+    "10:00",
+    "10:30",
+    "11:00",
+    "11:30",
+    "12:00",
+    "12:30",
+    "13:00",
+    "13:30",
+    "14:00",
+    "14:30",
+    "15:00",
+    "15:30",
+    "16:00",
+    "16:30",
+    "17:00",
+    "17:30",
+    "18:00",
+    "18:30",
+    "19:00",
+    "19:30",
+    "20:00",
+    "20:30",
+    "21:00",
+  ];
+
+  // Calculate minimum delivery date based on preparation times
+  const getMinimumDeliveryDate = () => {
+    if (!state?.items || state.items.length === 0) {
+      return new Date();
+    }
+
+    // Find the longest preparation time in hours
+    const maxPreparationHours = Math.max(
+      ...state.items.map((item) => item.preparationTimeHours || 0),
+    );
+
+    // Calculate when products will be ready
+    const now = new Date();
+    const readyTime = new Date();
+    readyTime.setHours(now.getHours() + maxPreparationHours);
+
+    // Get the day when products will be ready
+    const readyDate = new Date(readyTime);
+    readyDate.setHours(0, 0, 0, 0);
+
+    // Business rule: Must order before noon for next day delivery
+    // If it's after noon (12:00 PM) and trying to deliver tomorrow, push to day after
+    if (now.getHours() >= 12 && maxPreparationHours === 24) {
+      readyDate.setDate(readyDate.getDate() + 1);
+    }
+
+    // If products won't be ready until late in the day (after 6 PM),
+    // push delivery to next day since we can't deliver late at night
+    if (readyTime.getHours() >= 18) {
+      readyDate.setDate(readyDate.getDate() + 1);
+    }
+
+    return readyDate;
+  };
+
+  // Format date for input field (YYYY-MM-DD)
+  const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const minDeliveryDate = formatDateForInput(getMinimumDeliveryDate());
+  const maxPreparationTime = state?.items
+    ? Math.max(...state.items.map((item) => item.preparationTimeHours || 0))
+    : 0;
+
+  // Get products that require the maximum preparation time
+  const getProductsRequiringMaxPreparation = () => {
+    if (!state?.items) return [];
+    return state.items.filter(
+      (item) => item.preparationTimeHours === maxPreparationTime,
+    );
+  };
+
+  // Validate the selected delivery date
+  const validateDeliveryDate = (selectedDate: string) => {
+    if (!selectedDate) {
+      setDateValidationError("");
+      return true;
+    }
+
+    // Parse selected date and normalize to midnight local time
+    const selected = new Date(selectedDate + "T00:00:00");
+    const minDate = getMinimumDeliveryDate();
+
+    // Compare dates (both at midnight)
+    if (selected < minDate) {
+      const daysNeeded = Math.ceil(maxPreparationTime / 24);
+      const productsRequiringTime = getProductsRequiringMaxPreparation();
+      const productNames = productsRequiringTime.map((p) => p.name).join(", ");
+
+      const now = new Date();
+      const noonCutoffMessage =
+        maxPreparationTime === 24 && now.getHours() >= 12
+          ? " Note: Pour une livraison le lendemain, vous devez commander avant 12h (midi)."
+          : "";
+
+      setDateValidationError(
+        `❌ Date trop tôt! Les produits suivants nécessitent ${maxPreparationTime}h (${daysNeeded} jour${daysNeeded > 1 ? "s" : ""}) de préparation: ${productNames}. Date minimum: ${minDate.toLocaleDateString("fr-CA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}.${noonCutoffMessage}`,
+      );
+      return false;
+    }
+
+    setDateValidationError("");
+    return true;
+  };
+
+  // Handle date change with real-time validation
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    setDeliveryDate(newDate);
+    validateDeliveryDate(newDate);
+  };
+
+  // Validate time slot to ensure end time is after start time
+  const validateTimeSlot = (from: string, to: string) => {
+    if (!from || !to) {
+      setTimeSlotError("");
+      return;
+    }
+
+    // Convert time strings to comparable numbers (e.g., "15:30" -> 1530)
+    const fromTime = parseInt(from.replace(":", ""));
+    const toTime = parseInt(to.replace(":", ""));
+
+    if (toTime <= fromTime) {
+      setTimeSlotError("⚠️ L'heure de fin doit être après l'heure de début");
+    } else {
+      setTimeSlotError("");
+    }
+  };
+
+  const handleTimeFromChange = (time: string) => {
+    setDeliveryTimeFrom(time);
+    validateTimeSlot(time, deliveryTimeTo);
+  };
+
+  const handleTimeToChange = (time: string) => {
+    setDeliveryTimeTo(time);
+    validateTimeSlot(deliveryTimeFrom, time);
+  };
+
+  // Filter available end times based on selected start time
+  const getAvailableEndTimes = () => {
+    if (!deliveryTimeFrom) return availableHours;
+    const fromTime = parseInt(deliveryTimeFrom.replace(":", ""));
+    return availableHours.filter((time) => {
+      const timeValue = parseInt(time.replace(":", ""));
+      return timeValue > fromTime;
+    });
+  };
 
   useEffect(() => {
     console.log("🛒 [CHECKOUT] Component mounted, state:", state);
@@ -132,9 +304,45 @@ const Checkout: React.FC = () => {
     }
 
     console.log(
-      `💳 [CHECKOUT] Customer info collected, showing payment form for ${customerName} (${customerEmail}, ${customerPhone}), payment type: full`,
+      `👤 [CHECKOUT] Customer info collected: ${customerName} (${customerEmail}, ${customerPhone}), moving to delivery step`,
     );
-    setShowPaymentForm(true);
+    setCurrentStep("delivery");
+  };
+
+  const handleDeliveryFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!deliveryDate) {
+      alert("Veuillez sélectionner une date de livraison.");
+      return;
+    }
+
+    if (!deliveryTimeFrom) {
+      alert("Veuillez sélectionner l'heure de début de votre créneau.");
+      return;
+    }
+
+    if (!deliveryTimeTo) {
+      alert("Veuillez sélectionner l'heure de fin de votre créneau.");
+      return;
+    }
+
+    // Validate that end time is after start time
+    if (deliveryTimeFrom >= deliveryTimeTo) {
+      alert("L'heure de fin doit être après l'heure de début.");
+      return;
+    }
+
+    // Validate that the selected date is not before the minimum date
+    if (!validateDeliveryDate(deliveryDate)) {
+      // Error message already set by validateDeliveryDate
+      return;
+    }
+
+    console.log(
+      `📅 [CHECKOUT] Delivery info collected: ${deliveryDate} de ${deliveryTimeFrom} à ${deliveryTimeTo}, moving to payment step`,
+    );
+    setCurrentStep("payment");
   };
 
   const handlePaymentSuccess = async (paymentResult: any) => {
@@ -166,6 +374,8 @@ const Checkout: React.FC = () => {
           phone: customerPhone,
         },
         deliveryType: state.deliveryType,
+        deliveryDate: deliveryDate,
+        deliveryTimeSlot: `${deliveryTimeFrom} - ${deliveryTimeTo}`,
         deliveryAddress:
           state.deliveryType === "delivery" && state.postalCode
             ? {
@@ -189,7 +399,7 @@ const Checkout: React.FC = () => {
         paymentType: "full",
         depositPaid: true, // Payment was made
         squarePaymentId: paymentId,
-        notes: `Square Payment ID: ${paymentId}`,
+        notes: `Square Payment ID: ${paymentId} | Livraison prévue: ${deliveryDate} de ${deliveryTimeFrom} à ${deliveryTimeTo}`,
       };
 
       const response = await fetch(`${normalizedApiUrl}/api/orders`, {
@@ -319,9 +529,7 @@ const Checkout: React.FC = () => {
           </p>
         </div>
       ),
-      onClose: () => {
-        setShowPaymentForm(false);
-      },
+      onClose: () => {},
     });
   };
 
@@ -350,21 +558,41 @@ const Checkout: React.FC = () => {
                 color: "#C5A065",
               }}
             >
-              Paiement
+              {currentStep === "contact" && "Informations client"}
+              {currentStep === "delivery" && "Créneau de livraison"}
+              {currentStep === "payment" && "Paiement sécurisé"}
             </h1>
             <p className="text-stone-600">
-              Finalisez votre commande en toute sécurité
+              {currentStep === "contact" && "Renseignez vos coordonnées"}
+              {currentStep === "delivery" &&
+                "Choisissez votre créneau de livraison"}
+              {currentStep === "payment" &&
+                "Finalisez votre commande en toute sécurité"}
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Left Column - Customer Info & Payment */}
+            {/* Left Column - Multi-step Checkout */}
             <div className="space-y-6">
-              {!showPaymentForm ? (
+              {/* Step 1: Contact Information */}
+              {currentStep === "contact" && (
                 <div className="bg-white rounded-2xl p-6 shadow-lg">
-                  <h2 className="text-xl font-serif text-[#2D2A26] mb-2">
-                    Informations de contact
-                  </h2>
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 bg-[#C5A065] text-white rounded-full flex items-center justify-center text-sm font-bold">
+                        1
+                      </div>
+                      <h2 className="text-xl font-serif text-[#2D2A26]">
+                        Informations de contact
+                      </h2>
+                    </div>
+                    <div className="w-full bg-stone-200 rounded-full h-2">
+                      <div
+                        className="bg-[#C5A065] h-2 rounded-full"
+                        style={{ width: "33%" }}
+                      ></div>
+                    </div>
+                  </div>
                   <p className="text-sm text-stone-500 mb-4">
                     {isLoadingUserData
                       ? "Chargement de vos informations..."
@@ -420,20 +648,237 @@ const Checkout: React.FC = () => {
                       type="submit"
                       className="w-full bg-[#2D2A26] text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-[#C5A065] transition-all shadow-lg"
                     >
-                      <CreditCard size={18} />
-                      Continuer au paiement
+                      Suivant: Créneau de livraison
+                      <ArrowLeft size={18} className="rotate-180" />
                     </button>
                   </form>
                 </div>
-              ) : (
+              )}
+
+              {/* Step 2: Delivery Time Slot */}
+              {currentStep === "delivery" && (
                 <div className="bg-white rounded-2xl p-6 shadow-lg">
-                  <h2 className="text-xl font-serif text-[#2D2A26] mb-2">
-                    Informations de paiement
-                  </h2>
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 bg-[#C5A065] text-white rounded-full flex items-center justify-center text-sm font-bold">
+                        2
+                      </div>
+                      <h2 className="text-xl font-serif text-[#2D2A26]">
+                        Créneau de livraison
+                      </h2>
+                    </div>
+                    <div className="w-full bg-stone-200 rounded-full h-2">
+                      <div
+                        className="bg-[#C5A065] h-2 rounded-full"
+                        style={{ width: "66%" }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {maxPreparationTime > 0 && (
+                    <div
+                      className="mb-6 p-4 rounded-lg"
+                      style={{
+                        backgroundColor:
+                          maxPreparationTime >= 48 ? "#fef2f2" : "#fffbeb",
+                        borderLeft: `4px solid ${maxPreparationTime >= 48 ? "#dc2626" : "#d97706"}`,
+                      }}
+                    >
+                      <p
+                        className="text-sm font-medium"
+                        style={{
+                          color:
+                            maxPreparationTime >= 48 ? "#dc2626" : "#d97706",
+                        }}
+                      >
+                        ⏰ Temps de préparation requis:{" "}
+                        {maxPreparationTime >= 24
+                          ? `${Math.ceil(maxPreparationTime / 24)} jour${Math.ceil(maxPreparationTime / 24) > 1 ? "s" : ""}`
+                          : `${maxPreparationTime} heure${maxPreparationTime > 1 ? "s" : ""}`}
+                      </p>
+                      <p className="text-xs mt-2 text-stone-600">
+                        <strong>Produit(s) concerné(s):</strong>{" "}
+                        {getProductsRequiringMaxPreparation()
+                          .map((p) => `${p.name} (${p.preparationTimeHours}h)`)
+                          .join(", ")}
+                      </p>
+                      <p className="text-xs mt-2 text-stone-600">
+                        📅 Livraison disponible à partir du{" "}
+                        {new Date(minDeliveryDate).toLocaleDateString("fr-CA", {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
+                      {maxPreparationTime === 24 && (
+                        <p className="text-xs mt-2 text-stone-600 font-medium">
+                          🕐 Pour une livraison le lendemain, commandez avant
+                          12h (midi)
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={handleDeliveryFormSubmit}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="block text-sm text-stone-600 mb-2">
+                        Date de livraison *
+                      </label>
+                      <input
+                        type="date"
+                        value={deliveryDate}
+                        onChange={handleDateChange}
+                        min={minDeliveryDate}
+                        className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
+                          dateValidationError
+                            ? "border-red-500 focus:ring-red-500"
+                            : "border-stone-300 focus:ring-[#C5A065]"
+                        }`}
+                        required
+                      />
+                      {dateValidationError && (
+                        <p className="mt-2 text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
+                          {dateValidationError}
+                        </p>
+                      )}
+                      {deliveryDate && !dateValidationError && (
+                        <p className="mt-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                          ✅ Date valide! Livraison prévue le{" "}
+                          {new Date(deliveryDate).toLocaleDateString("fr-CA", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="flex text-sm text-stone-600 mb-2 items-center gap-2">
+                          <Clock size={16} />
+                          De *
+                        </label>
+                        <select
+                          value={deliveryTimeFrom}
+                          onChange={(e) => handleTimeFromChange(e.target.value)}
+                          className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065] bg-white"
+                          required
+                        >
+                          <option value="">Heure de début</option>
+                          {availableHours.map((time) => (
+                            <option key={time} value={time}>
+                              {time}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="flex text-sm text-stone-600 mb-2 items-center gap-2">
+                          <Clock size={16} />À *
+                        </label>
+                        <select
+                          value={deliveryTimeTo}
+                          onChange={(e) => handleTimeToChange(e.target.value)}
+                          className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 bg-white ${
+                            timeSlotError
+                              ? "border-red-500 focus:ring-red-500"
+                              : "border-stone-300 focus:ring-[#C5A065]"
+                          }`}
+                          required
+                        >
+                          <option value="">Heure de fin</option>
+                          {getAvailableEndTimes().map((time) => (
+                            <option key={time} value={time}>
+                              {time}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {timeSlotError && (
+                      <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
+                        {timeSlotError}
+                      </p>
+                    )}
+
+                    {deliveryTimeFrom && deliveryTimeTo && !timeSlotError && (
+                      <div className="text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                        ✅ <strong>Créneau sélectionné:</strong>{" "}
+                        {deliveryTimeFrom} - {deliveryTimeTo}
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentStep("contact");
+                          setDateValidationError("");
+                          setTimeSlotError("");
+                        }}
+                        className="flex-1 bg-stone-200 text-stone-700 py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-stone-300 transition-all"
+                      >
+                        <ArrowLeft size={18} />
+                        Retour
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!!dateValidationError || !!timeSlotError}
+                        className={`flex-1 py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all shadow-lg ${
+                          dateValidationError || timeSlotError
+                            ? "bg-stone-400 text-stone-600 cursor-not-allowed"
+                            : "bg-[#2D2A26] text-white hover:bg-[#C5A065]"
+                        }`}
+                      >
+                        Paiement
+                        <ArrowLeft size={18} className="rotate-180" />
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Step 3: Payment */}
+              {currentStep === "payment" && (
+                <div className="bg-white rounded-2xl p-6 shadow-lg">
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 bg-[#C5A065] text-white rounded-full flex items-center justify-center text-sm font-bold">
+                        3
+                      </div>
+                      <h2 className="text-xl font-serif text-[#2D2A26]">
+                        Informations de paiement
+                      </h2>
+                    </div>
+                    <div className="w-full bg-stone-200 rounded-full h-2">
+                      <div
+                        className="bg-[#C5A065] h-2 rounded-full"
+                        style={{ width: "100%" }}
+                      ></div>
+                    </div>
+                  </div>
                   <p className="text-sm text-stone-500 mb-4">
                     Montant à payer: {state.total.toFixed(2)}$ CAD (Paiement
                     complet)
                   </p>
+                  <div className="mb-4 p-3 bg-stone-50 rounded-lg">
+                    <p className="text-sm text-stone-600">
+                      <strong>Client:</strong> {customerName}
+                    </p>
+                    <p className="text-sm text-stone-600">
+                      <strong>Livraison:</strong>{" "}
+                      {new Date(deliveryDate).toLocaleDateString("fr-CA")} de{" "}
+                      {deliveryTimeFrom} à {deliveryTimeTo}
+                    </p>
+                  </div>
                   <SquarePaymentForm
                     amount={state.total}
                     onPaymentSuccess={handlePaymentSuccess}
@@ -447,6 +892,13 @@ const Checkout: React.FC = () => {
                       province: "",
                     }}
                   />
+                  <button
+                    onClick={() => setCurrentStep("delivery")}
+                    className="w-full mt-4 bg-stone-200 text-stone-700 py-3 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-stone-300 transition-all"
+                  >
+                    <ArrowLeft size={18} />
+                    Retour au créneau
+                  </button>
                 </div>
               )}
             </div>
@@ -488,10 +940,7 @@ const Checkout: React.FC = () => {
 
                 <div className="space-y-3 mb-4">
                   {state.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="text-sm"
-                    >
+                    <div key={item.id} className="text-sm">
                       <div className="flex justify-between items-center">
                         <span className="text-stone-600">
                           {item.name} × {item.quantity}
@@ -500,19 +949,33 @@ const Checkout: React.FC = () => {
                           {(item.price * item.quantity).toFixed(2)} $
                         </span>
                       </div>
-                      {item.preparationTimeHours && item.preparationTimeHours > 0 && (
-                        <div className="mt-1 p-2 rounded text-xs" style={{
-                          backgroundColor: item.preparationTimeHours >= 24 ? '#fef2f2' : item.preparationTimeHours >= 12 ? '#fffbeb' : '#f0fdf4',
-                          color: item.preparationTimeHours >= 24 ? '#dc2626' : item.preparationTimeHours >= 12 ? '#d97706' : '#16a34a'
-                        }}>
-                          ⏰ {item.preparationTimeHours >= 24
-                            ? `Préparation: ${item.preparationTimeHours / 24} jour${item.preparationTimeHours / 24 > 1 ? 's' : ''} requis`
-                            : item.preparationTimeHours >= 12
-                            ? `Préparation: ${item.preparationTimeHours} heures requises`
-                            : `Prêt en ${item.preparationTimeHours} heure${item.preparationTimeHours > 1 ? 's' : ''}`
-                          }
-                        </div>
-                      )}
+                      {item.preparationTimeHours &&
+                        item.preparationTimeHours > 0 && (
+                          <div
+                            className="mt-1 p-2 rounded text-xs"
+                            style={{
+                              backgroundColor:
+                                item.preparationTimeHours >= 24
+                                  ? "#fef2f2"
+                                  : item.preparationTimeHours >= 12
+                                    ? "#fffbeb"
+                                    : "#f0fdf4",
+                              color:
+                                item.preparationTimeHours >= 24
+                                  ? "#dc2626"
+                                  : item.preparationTimeHours >= 12
+                                    ? "#d97706"
+                                    : "#16a34a",
+                            }}
+                          >
+                            ⏰{" "}
+                            {item.preparationTimeHours >= 24
+                              ? `Préparation: ${item.preparationTimeHours / 24} jour${item.preparationTimeHours / 24 > 1 ? "s" : ""} requis`
+                              : item.preparationTimeHours >= 12
+                                ? `Préparation: ${item.preparationTimeHours} heures requises`
+                                : `Prêt en ${item.preparationTimeHours} heure${item.preparationTimeHours > 1 ? "s" : ""}`}
+                          </div>
+                        )}
                     </div>
                   ))}
                 </div>

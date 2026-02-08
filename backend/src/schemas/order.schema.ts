@@ -50,6 +50,8 @@ export const createOrderSchema = z
     deliveryType: z.enum(["pickup", "delivery"], {
       message: "Le type de livraison doit être pickup ou delivery",
     }),
+    deliveryDate: z.string().optional(),
+    deliveryTimeSlot: z.string().optional(),
     deliveryAddress: addressSchema.optional(),
     items: z
       .array(orderItemSchema)
@@ -87,6 +89,8 @@ export const updateOrderSchema = z.object({
   pickupDate: z.string().datetime().optional(),
   pickupLocation: z.enum(["Montreal", "Laval"]).optional(),
   deliveryType: z.enum(["pickup", "delivery"]).optional(),
+  deliveryDate: z.string().optional(),
+  deliveryTimeSlot: z.string().optional(),
   deliveryAddress: addressSchema.optional(),
   items: z.array(orderItemSchema).optional(),
   status: z

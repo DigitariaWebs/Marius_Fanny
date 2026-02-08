@@ -41,6 +41,8 @@ export interface IOrder extends Document {
   pickupDate?: Date;
   pickupLocation: "Montreal" | "Laval";
   deliveryType: "pickup" | "delivery";
+  deliveryDate?: string;
+  deliveryTimeSlot?: string;
   deliveryAddress?: IAddress;
   items: IOrderItem[];
   subtotal: number;
@@ -194,6 +196,14 @@ const OrderSchema = new Schema<IOrder>(
       enum: ["pickup", "delivery"],
       required: true,
       index: true,
+    },
+    deliveryDate: {
+      type: String,
+      trim: true,
+    },
+    deliveryTimeSlot: {
+      type: String,
+      trim: true,
     },
     deliveryAddress: {
       type: AddressSchema,
