@@ -2,7 +2,7 @@ import React from 'react';
 
 const GoldenBackground: React.FC = () => {
   return (
-    <div className="fixed inset-0 pointer-events-none z-0">
+    <div className="fixed inset-0 pointer-events-none" style={{ zIndex: -1 }}>
       <svg className="absolute w-full h-full opacity-40" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="golden-lines" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">

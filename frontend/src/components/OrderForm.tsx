@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -62,6 +62,14 @@ interface OrderFormData {
     province: string;
     postalCode: string;
   };
+  // AJOUT: Adresse de facturation
+  billingAddress?: {
+    street: string;
+    city: string;
+    province: string;
+    postalCode: string;
+    sameAsDelivery?: boolean;
+  };
   subtotal: number;
   taxAmount: number;
   deliveryFee: number;
@@ -99,6 +107,14 @@ export default function OrderForm({
     pickupLocation: initialData?.pickupLocation || "Laval",
     deliveryType: initialData?.deliveryType || "pickup",
     deliveryAddress: initialData?.deliveryAddress,
+    // AJOUT: Initialisation de l'adresse de facturation
+    billingAddress: initialData?.billingAddress || {
+      street: "",
+      city: "",
+      province: "",
+      postalCode: "",
+      sameAsDelivery: true,
+    },
     subtotal: 0,
     taxAmount: 0,
     deliveryFee: initialData?.deliveryFee || 0,
@@ -114,6 +130,10 @@ export default function OrderForm({
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(
     null,
   );
+  // AJOUT: État pour l'adresse de facturation sélectionnée
+  const [selectedBillingAddressId, setSelectedBillingAddressId] = useState<
+    number | null
+  >(null);
   const [deliveryZoneInfo, setDeliveryZoneInfo] = useState<{
     zoneName: string;
     fee: number;
@@ -126,7 +146,7 @@ export default function OrderForm({
     const subtotal = formData.items.reduce((sum, item) => sum + item.amount, 0);
     const taxAmount = subtotal * TAX_RATE;
     const total = subtotal + taxAmount + formData.deliveryFee;
-    const depositAmount = total * 0.5; // 50% deposit
+    const depositAmount = total * 0.5;
     const balance = total - depositAmount;
 
     setFormData((prev) => ({
@@ -138,7 +158,6 @@ export default function OrderForm({
       balance,
     }));
 
-    // Validate minimum order when subtotal changes and we have delivery zone info
     if (
       formData.deliveryType === "delivery" &&
       deliveryZoneInfo?.isValid &&
@@ -171,9 +190,6 @@ export default function OrderForm({
           updated.deliveryAddress = undefined;
           updated.deliveryFee = 0;
           setSelectedAddressId(null);
-        } else if (value === "delivery") {
-          // Clear pickup location if switching to delivery
-          // Keep it for now as it might be useful for internal tracking
         }
       }
 
@@ -184,7 +200,6 @@ export default function OrderForm({
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
 
-    // Clear related errors when delivery type changes
     if (field === "deliveryType") {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -211,7 +226,6 @@ export default function OrderForm({
       items: prev.items.map((item) => {
         if (item.id === id) {
           const updatedItem = { ...item, [field]: value };
-          // Recalculate amount when quantity or unit price changes
           if (field === "quantity" || field === "unitPrice") {
             updatedItem.amount = updatedItem.quantity * updatedItem.unitPrice;
           }
@@ -259,19 +273,6 @@ export default function OrderForm({
   const getProductById = (productId: number | null): Product | null => {
     if (!productId) return null;
     return MOCK_PRODUCTS.find((p) => p.id === productId) || null;
-  };
-
-  const validateItemQuantity = (itemId: string, quantity: number) => {
-    const item = formData.items.find((i) => i.id === itemId);
-    if (!item?.productId) return true;
-
-    const product = getProductById(item.productId);
-    if (!product) return true;
-
-    return (
-      quantity >= product.minOrderQuantity &&
-      quantity <= product.maxOrderQuantity
-    );
   };
 
   const validatePreparationTime = (orderDate: string, productId: number) => {
@@ -340,8 +341,8 @@ export default function OrderForm({
     }));
     setEmailSearch(client.email);
     setEmailOpen(false);
-
     setSelectedAddressId(null);
+    setSelectedBillingAddressId(null);
   };
 
   const handleEmailChange = (value: string) => {
@@ -371,6 +372,42 @@ export default function OrderForm({
           postalCode: address.postalCode,
         },
       }));
+    }
+  };
+
+  // AJOUT: Fonction pour sélectionner l'adresse de facturation
+  const handleBillingAddressSelect = (addressId: number) => {
+    if (!selectedClient) return;
+
+    const address = selectedClient.addresses.find(
+      (addr) => addr.id === addressId,
+    );
+    if (address) {
+      setSelectedBillingAddressId(addressId);
+      setFormData((prev) => ({
+        ...prev,
+        billingAddress: {
+          street: address.street,
+          city: address.city,
+          province: address.province,
+          postalCode: address.postalCode,
+          sameAsDelivery: false,
+        },
+      }));
+    }
+  };
+
+  // AJOUT: Fonction pour copier l'adresse de livraison
+  const copyDeliveryToBilling = () => {
+    if (formData.deliveryAddress) {
+      setFormData((prev) => ({
+        ...prev,
+        billingAddress: {
+          ...prev.deliveryAddress!,
+          sameAsDelivery: true,
+        },
+      }));
+      setSelectedBillingAddressId(null);
     }
   };
 
@@ -413,11 +450,23 @@ export default function OrderForm({
         newErrors.deliveryZone =
           "Veuillez sélectionner un code postal de livraison valide";
       }
-
-      // Validate minimum order amount for delivery
       if (minimumOrderError) {
         newErrors.minimumOrder = minimumOrderError;
       }
+    }
+
+    // AJOUT: Validation de l'adresse de facturation
+    if (!formData.billingAddress?.street.trim()) {
+      newErrors.billingAddress = "L'adresse de facturation est requise";
+    }
+    if (!formData.billingAddress?.city.trim()) {
+      newErrors.billingCity = "La ville de facturation est requise";
+    }
+    if (!formData.billingAddress?.province.trim()) {
+      newErrors.billingProvince = "La province de facturation est requise";
+    }
+    if (!formData.billingAddress?.postalCode.trim()) {
+      newErrors.billingPostalCode = "Le code postal de facturation est requis";
     }
 
     const hasValidItem = formData.items.some(
@@ -427,7 +476,6 @@ export default function OrderForm({
       newErrors.items = "Au moins un article est requis";
     }
 
-    // Validate item quantities against min/max
     formData.items.forEach((item, index) => {
       if (item.productId) {
         const product = getProductById(item.productId);
@@ -444,7 +492,6 @@ export default function OrderForm({
       }
     });
 
-    // Validate preparation time for each item
     formData.items.forEach((item, index) => {
       if (item.productId) {
         if (!validatePreparationTime(formData.date, item.productId)) {
@@ -468,7 +515,7 @@ export default function OrderForm({
 
   return (
     <form id="order-form" onSubmit={handleSubmit} className="space-y-6">
-      {/* Client Information */}
+      {/* SECTION 1: Informations client */}
       <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-200">
         <div>
           <Label htmlFor="date" className="text-xs text-gray-600">
@@ -605,7 +652,7 @@ export default function OrderForm({
         </div>
       </div>
 
-      {/* Pickup/Delivery Options */}
+      {/* SECTION 2: Type de commande (Ramassage/Livraison) */}
       <div className="pb-4 border-b border-gray-200">
         <div className="mb-4">
           <Label className="text-xs text-gray-600 mb-2">TYPE:</Label>
@@ -629,7 +676,6 @@ export default function OrderForm({
           </RadioGroup>
         </div>
 
-        {/* Pickup Location - Only for pickup */}
         {formData.deliveryType === "pickup" && (
           <div>
             <Label className="text-xs text-gray-600 mb-2">
@@ -664,7 +710,7 @@ export default function OrderForm({
         )}
       </div>
 
-      {/* Delivery Address - Only for delivery */}
+      {/* SECTION 3: Adresse de livraison (uniquement pour livraison) */}
       {formData.deliveryType === "delivery" && (
         <div className="space-y-4 pb-4 border-b border-gray-200">
           <Label className="text-xs text-gray-600">ADRESSE DE LIVRAISON:</Label>
@@ -787,8 +833,54 @@ export default function OrderForm({
                     },
                   }))
                 }
-                className={errors.deliveryPostalCode ? "border-red-500" : ""}
+                className={errors.deliveryProvince ? "border-red-500" : ""}
                 placeholder="Québec"
+              />
+              {errors.deliveryProvince && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.deliveryProvince}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label
+                htmlFor="deliveryPostalCode"
+                className="text-xs text-gray-600"
+              >
+                CODE POSTAL:
+              </Label>
+              <Input
+                id="deliveryPostalCode"
+                type="text"
+                value={formData.deliveryAddress?.postalCode || ""}
+                onChange={(e) => {
+                  const postalCode = e.target.value.toUpperCase();
+                  const zoneInfo = calculateDeliveryFee(postalCode);
+                  if (zoneInfo.isValid) {
+                    setDeliveryZoneInfo({
+                      zoneName: zoneInfo.zoneName,
+                      fee: zoneInfo.fee,
+                      minimumOrder: zoneInfo.minimumOrder,
+                      isValid: true,
+                    });
+                  } else {
+                    setDeliveryZoneInfo(null);
+                  }
+                  setFormData((prev) => ({
+                    ...prev,
+                    deliveryAddress: {
+                      ...prev.deliveryAddress,
+                      street: prev.deliveryAddress?.street || "",
+                      city: prev.deliveryAddress?.city || "",
+                      province: prev.deliveryAddress?.province || "",
+                      postalCode,
+                    },
+                    deliveryFee: zoneInfo.isValid ? zoneInfo.fee : 0,
+                  }));
+                }}
+                className={errors.deliveryPostalCode ? "border-red-500" : ""}
+                placeholder="H1A 1A1"
               />
               {errors.deliveryPostalCode && (
                 <p className="text-xs text-red-500 mt-1">
@@ -806,14 +898,14 @@ export default function OrderForm({
                   {deliveryZoneInfo.isValid ? (
                     <>
                       <div className="font-semibold">
-                        {formData.deliveryAddress?.postalCode}
+                        Zone: {deliveryZoneInfo.zoneName}
                       </div>
                       <div>
                         Frais de livraison: {deliveryZoneInfo.fee.toFixed(2)}$
                       </div>
                       <div>
                         Minimum requis:{" "}
-                        {deliveryZoneInfo.minimumOrder.toFixed(2)}$ (avant taxe)
+                        {deliveryZoneInfo.minimumOrder.toFixed(2)}$
                       </div>
                     </>
                   ) : (
@@ -821,68 +913,264 @@ export default function OrderForm({
                   )}
                 </div>
               )}
-              <div>
-                <Label htmlFor="deliveryZone" className="text-xs text-gray-600">
-                  CODE POSTAL DE LIVRAISON:
-                </Label>
-                <Select
-                  value={deliveryZoneInfo?.zoneName || ""}
-                  onValueChange={(postalCode) => {
-                    const zoneInfo = calculateDeliveryFee(postalCode);
-                    if (zoneInfo.isValid) {
-                      setDeliveryZoneInfo({
-                        zoneName: zoneInfo.zoneName,
-                        fee: zoneInfo.fee,
-                        minimumOrder: zoneInfo.minimumOrder,
-                        isValid: true,
-                      });
-                      setFormData((prev) => ({
-                        ...prev,
-                        deliveryAddress: {
-                          street: prev.deliveryAddress?.street || "",
-                          city: prev.deliveryAddress?.city || "",
-                          province: prev.deliveryAddress?.province || "",
-                          postalCode,
-                        },
-                        deliveryFee: zoneInfo.fee,
-                      }));
-                    } else {
-                      setDeliveryZoneInfo(null);
-                      setFormData((prev) => ({
-                        ...prev,
-                        deliveryFee: 0,
-                      }));
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Sélectionnez votre code postal" />
-                  </SelectTrigger>
-                  <SelectContent
-                    className="z-100 max-h-60"
-                    side="bottom"
-                    align="start"
-                  >
-                    {DELIVERY_ZONES.flatMap((zone) =>
-                      zone.postalCodes.map((postalCode) => (
-                        <SelectItem
-                          key={`${zone.name}-${postalCode}`}
-                          value={postalCode}
-                        >
-                          {postalCode} ({zone.deliveryFee.toFixed(2)}$
-                          livraison, min. {zone.minimumOrder.toFixed(2)}$)
-                        </SelectItem>
-                      )),
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Items Table */}
+      {/* ===== SECTION 4: ADRESSE DE FACTURATION ===== */}
+      {/* C'EST ICI QUE TU LA TROUVES !!! */}
+      <div className="space-y-4 pb-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-bold text-gray-700 uppercase">
+            ADRESSE DE FACTURATION:
+          </Label>
+          {formData.deliveryAddress && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={copyDeliveryToBilling}
+              className="text-xs text-[#C5A065] hover:text-[#B38F55]"
+            >
+              <Check className="w-3 h-3 mr-1" />
+              Identique à la livraison
+            </Button>
+          )}
+        </div>
+
+        {/* Checkbox "Identique à la livraison" */}
+        {formData.deliveryAddress && (
+          <div className="flex items-center space-x-2 mb-2">
+            <input
+              type="checkbox"
+              id="sameAsDelivery"
+              checked={formData.billingAddress?.sameAsDelivery || false}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  copyDeliveryToBilling();
+                } else {
+                  setFormData((prev) => ({
+                    ...prev,
+                    billingAddress: {
+                      street: "",
+                      city: "",
+                      province: "",
+                      postalCode: "",
+                      sameAsDelivery: false,
+                    },
+                  }));
+                }
+              }}
+              className="rounded border-gray-300 text-[#C5A065] focus:ring-[#C5A065]"
+            />
+            <Label htmlFor="sameAsDelivery" className="text-sm font-normal">
+              Identique à l'adresse de livraison
+            </Label>
+          </div>
+        )}
+
+        {/* Adresses enregistrées pour facturation */}
+        {selectedClient &&
+          selectedClient.addresses.length > 0 &&
+          !formData.billingAddress?.sameAsDelivery && (
+            <div className="space-y-2">
+              <Label className="text-xs text-gray-500">
+                Adresses de facturation enregistrées:
+              </Label>
+              <RadioGroup
+                value={selectedBillingAddressId?.toString()}
+                onValueChange={(value) =>
+                  handleBillingAddressSelect(parseInt(value))
+                }
+                className="space-y-2"
+              >
+                {selectedClient.addresses.map((address) => (
+                  <div
+                    key={`billing-${address.id}`}
+                    className="flex items-start space-x-2"
+                  >
+                    <RadioGroupItem
+                      value={address.id.toString()}
+                      id={`billing-address-${address.id}`}
+                    />
+                    <Label
+                      htmlFor={`billing-address-${address.id}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      <div>
+                        <div>{address.street}</div>
+                        <div className="text-xs text-gray-500">
+                          {address.city}, {address.province}{" "}
+                          {address.postalCode}
+                        </div>
+                      </div>
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+              <div className="text-xs text-gray-500 mt-2">
+                Ou entrez une nouvelle adresse de facturation:
+              </div>
+            </div>
+          )}
+
+        {/* Champs pour nouvelle adresse de facturation */}
+        {!formData.billingAddress?.sameAsDelivery && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Label htmlFor="billingStreet" className="text-xs text-gray-600">
+                RUE:
+              </Label>
+              <Input
+                id="billingStreet"
+                type="text"
+                value={formData.billingAddress?.street || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    billingAddress: {
+                      ...prev.billingAddress,
+                      street: e.target.value,
+                      city: prev.billingAddress?.city || "",
+                      province: prev.billingAddress?.province || "",
+                      postalCode: prev.billingAddress?.postalCode || "",
+                      sameAsDelivery: false,
+                    },
+                  }))
+                }
+                className={errors.billingAddress ? "border-red-500" : ""}
+                placeholder="123 Rue Example"
+              />
+              {errors.billingAddress && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.billingAddress}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="billingCity" className="text-xs text-gray-600">
+                VILLE:
+              </Label>
+              <Input
+                id="billingCity"
+                type="text"
+                value={formData.billingAddress?.city || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    billingAddress: {
+                      ...prev.billingAddress,
+                      street: prev.billingAddress?.street || "",
+                      city: e.target.value,
+                      province: prev.billingAddress?.province || "",
+                      postalCode: prev.billingAddress?.postalCode || "",
+                      sameAsDelivery: false,
+                    },
+                  }))
+                }
+                className={errors.billingCity ? "border-red-500" : ""}
+                placeholder="Montréal"
+              />
+              {errors.billingCity && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.billingCity}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label
+                htmlFor="billingProvince"
+                className="text-xs text-gray-600"
+              >
+                PROVINCE:
+              </Label>
+              <Input
+                id="billingProvince"
+                type="text"
+                value={formData.billingAddress?.province || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    billingAddress: {
+                      ...prev.billingAddress,
+                      street: prev.billingAddress?.street || "",
+                      city: prev.billingAddress?.city || "",
+                      province: e.target.value,
+                      postalCode: prev.billingAddress?.postalCode || "",
+                      sameAsDelivery: false,
+                    },
+                  }))
+                }
+                className={errors.billingProvince ? "border-red-500" : ""}
+                placeholder="Québec"
+              />
+              {errors.billingProvince && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.billingProvince}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label
+                htmlFor="billingPostalCode"
+                className="text-xs text-gray-600"
+              >
+                CODE POSTAL:
+              </Label>
+              <Input
+                id="billingPostalCode"
+                type="text"
+                value={formData.billingAddress?.postalCode || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    billingAddress: {
+                      ...prev.billingAddress,
+                      street: prev.billingAddress?.street || "",
+                      city: prev.billingAddress?.city || "",
+                      province: prev.billingAddress?.province || "",
+                      postalCode: e.target.value.toUpperCase(),
+                      sameAsDelivery: false,
+                    },
+                  }))
+                }
+                className={errors.billingPostalCode ? "border-red-500" : ""}
+                placeholder="H1A 1A1"
+              />
+              {errors.billingPostalCode && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.billingPostalCode}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Affichage quand c'est identique */}
+        {formData.billingAddress?.sameAsDelivery && formData.deliveryAddress && (
+          <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+            <div className="flex items-start gap-2">
+              <Check className="w-4 h-4 text-green-600 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-green-800">
+                  Adresse de facturation identique à l'adresse de livraison
+                </p>
+                <p className="text-xs text-green-700 mt-1">
+                  {formData.deliveryAddress.street}, {formData.deliveryAddress.city},{" "}
+                  {formData.deliveryAddress.province}{" "}
+                  {formData.deliveryAddress.postalCode}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 5: Articles */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <Label className="text-xs text-gray-600">ARTICLES:</Label>
@@ -1025,7 +1313,7 @@ export default function OrderForm({
         </div>
       )}
 
-      {/* Notes */}
+      {/* SECTION 6: Notes */}
       <div>
         <Label htmlFor="notes" className="text-xs text-gray-600">
           NOTE:
@@ -1039,7 +1327,7 @@ export default function OrderForm({
         />
       </div>
 
-      {/* Totals */}
+      {/* SECTION 7: Totaux */}
       <div className="border-t border-gray-200 pt-4">
         <div className="ml-auto space-y-2">
           <div className="flex justify-between items-center text-sm">
@@ -1055,19 +1343,9 @@ export default function OrderForm({
           {formData.deliveryType === "delivery" && (
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-600">LIVRAISON:</span>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.deliveryFee}
-                onChange={(e) =>
-                  handleInputChange(
-                    "deliveryFee",
-                    parseFloat(e.target.value) || 0,
-                  )
-                }
-                className="w-24 h-8 text-sm text-right"
-              />
+              <span className="font-medium">
+                ${formData.deliveryFee.toFixed(2)}
+              </span>
             </div>
           )}
           <div className="flex justify-between items-center text-base font-semibold border-t border-gray-300 pt-2">

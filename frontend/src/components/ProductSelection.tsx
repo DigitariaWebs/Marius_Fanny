@@ -171,6 +171,9 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [cakeSize, setCakeSize] = useState<"6" | "12">("6");
   const [allergyNote, setAllergyNote] = useState("");
+  const [selectedBread, setSelectedBread] = useState<string>("Baguette");
+  const [selectedSize, setSelectedSize] = useState<string>("400g");
+  const [isSliced, setIsSliced] = useState<boolean>(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -180,6 +183,9 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
     setQuantity(1);
     setCakeSize("6");
     setAllergyNote("");
+    setSelectedBread("Baguette");
+    setSelectedSize("400g");
+    setIsSliced(false);
   }, [selectedProduct]);
 
   useEffect(() => {
@@ -235,7 +241,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
   const handleAddToCart = () => {
     if (selectedProduct) {
-      const productToAdd = { ...selectedProduct };
+      const productToAdd: any = { ...selectedProduct };
 
       if (selectedProduct.id === 101 || selectedProduct.id === 103) {
         if (cakeSize === "12") {
@@ -248,23 +254,29 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
         }
       }
 
-      if (selectedProduct.categoryId === 51 && allergyNote.trim() !== "") {
-        productToAdd.userAllergies = allergyNote;
+      if (selectedProduct.categoryId === 2) {
+        productToAdd.selectedBread = selectedBread;
+        productToAdd.selectedSize = selectedSize;
+        productToAdd.isSliced = isSliced;
+      }
+
+      if (selectedProduct.categoryId === 51) {
+        productToAdd.selectedBread = selectedBread;
+        if (allergyNote.trim() !== "") {
+          productToAdd.userAllergies = allergyNote;
+        }
       }
 
       for (let i = 0; i < quantity; i++) {
         onAddToCart(productToAdd);
       }
       setSelectedProduct(null);
-      setQuantity(1);
     }
   };
 
-  // Empêcher le scroll de la page principale quand le modal est ouvert
   useEffect(() => {
     if (selectedProduct) {
       document.body.style.overflow = "hidden";
-      // Sur mobile, cela aide parfois à bloquer le défilement de fond
       document.documentElement.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
@@ -296,7 +308,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
             onClick={handleBack}
             className="hover:text-[#C5A065] transition-colors flex items-center gap-2 group"
           >
-            <span className="w-8 h-px bg-stone-400 group-hover:bg-[#C5A065] transition-colors"></span>{" "}
+            <span className="w-8 h-px bg-stone-400 group-hover:bg-[#C5A065] transition-colors"></span>
             Retour
           </button>
           <span className="opacity-30">|</span>
@@ -381,22 +393,16 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
         )}
       </div>
 
-      {/* --- MODAL PRODUIT --- */}
+      {/* MODAL PRODUIT - AVEC SCROLL CORRIGÉ */}
       {selectedProduct && (
-        // z-[9999] assure que le modal est au dessus de tout header/footer
-        <div className="fixed inset-0 z-9999 flex items-end md:items-center justify-center md:p-4">
-          {/* Fond flouté */}
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-[#2D2A26]/90 backdrop-blur-md transition-opacity"
             onClick={() => setSelectedProduct(null)}
           />
 
-          {/* Conteneur Principal : 
-              - Mobile: h-full (plein écran), rounded-none
-              - Desktop: rounded-2xl, hauteur auto, max-h-[90vh]
-          */}
-          <div className="relative bg-white w-full md:max-w-4xl h-full md:h-auto md:max-h-[90vh] md:rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
-            {/* Bouton Fermer */}
+          <div className="relative bg-white w-full md:max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+            
             <button
               onClick={() => setSelectedProduct(null)}
               className="absolute top-4 right-4 z-20 w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center shadow-md hover:bg-[#C5A065] hover:text-white transition-all text-lg font-bold"
@@ -404,90 +410,179 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
               ✕
             </button>
 
-            {/* Colonne Image (Hauteur réduite sur mobile) */}
-            <div className="w-full md:w-1/2 h-56 md:h-auto shrink-0 relative">
+            <div className="w-full md:w-1/2 h-64 md:h-auto shrink-0 relative">
               <img
                 src={selectedProduct.image}
                 alt={selectedProduct.name}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-linear-to-t from-white via-transparent to-transparent md:hidden"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent md:hidden"></div>
             </div>
 
-            {/* Colonne Contenu */}
-            <div className="w-full md:w-1/2 flex flex-col h-full overflow-hidden">
-              {/* Zone défilante (Scrollable) */}
-              <div className="flex-1 overflow-y-auto p-6 md:p-12 pb-32 md:pb-12">
+            <div className="w-full md:w-1/2 flex flex-col h-[60vh] md:h-[80vh] overflow-hidden">
+              
+              <div 
+                className="flex-1 overflow-y-auto p-6 md:p-8" 
+                style={{ 
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#C5A065 #f1f1f1'
+                }}
+              >
+                
                 <span className="text-[#C5A065] text-xs font-bold uppercase tracking-widest mb-2 block">
                   Artisan Pâtissier
                 </span>
-                <h2 className="text-3xl md:text-4xl font-serif mb-2 text-[#2D2A26]">
+                
+                <h2 className="text-2xl md:text-3xl font-serif mb-2 text-[#2D2A26]">
                   {selectedProduct.name}
                 </h2>
+                
                 <div className="text-2xl font-medium text-[#C5A065] mb-6">
                   {getCurrentPrice().toFixed(2)} $
                 </div>
+
+                {/* OPTIONS POUR LES PAINS */}
+                {selectedProduct?.categoryId === 2 && (
+                  <>
+                    <div className="mb-6">
+                      <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
+                        <span className="w-1 h-4 bg-[#C5A065] rounded-full"></span>
+                        Grandeur
+                      </h4>
+                      <div className="flex gap-2 flex-wrap">
+                        {["400g", "800g", "1kg"].map((size) => (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => setSelectedSize(size)}
+                            className={`flex-1 py-3 px-2 rounded text-sm font-medium transition-all ${
+                              selectedSize === size
+                                ? "bg-[#C5A065] text-white shadow-md"
+                                : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="mb-6">
+                      <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
+                        <span className="w-1 h-4 bg-[#C5A065] rounded-full"></span>
+                        Sorte de pain
+                      </h4>
+                      <div className="flex gap-2 flex-wrap">
+                        {["Baguette", "Carré Blanc", "Pain de Campagne"].map((pain) => (
+                          <button
+                            key={pain}
+                            type="button"
+                            onClick={() => setSelectedBread(pain)}
+                            className={`flex-1 py-3 px-2 rounded text-sm font-medium transition-all ${
+                              selectedBread === pain
+                                ? "bg-[#C5A065] text-white shadow-md"
+                                : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                            }`}
+                          >
+                            {pain}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="mb-6">
+                      <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
+                        <span className="w-1 h-4 bg-[#C5A065] rounded-full"></span>
+                        Tranché ?
+                      </h4>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsSliced(true)}
+                          className={`flex-1 py-3 px-2 rounded text-sm font-medium transition-all ${
+                            isSliced
+                              ? "bg-[#C5A065] text-white shadow-md"
+                              : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                          }`}
+                        >
+                          Tranché
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsSliced(false)}
+                          className={`flex-1 py-3 px-2 rounded text-sm font-medium transition-all ${
+                            !isSliced
+                              ? "bg-[#C5A065] text-white shadow-md"
+                              : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                          }`}
+                        >
+                          Non tranché
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <p className="text-stone-600 mb-6 font-light leading-relaxed text-sm md:text-base">
                   {selectedProduct.description}
                 </p>
 
-                {/* --- PREPARATION TIME NOTICE --- */}
-                {selectedProduct.preparationTimeHours &&
-                  selectedProduct.preparationTimeHours > 0 && (
-                    <div
-                      className="mb-6 p-4 rounded-lg border"
-                      style={{
-                        backgroundColor:
-                          selectedProduct.preparationTimeHours >= 24
-                            ? "#fef2f2"
-                            : selectedProduct.preparationTimeHours >= 12
-                              ? "#fffbeb"
-                              : "#f0fdf4",
-                        borderColor:
-                          selectedProduct.preparationTimeHours >= 24
-                            ? "#fecaca"
-                            : selectedProduct.preparationTimeHours >= 12
-                              ? "#fde68a"
-                              : "#bbf7d0",
-                      }}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className="text-xs font-bold uppercase tracking-widest"
-                          style={{
-                            color:
-                              selectedProduct.preparationTimeHours >= 24
-                                ? "#dc2626"
-                                : selectedProduct.preparationTimeHours >= 12
-                                  ? "#d97706"
-                                  : "#16a34a",
-                          }}
-                        >
-                          ⏰ Préparation requise
-                        </span>
-                      </div>
-                      <p
-                        className="text-sm font-medium"
+                {/* TEMPS DE PRÉPARATION */}
+                {selectedProduct.preparationTimeHours && selectedProduct.preparationTimeHours > 0 && (
+                  <div
+                    className="mb-6 p-4 rounded-lg border"
+                    style={{
+                      backgroundColor:
+                        selectedProduct.preparationTimeHours >= 24
+                          ? "#fef2f2"
+                          : selectedProduct.preparationTimeHours >= 12
+                          ? "#fffbeb"
+                          : "#f0fdf4",
+                      borderColor:
+                        selectedProduct.preparationTimeHours >= 24
+                          ? "#fecaca"
+                          : selectedProduct.preparationTimeHours >= 12
+                          ? "#fde68a"
+                          : "#bbf7d0",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span
+                        className="text-xs font-bold uppercase tracking-widest"
                         style={{
                           color:
                             selectedProduct.preparationTimeHours >= 24
                               ? "#dc2626"
                               : selectedProduct.preparationTimeHours >= 12
-                                ? "#d97706"
-                                : "#16a34a",
+                              ? "#d97706"
+                              : "#16a34a",
                         }}
                       >
-                        {selectedProduct.preparationTimeHours >= 24
-                          ? `Commande à passer ${selectedProduct.preparationTimeHours / 24} jour${selectedProduct.preparationTimeHours / 24 > 1 ? "s" : ""} à l'avance minimum`
-                          : selectedProduct.preparationTimeHours >= 12
-                            ? `Préparation en ${selectedProduct.preparationTimeHours} heures - planifiez à l'avance`
-                            : `Prêt en ${selectedProduct.preparationTimeHours} heure${selectedProduct.preparationTimeHours > 1 ? "s" : ""}`}
-                      </p>
+                        ⏰ Préparation requise
+                      </span>
                     </div>
-                  )}
+                    <p
+                      className="text-sm font-medium"
+                      style={{
+                        color:
+                          selectedProduct.preparationTimeHours >= 24
+                            ? "#dc2626"
+                            : selectedProduct.preparationTimeHours >= 12
+                            ? "#d97706"
+                            : "#16a34a",
+                      }}
+                    >
+                      {selectedProduct.preparationTimeHours >= 24
+                        ? `Commande à passer ${selectedProduct.preparationTimeHours / 24} jour${selectedProduct.preparationTimeHours / 24 > 1 ? "s" : ""} à l'avance minimum`
+                        : selectedProduct.preparationTimeHours >= 12
+                        ? `Préparation en ${selectedProduct.preparationTimeHours} heures - planifiez à l'avance`
+                        : `Prêt en ${selectedProduct.preparationTimeHours} heure${selectedProduct.preparationTimeHours > 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                )}
 
-                {/* --- OPTIONS GÂTEAUX --- */}
+                {/* OPTIONS GÂTEAUX */}
                 {(selectedProduct.id === 101 || selectedProduct.id === 103) && (
                   <div className="mb-6 bg-stone-50 p-4 rounded-lg border border-stone-100">
                     <h4 className="text-xs font-bold uppercase mb-3 text-stone-500">
@@ -496,43 +591,75 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                     <div className="flex gap-3">
                       <button
                         onClick={() => setCakeSize("6")}
-                        className={`flex-1 py-3 px-3 rounded text-sm font-medium transition-all ${cakeSize === "6" ? "bg-[#C5A065] text-white shadow-md" : "bg-white border border-stone-200 text-stone-600"}`}
+                        className={`flex-1 py-3 px-3 rounded text-sm font-medium transition-all ${
+                          cakeSize === "6"
+                            ? "bg-[#C5A065] text-white shadow-md"
+                            : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                        }`}
                       >
                         6 Pers.
                       </button>
                       <button
                         onClick={() => setCakeSize("12")}
-                        className={`flex-1 py-3 px-3 rounded text-sm font-medium transition-all ${cakeSize === "12" ? "bg-[#C5A065] text-white shadow-md" : "bg-white border border-stone-200 text-stone-600"}`}
+                        className={`flex-1 py-3 px-3 rounded text-sm font-medium transition-all ${
+                          cakeSize === "12"
+                            ? "bg-[#C5A065] text-white shadow-md"
+                            : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                        }`}
                       >
-                        12 Pers.{" "}
-                        <span className="text-[10px] block opacity-80">
-                          +21.50$
-                        </span>
+                        12 Pers.
+                        <span className="text-[10px] block opacity-80">+21.50$</span>
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* --- INPUT ALLERGIES --- */}
-                {selectedProduct.categoryId === 51 && (
-                  <div className="mb-6">
-                    <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
-                      <span className="w-1 h-4 bg-red-400 rounded-full"></span>
-                      Allergies ?
-                    </h4>
-                    <textarea
-                      value={allergyNote}
-                      onChange={(e) => setAllergyNote(e.target.value)}
-                      placeholder="Ex: Arachides, Sans gluten..."
-                      className="w-full p-3 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-[#C5A065] bg-stone-50"
-                      rows={2}
-                    />
-                  </div>
+                {/* OPTIONS BOÎTE À LUNCH */}
+                {selectedProduct?.categoryId === 51 && (
+                  <>
+                    <div className="mb-6">
+                      <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
+                        <span className="w-1 h-4 bg-[#C5A065] rounded-full"></span>
+                        Pain
+                      </h4>
+                      <div className="flex gap-2 flex-wrap">
+                        {["Baguette", "Roulé pita", "Croissant"].map((pain) => (
+                          <button
+                            key={pain}
+                            type="button"
+                            onClick={() => setSelectedBread(pain)}
+                            className={`flex-1 py-3 px-2 rounded text-sm font-medium transition-all ${
+                              selectedBread === pain
+                                ? "bg-[#C5A065] text-white shadow-md"
+                                : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                            }`}
+                          >
+                            {pain}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="mb-6">
+                      <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
+                        <span className="w-1 h-4 bg-red-400 rounded-full"></span>
+                        Allergies ?
+                      </h4>
+                      <textarea
+                        value={allergyNote}
+                        onChange={(e) => setAllergyNote(e.target.value)}
+                        placeholder="Ex: Arachides, Sans gluten..."
+                        className="w-full p-3 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-[#C5A065] bg-stone-50"
+                        rows={2}
+                      />
+                    </div>
+                  </>
                 )}
 
-                {selectedProduct.allergens && (
+                {/* ALLERGÈNES */}
+                {selectedProduct.allergens && selectedProduct.allergens.length > 0 && (
                   <div className="mb-4">
-                    <h4 className="text-xs font-bold uppercase mb-2">
+                    <h4 className="text-xs font-bold uppercase mb-2 text-stone-500">
                       Allergènes
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -547,30 +674,32 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                     </div>
                   </div>
                 )}
+                
+                {/* ESPACE SUPPLÉMENTAIRE POUR LE SCROLL */}
+                <div className="h-12 md:h-8"></div>
               </div>
 
-              {/* Zone Boutons (FIXE EN BAS sur mobile) 
-                 md:relative -> redevient normal sur desktop
-              */}
-              <div className="absolute bottom-0 left-0 right-0 md:relative bg-white border-t border-stone-100 p-4 md:p-0 md:border-t-0 z-10 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] md:shadow-none">
-                <div className="flex gap-4 md:p-12 md:pt-0">
-                  <div className="flex items-center border border-stone-200 rounded-lg h-14">
+              {/* BOUTONS FIXES EN BAS */}
+              <div className="bg-white border-t border-stone-100 p-4 md:p-6 shrink-0">
+                <div className="flex gap-4">
+                  <div className="flex items-center border border-stone-200 rounded-lg h-14 shrink-0">
                     <button
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="px-4 h-full hover:bg-stone-50 text-xl text-stone-500"
+                      className="px-4 h-full hover:bg-stone-50 text-xl text-stone-500 transition-colors"
                     >
                       -
                     </button>
-                    <span className="px-2 font-bold min-w-7.5 text-center">
+                    <span className="px-3 font-bold min-w-[3rem] text-center text-[#2D2A26]">
                       {quantity}
                     </span>
                     <button
                       onClick={() => setQuantity(quantity + 1)}
-                      className="px-4 h-full hover:bg-stone-50 text-xl text-stone-500"
+                      className="px-4 h-full hover:bg-stone-50 text-xl text-stone-500 transition-colors"
                     >
                       +
                     </button>
                   </div>
+                  
                   <button
                     onClick={handleAddToCart}
                     className="flex-1 bg-[#2D2A26] text-white h-14 rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-[#C5A065] transition-all shadow-lg active:scale-95"
