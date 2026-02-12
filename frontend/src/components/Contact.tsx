@@ -141,7 +141,7 @@ const Contact: React.FC = () => {
                     <label className="text-xs font-bold uppercase tracking-widest text-stone-500">Sujet</label>
                     <select className="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-lg focus:outline-none focus:border-[#C5A065] transition-colors">
                       <option>Renseignement général</option>
-                      <option>Commande spéciale / Gâteau de fête</option>
+                      <option>Commande spéciale </option>
                       <option>Service traiteur</option>
                       <option>Réclamation / Qualité</option>
                       <option>Autre</option>

@@ -1,21 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Truck,
-  MapPin,
   Package,
-  CheckCircle,
   Clock,
-  Navigation,
+  MapPin,
   Phone,
   User,
   ChevronRight,
-  AlertCircle,
   LogOut,
-  Bell,
   Menu,
   X,
-  Activity,
+  Calendar,
+  Filter,
 } from "lucide-react";
 import { authClient, normalizedApiUrl } from "../lib/AuthClient";
 import { Modal } from "@/components/ui/modal";
@@ -40,25 +36,18 @@ interface DeliveryOrder {
   items: Array<{
     productName: string;
     quantity: number;
+    price?: number;
   }>;
   totalAmount: number;
   estimatedDeliveryTime?: string;
+  createdAt: string;
 }
 
-interface DeliveryDriver {
-  id: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  status: "available" | "on_route" | "offline";
-}
-
-// Mock Data for Testing
+// Mock Data - MIS À JOUR POUR 2026
 const MOCK_DELIVERY_ORDERS: DeliveryOrder[] = [
   {
     id: "mock-001",
-    orderNumber: "CMD-2024-001",
+    orderNumber: "CMD-2026-001",
     clientInfo: {
       firstName: "Sophie",
       lastName: "Martin",
@@ -73,16 +62,17 @@ const MOCK_DELIVERY_ORDERS: DeliveryOrder[] = [
     },
     status: "pending",
     items: [
-      { productName: "Croissants au beurre", quantity: 6 },
-      { productName: "Pain de campagne", quantity: 1 },
-      { productName: "Tartelettes aux fruits", quantity: 4 },
+      { productName: "Croissants au beurre", quantity: 6, price: 3.5 },
+      { productName: "Pain de campagne", quantity: 1, price: 5.75 },
+      { productName: "Tartelettes aux fruits", quantity: 4, price: 4.25 },
     ],
     totalAmount: 42.5,
     estimatedDeliveryTime: "14:30",
+    createdAt: "2026-02-12T10:30:00Z", // AUJOURD'HUI
   },
   {
     id: "mock-002",
-    orderNumber: "CMD-2024-002",
+    orderNumber: "CMD-2026-002",
     clientInfo: {
       firstName: "Jean",
       lastName: "Dubois",
@@ -97,15 +87,16 @@ const MOCK_DELIVERY_ORDERS: DeliveryOrder[] = [
     },
     status: "pending",
     items: [
-      { productName: "Baguette tradition", quantity: 3 },
-      { productName: "Éclairs au chocolat", quantity: 6 },
+      { productName: "Baguette tradition", quantity: 3, price: 4.25 },
+      { productName: "Éclairs au chocolat", quantity: 6, price: 3.5 },
     ],
     totalAmount: 28.75,
     estimatedDeliveryTime: "15:00",
+    createdAt: "2026-02-12T11:15:00Z", // AUJOURD'HUI
   },
   {
     id: "mock-003",
-    orderNumber: "CMD-2024-003",
+    orderNumber: "CMD-2026-003",
     clientInfo: {
       firstName: "Marie",
       lastName: "Tremblay",
@@ -120,39 +111,16 @@ const MOCK_DELIVERY_ORDERS: DeliveryOrder[] = [
     },
     status: "in_transit",
     items: [
-      { productName: "Gâteau forêt noire", quantity: 1 },
-      { productName: "Macarons assortis", quantity: 12 },
+      { productName: "Gâteau forêt noire", quantity: 1, price: 45.0 },
+      { productName: "Macarons assortis", quantity: 12, price: 1.25 },
     ],
     totalAmount: 65.0,
     estimatedDeliveryTime: "15:30",
+    createdAt: "2026-02-12T09:45:00Z", // AUJOURD'HUI
   },
   {
     id: "mock-004",
-    orderNumber: "CMD-2024-004",
-    clientInfo: {
-      firstName: "Pierre",
-      lastName: "Gagnon",
-      phone: "514-555-0162",
-      email: "pierre.gagnon@example.com",
-    },
-    deliveryAddress: {
-      street: "456 Rue Sainte-Catherine Est",
-      city: "Montréal",
-      postalCode: "H2L 2C6",
-      province: "QC",
-    },
-    status: "pending",
-    items: [
-      { productName: "Pain aux raisins", quantity: 4 },
-      { productName: "Chaussons aux pommes", quantity: 3 },
-      { productName: "Café latté", quantity: 2 },
-    ],
-    totalAmount: 35.25,
-    estimatedDeliveryTime: "16:00",
-  },
-  {
-    id: "mock-005",
-    orderNumber: "CMD-2024-005",
+    orderNumber: "CMD-2026-004",
     clientInfo: {
       firstName: "Isabelle",
       lastName: "Côté",
@@ -167,39 +135,119 @@ const MOCK_DELIVERY_ORDERS: DeliveryOrder[] = [
     },
     status: "arrived",
     items: [
-      { productName: "Tarte tatin", quantity: 1 },
-      { productName: "Millefeuille", quantity: 2 },
-      { productName: "Pain au chocolat", quantity: 6 },
+      { productName: "Tarte tatin", quantity: 1, price: 32.0 },
+      { productName: "Millefeuille", quantity: 2, price: 7.5 },
+      { productName: "Pain au chocolat", quantity: 6, price: 2.8 },
     ],
     totalAmount: 52.8,
     estimatedDeliveryTime: "16:30",
+    createdAt: "2026-02-12T08:20:00Z", // AUJOURD'HUI
+  },
+  {
+    id: "mock-005",
+    orderNumber: "CMD-2026-005",
+    clientInfo: {
+      firstName: "Thomas",
+      lastName: "Leroy",
+      phone: "514-555-0188",
+      email: "thomas.leroy@example.com",
+    },
+    deliveryAddress: {
+      street: "567 Rue Peel",
+      city: "Montréal",
+      postalCode: "H3A 1W5",
+      province: "QC",
+    },
+    status: "delivered",
+    items: [
+      { productName: "Fougasse", quantity: 2, price: 6.5 },
+      { productName: "Financiers", quantity: 8, price: 2.25 },
+    ],
+    totalAmount: 31.0,
+    estimatedDeliveryTime: "12:45",
+    createdAt: "2026-02-11T07:15:00Z", // HIER
+  },
+  {
+    id: "mock-006",
+    orderNumber: "CMD-2026-006",
+    clientInfo: {
+      firstName: "Julie",
+      lastName: "Bergeron",
+      phone: "514-555-0199",
+      email: "julie.bergeron@example.com",
+    },
+    deliveryAddress: {
+      street: "890 Rue Notre-Dame",
+      city: "Montréal",
+      postalCode: "H3C 1K8",
+      province: "QC",
+    },
+    status: "pending",
+    items: [
+      { productName: "Pain aux noix", quantity: 2, price: 7.25 },
+      { productName: "Brownies", quantity: 6, price: 3.75 },
+    ],
+    totalAmount: 37.0,
+    estimatedDeliveryTime: "11:00",
+    createdAt: "2026-02-13T10:00:00Z", // DEMAIN
+  },
+  {
+    id: "mock-007",
+    orderNumber: "CMD-2026-007",
+    clientInfo: {
+      firstName: "Marc",
+      lastName: "Lafleur",
+      phone: "450-555-0177",
+      email: "marc.lafleur@example.com",
+    },
+    deliveryAddress: {
+      street: "4321 Boulevard Saint-Laurent",
+      city: "Montréal",
+      postalCode: "H2W 1Z8",
+      province: "QC",
+    },
+    status: "pending",
+    items: [
+      { productName: "Tarte au citron", quantity: 1, price: 28.0 },
+      { productName: "Muffins", quantity: 8, price: 2.5 },
+    ],
+    totalAmount: 48.0,
+    estimatedDeliveryTime: "13:30",
+    createdAt: "2026-02-14T09:30:00Z", // APRÈS-DEMAIN
   },
 ];
+
+interface DeliveryDriver {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  status: "available" | "on_route" | "offline";
+}
 
 const DeliveryDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [driver, setDriver] = useState<DeliveryDriver | null>(null);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(
-    null,
-  );
+  const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Check authentication and load driver data
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const session = await authClient.getSession();
-
         if (!session?.data) {
           navigate("/se-connecter");
           return;
         }
 
         const user: any = session.data.user;
-        const userRole =
-          user.user_metadata?.role || user.role || "deliveryDriver";
+        const userRole = user.user_metadata?.role || user.role || "deliveryDriver";
 
         if (userRole !== "deliveryDriver") {
           navigate("/");
@@ -208,12 +256,8 @@ const DeliveryDashboard: React.FC = () => {
 
         const driverData: DeliveryDriver = {
           id: Number(user.id),
-          firstName:
-            user.user_metadata?.firstName ||
-            user.name?.split(" ")[0] ||
-            "Livreur",
-          lastName:
-            user.user_metadata?.lastName || user.name?.split(" ")[1] || "",
+          firstName: user.user_metadata?.firstName || user.name?.split(" ")[0] || "Livreur",
+          lastName: user.user_metadata?.lastName || user.name?.split(" ")[1] || "",
           email: user.email,
           phone: user.user_metadata?.phone || "514-555-0100",
           status: "available",
@@ -230,15 +274,12 @@ const DeliveryDashboard: React.FC = () => {
     checkAuth();
   }, [navigate]);
 
-  // Load delivery orders
   useEffect(() => {
     const loadOrders = async () => {
       try {
         const response = await fetch(
           `${normalizedApiUrl}/api/orders?deliveryStatus=ready_for_delivery`,
-          {
-            credentials: "include",
-          },
+          { credentials: "include" }
         );
 
         if (response.ok) {
@@ -246,24 +287,20 @@ const DeliveryDashboard: React.FC = () => {
           const deliveryOrders = result.data.filter(
             (order: any) =>
               order.deliveryType === "delivery" &&
-              ["pending", "in_transit", "arrived"].includes(order.status),
+              ["pending", "in_transit", "arrived", "delivered"].includes(order.status)
           );
           setOrders(deliveryOrders);
         } else {
-          // Fallback to mock data if API returns error
-          console.log("API unavailable, using mock data");
           setOrders(MOCK_DELIVERY_ORDERS);
         }
       } catch (error) {
         console.error("Failed to load orders, using mock data:", error);
-        // Use mock data as fallback when API is unavailable
         setOrders(MOCK_DELIVERY_ORDERS);
       }
     };
 
     if (driver) {
       loadOrders();
-      // Refresh every 30 seconds
       const interval = setInterval(loadOrders, 30000);
       return () => clearInterval(interval);
     }
@@ -281,433 +318,620 @@ const DeliveryDashboard: React.FC = () => {
 
   const updateDeliveryStatus = async (
     orderId: string,
-    newStatus: "in_transit" | "arrived" | "delivered",
+    newStatus: "in_transit" | "arrived" | "delivered"
   ) => {
-    // Optimistic update - update UI immediately
     setOrders((prev) =>
       prev.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order,
-      ),
+        order.id === orderId ? { ...order, status: newStatus } : order
+      )
     );
 
-    // Update selected order if it's the current one
     if (selectedOrder?.id === orderId) {
       setSelectedOrder({ ...selectedOrder, status: newStatus });
     }
 
-    // Try to sync with backend (will fail gracefully with mock data)
     try {
       await fetch(`${normalizedApiUrl}/api/orders/${orderId}/delivery-status`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ deliveryStatus: newStatus }),
       });
     } catch (error) {
-      console.log("Backend sync failed (using mock data):", error);
+      console.log("Backend sync failed:", error);
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("fr-CA", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const formatDayName = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const afterTomorrow = new Date(today);
+    afterTomorrow.setDate(today.getDate() + 2);
+    
+    if (isSameDay(date, today)) return "Aujourd'hui";
+    if (isSameDay(date, tomorrow)) return "Demain";
+    if (isSameDay(date, afterTomorrow)) return "Après-demain";
+    
+    return date.toLocaleDateString("fr-CA", { weekday: "long" });
+  };
+
+  const isSameDay = (dateA: Date, dateB: Date) => {
+    return (
+      dateA.getFullYear() === dateB.getFullYear() &&
+      dateA.getMonth() === dateB.getMonth() &&
+      dateA.getDate() === dateB.getDate()
+    );
+  };
+
+  const getFilteredOrders = () => {
+    let filtered = orders;
+    
+    // Filtre par statut
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((order) => order.status === statusFilter);
+    }
+    
+    // Filtre par date - CORRIGÉ POUR 2026
+    if (dateFilter !== "all") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      
+      const afterTomorrow = new Date(today);
+      afterTomorrow.setDate(today.getDate() + 2);
+      
+      filtered = filtered.filter((order) => {
+        const orderDate = new Date(order.createdAt);
+        orderDate.setHours(0, 0, 0, 0);
+        
+        if (dateFilter === "today") {
+          return orderDate.getTime() === today.getTime();
+        }
+        if (dateFilter === "tomorrow") {
+          return orderDate.getTime() === tomorrow.getTime();
+        }
+        if (dateFilter === "afterTomorrow") {
+          return orderDate.getTime() === afterTomorrow.getTime();
+        }
+        return true;
+      });
+    }
+    
+    return filtered;
   };
 
   if (loading || !driver) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#F9F7F2" }}
-      >
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-[#C5A065] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm" style={{ color: "#2D2A26" }}>
-            Chargement...
-          </p>
+          <p className="text-sm text-gray-600">Chargement...</p>
         </div>
       </div>
     );
   }
 
-  const pendingOrders = orders.filter((o) => o.status === "pending");
-  const inTransitOrders = orders.filter((o) => o.status === "in_transit");
-  const arrivedOrders = orders.filter((o) => o.status === "arrived");
+  const filteredOrders = getFilteredOrders();
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F9F7F2" }}>
-      {/* Header */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <Truck className="w-8 h-8" style={{ color: "#C5A065" }} />
-              <div>
-                <h1 className="font-bold text-lg" style={{ color: "#2D2A26" }}>
-                  Marius & Fanny
-                </h1>
-                <p className="text-xs text-stone-500">Livraisons</p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* SIDEBAR */}
+      <aside className="w-64 bg-white border-r border-gray-200 fixed h-full hidden md:block shadow-sm">
+        <div className="p-6">
+          <h1
+            className="text-2xl mb-1"
+            style={{
+              fontFamily: '"Great Vibes", cursive',
+              color: "#C5A065",
+            }}
+          >
+            Marius & Fanny
+          </h1>
+          <p className="text-xs text-gray-500 uppercase tracking-wider">DELIVERY PANEL</p>
+        </div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-6">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-50">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium text-green-700">
-                  Disponible
-                </span>
-              </div>
-
-              <button className="relative p-2 hover:bg-stone-100 rounded-full transition-colors">
-                <Bell className="w-5 h-5" style={{ color: "#2D2A26" }} />
-                {orders.length > 0 && (
-                  <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                    {orders.length}
-                  </span>
-                )}
-              </button>
-
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: "#2D2A26" }}
-                  >
-                    {driver.firstName} {driver.lastName}
-                  </p>
-                  <p className="text-xs text-stone-500">Livreur</p>
-                </div>
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: "#C5A065" }}
-                >
-                  <User className="w-6 h-6 text-white" />
-                </div>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-stone-600 hover:bg-stone-100 transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-                <span className="text-sm font-medium">Déconnexion</span>
-              </button>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              className="md:hidden p-2 rounded-lg hover:bg-stone-100"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
-            </button>
+        <div className="px-4 py-2">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 mb-2">
+            Principal
+          </p>
+          <div className="bg-[#C5A065] bg-opacity-10 text-[#C5A065] flex items-center gap-3 px-4 py-3 rounded-lg">
+            <Package className="w-5 h-5" />
+             <span className="font-medium text-white">Commandes</span>
+            <span className="ml-auto px-2 py-0.5 text-xs bg-[#C5A065] text-white rounded-full">
+              {filteredOrders.length}
+            </span>
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-stone-200 bg-white">
-            <div className="px-4 py-4 space-y-3">
-              <div className="flex items-center gap-3 pb-3 border-b border-stone-200">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: "#C5A065" }}
-                >
-                  <User className="w-6 h-6 text-white" />
+        <div className="absolute bottom-0 w-64 p-6 border-t border-gray-200">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg w-full transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Déconnexion</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <div className="flex-1 md:ml-64">
+        {/* HEADER */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+          <div className="flex items-center justify-between px-6 h-16">
+            <div className="flex items-center gap-4">
+              <button
+                className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+              <h2 className="text-xl font-semibold text-gray-900">Commandes</h2>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-[#C5A065] rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: "#2D2A26" }}
-                  >
+                <div className="hidden sm:block">
+                  <p className="text-sm font-medium text-gray-900">
                     {driver.firstName} {driver.lastName}
                   </p>
-                  <p className="text-xs text-stone-500">Livreur</p>
+                  <p className="text-xs text-gray-500">Livreur</p>
                 </div>
               </div>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-stone-100 hover:bg-stone-200 transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-                <span className="text-sm font-medium">Déconnexion</span>
-              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* MOBILE MENU */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 z-50 bg-black bg-opacity-50">
+            <div className="absolute left-0 top-0 bottom-0 w-64 bg-white">
+              <div className="p-6">
+                <h1
+                  className="text-2xl mb-1"
+                  style={{
+                    fontFamily: '"Great Vibes", cursive',
+                    color: "#C5A065",
+                  }}
+                >
+                  Marius & Fanny
+                </h1>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-6">DELIVERY PANEL</p>
+                
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 mb-2">
+                  Principal
+                </p>
+                <div className="bg-[#C5A065] bg-opacity-10 text-[#C5A065] flex items-center gap-3 px-4 py-3 rounded-lg">
+                  <Package className="w-5 h-5" />
+                  <span className="font-medium">Commandes</span>
+                </div>
+              </div>
+
+              <div className="absolute bottom-0 w-64 p-6 border-t border-gray-200">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg w-full"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>Déconnexion</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200">
+        {/* PAGE CONTENT */}
+        <div className="p-6 lg:p-8">
+          {/* FILTRES - REPOSITIONNÉS */}
+          <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-stone-600 mb-1">En attente</p>
-                <p className="text-3xl font-bold" style={{ color: "#2D2A26" }}>
-                  {pendingOrders.length}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-orange-50">
-                <Clock className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-stone-600 mb-1">En route</p>
-                <p className="text-3xl font-bold" style={{ color: "#2D2A26" }}>
-                  {inTransitOrders.length}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-blue-50">
-                <Truck className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-stone-600 mb-1">Arrivé</p>
-                <p className="text-3xl font-bold" style={{ color: "#2D2A26" }}>
-                  {arrivedOrders.length}
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-green-50">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Orders List */}
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
-          <div className="p-6 border-b border-stone-200">
-            <h2 className="text-xl font-bold" style={{ color: "#2D2A26" }}>
-              Mes livraisons
-            </h2>
-            <p className="text-sm text-stone-500 mt-1">
-              Cliquez sur une commande pour voir les détails
-            </p>
-          </div>
-
-          {orders.length === 0 ? (
-            <div className="p-12 text-center">
-              <Package className="w-16 h-16 text-stone-300 mx-auto mb-4" />
-              <p className="text-stone-500 mb-2">Aucune livraison en cours</p>
-              <p className="text-sm text-stone-400">
-                Les nouvelles livraisons apparaîtront ici
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-stone-200">
-              {orders.map((order) => (
-                <div
-                  key={order.id}
-                  onClick={() => setSelectedOrder(order)}
-                  className="p-6 hover:bg-stone-50 cursor-pointer transition-colors"
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span
-                          className="font-bold text-lg"
-                          style={{ color: "#2D2A26" }}
-                        >
-                          #{order.orderNumber}
-                        </span>
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            order.status === "pending"
-                              ? "bg-orange-100 text-orange-700"
-                              : order.status === "in_transit"
-                                ? "bg-blue-100 text-blue-700"
-                                : order.status === "arrived"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {order.status === "pending" && "En attente"}
-                          {order.status === "in_transit" && "En route"}
-                          {order.status === "arrived" && "Arrivé"}
-                          {order.status === "delivered" && "Livré"}
-                        </span>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="w-4 h-4 text-stone-400" />
-                          <span style={{ color: "#2D2A26" }}>
-                            {order.clientInfo.firstName}{" "}
-                            {order.clientInfo.lastName}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <MapPin className="w-4 h-4 text-stone-400" />
-                          <span className="text-stone-600">
-                            {order.deliveryAddress.street},{" "}
-                            {order.deliveryAddress.city}{" "}
-                            {order.deliveryAddress.postalCode}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Phone className="w-4 h-4 text-stone-400" />
-                          <span className="text-stone-600">
-                            {order.clientInfo.phone}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-stone-400" />
-                        <span className="text-sm text-stone-600">
-                          {order.items.length} article(s)
-                        </span>
-                      </div>
+                  <Filter className="w-4 h-4" />
+                  <span className="text-sm font-medium">Filtres</span>
+                </button>
+                
+                <div className="flex items-center gap-2 flex-wrap">
+                  {statusFilter !== "all" && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-[#C5A065] bg-opacity-10 rounded-full">
+                      <span className="text-xs font-medium text-[#C5A065]">
+                        {statusFilter === "pending" && "En attente"}
+                        {statusFilter === "in_transit" && "En route"}
+                        {statusFilter === "arrived" && "Arrivé"}
+                        {statusFilter === "delivered" && "Livré"}
+                      </span>
+                      <button
+                        onClick={() => setStatusFilter("all")}
+                        className="text-[#C5A065] hover:text-[#B38F55]"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
+                  )}
+                  
+                  {dateFilter !== "all" && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-full">
+                      <Calendar className="w-3 h-3 text-blue-600" />
+                      <span className="text-xs font-medium text-blue-700">
+                        {dateFilter === "today" && "Aujourd'hui"}
+                        {dateFilter === "tomorrow" && "Demain"}
+                        {dateFilter === "afterTomorrow" && "Après-demain"}
+                      </span>
+                      <button
+                        onClick={() => setDateFilter("all")}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="text-sm text-gray-500">
+                <span className="font-medium text-gray-700">{filteredOrders.length}</span> commande(s)
+              </div>
+            </div>
 
-                    <div className="flex flex-col items-end gap-3">
-                      <div className="text-right">
-                        <p
-                          className="text-lg font-bold"
-                          style={{ color: "#C5A065" }}
-                        >
-                          {order.totalAmount.toFixed(2)}$
-                        </p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-stone-400" />
+            {/* PANEL DE FILTRES DÉROULANT */}
+            {showFilters && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Filtre par statut */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      Statut de livraison
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => setStatusFilter("all")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          statusFilter === "all"
+                            ? "bg-[#C5A065] text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        Toutes
+                      </button>
+                      <button
+                        onClick={() => setStatusFilter("pending")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          statusFilter === "pending"
+                            ? "bg-yellow-500 text-white"
+                            : "bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
+                        }`}
+                      >
+                        En attente
+                      </button>
+                      <button
+                        onClick={() => setStatusFilter("in_transit")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          statusFilter === "in_transit"
+                            ? "bg-blue-500 text-white"
+                            : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        }`}
+                      >
+                        En route
+                      </button>
+                      <button
+                        onClick={() => setStatusFilter("arrived")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          statusFilter === "arrived"
+                            ? "bg-green-500 text-white"
+                            : "bg-green-50 text-green-700 hover:bg-green-100"
+                        }`}
+                      >
+                        Arrivé
+                      </button>
+                      <button
+                        onClick={() => setStatusFilter("delivered")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          statusFilter === "delivered"
+                            ? "bg-gray-700 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        Livré
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filtre par date */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      Date de livraison
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => setDateFilter("all")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          dateFilter === "all"
+                            ? "bg-[#C5A065] text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        Toutes
+                      </button>
+                      <button
+                        onClick={() => setDateFilter("today")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          dateFilter === "today"
+                            ? "bg-blue-500 text-white"
+                            : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        }`}
+                      >
+                        Aujourd'hui
+                      </button>
+                      <button
+                        onClick={() => setDateFilter("tomorrow")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          dateFilter === "tomorrow"
+                            ? "bg-blue-500 text-white"
+                            : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        }`}
+                      >
+                        Demain
+                      </button>
+                      <button
+                        onClick={() => setDateFilter("afterTomorrow")}
+                        className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                          dateFilter === "afterTomorrow"
+                            ? "bg-blue-500 text-white"
+                            : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        }`}
+                      >
+                        Après-demain
+                      </button>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </main>
+              </div>
+            )}
+          </div>
 
-      {/* Order Detail Modal */}
+          {/* TABLEAU DES COMMANDES - FOND BLANC */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Commande
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Adresse
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Statut
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center bg-white">
+                        <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-500">Aucune commande trouvée</p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          {statusFilter !== "all" || dateFilter !== "all"
+                            ? "Essayez de modifier vos filtres"
+                            : "Les nouvelles livraisons apparaîtront ici"}
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOrders.map((order) => (
+                      <tr
+                        key={order.id}
+                        className="hover:bg-gray-50 cursor-pointer transition-colors bg-white"
+                        onClick={() => setSelectedOrder(order)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="font-medium text-gray-900">
+                            {order.orderNumber}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {order.estimatedDeliveryTime}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1 text-sm text-gray-900">
+                            <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                            <span>{formatDate(order.createdAt)}</span>
+                          </div>
+                          <div className="text-xs text-blue-600 font-medium mt-1">
+                            {formatDayName(order.createdAt)}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                            <Clock className="w-3 h-3 text-gray-400" />
+                            <span>{new Date(order.createdAt).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {order.clientInfo.firstName} {order.clientInfo.lastName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {order.clientInfo.phone}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-600">
+                            {order.deliveryAddress.street}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {order.deliveryAddress.city}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              order.status === "pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : order.status === "in_transit"
+                                ? "bg-blue-100 text-blue-800"
+                                : order.status === "arrived"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {order.status === "pending" && "En attente"}
+                            {order.status === "in_transit" && "En route"}
+                            {order.status === "arrived" && "Arrivé"}
+                            {order.status === "delivered" && "Livré"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="font-medium text-gray-900">
+                            {order.totalAmount.toFixed(2)}$
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOrder(order);
+                            }}
+                            className="text-[#C5A065] hover:text-[#B38F55] font-medium text-sm flex items-center gap-1 transition-colors"
+                          >
+                            Voir détails
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* MODAL DÉTAILS COMMANDE */}
       <Modal
         open={!!selectedOrder}
         onOpenChange={(open) => !open && setSelectedOrder(null)}
         type="details"
-        title="Détails de la livraison"
-        description={
-          selectedOrder ? `Commande #${selectedOrder.orderNumber}` : ""
-        }
+        title={`Commande ${selectedOrder?.orderNumber}`}
+        description={`Client: ${selectedOrder?.clientInfo.firstName} ${selectedOrder?.clientInfo.lastName}`}
         size="lg"
         closable={true}
         actions={{
           ...(selectedOrder?.status === "pending" && {
             primary: {
-              label: "Je suis en route",
-              icon: <Navigation className="w-5 h-5" />,
+              label: "Commencer la livraison",
               onClick: () =>
-                selectedOrder &&
-                updateDeliveryStatus(selectedOrder.id, "in_transit"),
+                selectedOrder && updateDeliveryStatus(selectedOrder.id, "in_transit"),
             },
           }),
           ...(selectedOrder?.status === "in_transit" && {
             primary: {
-              label: "Je suis arrivé",
-              icon: <MapPin className="w-5 h-5" />,
+              label: "Arrivé sur place",
               onClick: () =>
-                selectedOrder &&
-                updateDeliveryStatus(selectedOrder.id, "arrived"),
+                selectedOrder && updateDeliveryStatus(selectedOrder.id, "arrived"),
             },
           }),
           ...(selectedOrder?.status === "arrived" && {
             primary: {
-              label: "Livraison terminée",
-              icon: <CheckCircle className="w-5 h-5" />,
+              label: "Terminer la livraison",
               onClick: () =>
-                selectedOrder &&
-                updateDeliveryStatus(selectedOrder.id, "delivered"),
+                selectedOrder && updateDeliveryStatus(selectedOrder.id, "delivered"),
             },
           }),
         }}
       >
         {selectedOrder && (
           <div className="space-y-6">
-            {/* Order Info */}
-            <div>
-              <h4 className="font-semibold mb-3" style={{ color: "#2D2A26" }}>
-                Informations client
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-stone-400" />
-                  <span>
-                    {selectedOrder.clientInfo.firstName}{" "}
-                    {selectedOrder.clientInfo.lastName}
-                  </span>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h4 className="text-sm font-medium text-gray-500 mb-3">Informations client</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <User className="w-4 h-4 text-gray-400" />
+                    <span>{selectedOrder.clientInfo.firstName} {selectedOrder.clientInfo.lastName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="w-4 h-4 text-gray-400" />
+                    <a href={`tel:${selectedOrder.clientInfo.phone}`} className="text-[#C5A065] hover:underline">
+                      {selectedOrder.clientInfo.phone}
+                    </a>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm">
+                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                    <div>
+                      <p>{selectedOrder.deliveryAddress.street}</p>
+                      <p>{selectedOrder.deliveryAddress.city}, {selectedOrder.deliveryAddress.postalCode}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-stone-400" />
-                  <a
-                    href={`tel:${selectedOrder.clientInfo.phone}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    {selectedOrder.clientInfo.phone}
-                  </a>
-                </div>
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-stone-400 mt-0.5" />
-                  <div>
-                    <p>{selectedOrder.deliveryAddress.street}</p>
-                    <p>
-                      {selectedOrder.deliveryAddress.city},{" "}
-                      {selectedOrder.deliveryAddress.province}{" "}
-                      {selectedOrder.deliveryAddress.postalCode}
-                    </p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500 mb-3">Résumé</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Package className="w-4 h-4 text-gray-400" />
+                    <span>{selectedOrder.items.length} article(s)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    <span>Livraison: {selectedOrder.estimatedDeliveryTime}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span>Commandé: {formatDate(selectedOrder.createdAt)}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Items */}
             <div>
-              <h4 className="font-semibold mb-3" style={{ color: "#2D2A26" }}>
-                Articles
-              </h4>
-              <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-500 mb-3">Articles</h4>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                 {selectedOrder.items.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center p-3 bg-stone-50 rounded-lg"
-                  >
-                    <span className="text-sm">{item.productName}</span>
-                    <span className="text-sm font-medium">
-                      × {item.quantity}
-                    </span>
+                  <div key={index} className="flex justify-between text-sm">
+                    <span>{item.productName} × {item.quantity}</span>
+                    {item.price && (
+                      <span className="font-medium">{(item.price * item.quantity).toFixed(2)}$</span>
+                    )}
                   </div>
                 ))}
-              </div>
-              <div className="mt-3 pt-3 border-t border-stone-200 flex justify-between items-center">
-                <span className="font-semibold">Total</span>
-                <span
-                  className="text-xl font-bold"
-                  style={{ color: "#C5A065" }}
-                >
-                  {selectedOrder.totalAmount.toFixed(2)}$
-                </span>
-              </div>
-            </div>
-
-            {/* Status Update Info */}
-            <div className="p-4 bg-blue-50 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-900">
-                <p className="font-medium mb-1">Information importante</p>
-                <p>
-                  Le client sera automatiquement notifié de chaque changement de
-                  statut.
-                </p>
+                <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between font-medium">
+                  <span>Total</span>
+                  <span className="text-[#C5A065]">{selectedOrder.totalAmount.toFixed(2)}$</span>
+                </div>
               </div>
             </div>
           </div>

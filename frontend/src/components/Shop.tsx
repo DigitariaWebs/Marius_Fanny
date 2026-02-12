@@ -16,10 +16,9 @@ interface Category {
   size: 'large' | 'small';
 }
 
-// On met à jour l'interface pour accepter onAddToCart, même si on ne l'utilise pas ici
 interface CategoryShowcaseProps {
   onCategoryClick?: (categoryId: number, categoryTitle: string) => void;
-  onAddToCart?: (product: any) => void; // Ajout crucial pour le build Netlify
+  onAddToCart?: (product: any) => void;
 }
 
 const categories: Category[] = [
@@ -38,15 +37,19 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) => {
     if (onCategoryClick) {
       onCategoryClick(categoryId, categoryTitle);
     }
-    
-    // On redirige vers la page de sélection de produits
     navigate(`/products?category=${categoryId}&title=${encodeURIComponent(categoryTitle)}`);
   };
 
   return (
-    <section className="py-20 px-6" style={{ backgroundColor: styles.cream, fontFamily: styles.fontSans }}>
-      <div className="max-w-7xl mx-auto">
-        
+    <section
+      className="relative py-20 px-6"
+      style={{
+        fontFamily: styles.fontSans,
+        backgroundColor: 'rgba(249, 247, 242, 0.85)', 
+      }}
+    >
+      <div className="max-w-7xl mx-auto" style={{ position: 'relative', zIndex: 1 }}>
+
         <div className="text-center mb-16 space-y-4">
           <h2 className="text-5xl md:text-6xl" style={{ fontFamily: styles.fontScript, color: styles.gold }}>
             Bienvenue sur notre boutique en ligne
@@ -67,24 +70,32 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) => {
             <div
               key={cat.id}
               onClick={() => handleCategoryClick(cat.id, cat.title)}
-              className={`group relative overflow-hidden rounded-2xl shadow-sm transition-all duration-500 hover:shadow-xl cursor-pointer
+              className={`group overflow-hidden rounded-2xl shadow-sm transition-all duration-500 hover:shadow-xl cursor-pointer
                 ${cat.size === 'large' ? 'md:col-span-2' : 'md:col-span-1'}`}
+              style={{ position: 'relative', isolation: 'isolate' }} // isole chaque carte du quadrillé fixed
             >
               <img
                 src={cat.image}
                 alt={cat.title}
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                style={{ zIndex: 1 }}
               />
-              
-              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
 
-              <div className="absolute inset-0 p-8 flex flex-col justify-end">
+              <div
+                className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity"
+                style={{ zIndex: 2 }}
+              />
+
+              <div
+                className="absolute inset-0 p-8 flex flex-col justify-end"
+                style={{ zIndex: 3 }}
+              >
                 <h3 className="text-white text-2xl font-semibold tracking-wide uppercase transition-transform duration-500 group-hover:-translate-y-2">
                   {cat.title}
                 </h3>
-                <div 
-                  className="h-1 w-0 group-hover:w-16 transition-all duration-500" 
-                  style={{ backgroundColor: styles.gold }} 
+                <div
+                  className="h-1 w-0 group-hover:w-16 transition-all duration-500"
+                  style={{ backgroundColor: styles.gold }}
                 />
                 <span className="text-white/0 group-hover:text-white text-xs uppercase tracking-[0.2em] mt-4 transition-all duration-500">
                   Voir la sélection →
