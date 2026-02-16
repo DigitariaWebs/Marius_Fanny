@@ -365,5 +365,9 @@ export const CATEGORIES = [
   "Viennoiseries",
   "Chocolats",
   "Boîtes à lunch",
+  "Salade repas",
+  "Plateau repas",
+  "Option végétarienne",
   "À la carte",
+  "St-Valentin",
 ];

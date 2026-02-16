@@ -15,11 +15,11 @@ const CATEGORY_MAPPING: { [key: number]: string } = {
   1: "Gâteaux",
   2: "Pains",
   3: "Viennoiseries",
-  4: "Chocolats et macarons",
-  5: "Boîte à lunch Marius et Fanny",
+  4: "Chocolats",
+  5: "Boîtes à lunch",
   6: "À la carte",
   7: "St-Valentin",
-  51: "Boite à lunch",
+  51: "Boîtes à lunch",
   52: "Salade repas",
   53: "Plateau repas",
   54: "Option végétarienne",
@@ -33,7 +33,7 @@ interface ProductSelectionProps {
 }
 
 const LUNCH_SUBCATEGORIES = [
-  { id: 51, title: "Boite à lunch", image: "./boite.jpg" },
+  { id: 51, title: "Boîtes à lunch", image: "./boite.jpg" },
   { id: 52, title: "Salade repas", image: "./salade1.jpg" },
   { id: 53, title: "Plateau repas", image: "./salade2.jpg" },
   { id: 54, title: "Option végétarienne", image: "./salade3.jpg" },
@@ -68,6 +68,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const [allergyNote, setAllergyNote] = useState("");
   const [selectedBread, setSelectedBread] = useState<string>("Baguette");
   const [isSliced, setIsSliced] = useState<boolean>(false);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchProducts();
@@ -96,6 +97,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
     setAllergyNote("");
     setSelectedBread("Baguette");
     setIsSliced(false);
+    setSelectedOptions({});
   }, [selectedProduct]);
 
   useEffect(() => {
@@ -176,6 +178,16 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
         if (allergyNote.trim() !== "") {
           productToAdd.userAllergies = allergyNote;
         }
+      }
+
+      // Handle dynamic custom options
+      if (selectedOptions && Object.keys(selectedOptions).length > 0) {
+        productToAdd.selectedOptions = { ...selectedOptions };
+        // Optionally append to name for clarity in cart
+        const optionsString = Object.entries(selectedOptions)
+          .map(([name, choice]) => `${name}: ${choice}`)
+          .join(", ");
+        productToAdd.name = `${productToAdd.name} (${optionsString})`;
       }
 
       for (let i = 0; i < quantity; i++) {
@@ -375,10 +387,53 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                 
                 <div className="text-2xl font-medium text-[#C5A065] mb-6">
                   {getCurrentPrice().toFixed(2)} $
+                  {selectedProduct.hasTaxes && (
+                    <span className="text-xs text-stone-400 ml-2 font-normal">
+                      + taxes
+                    </span>
+                  )}
                 </div>
 
-                {/* OPTIONS POUR LES PAINS */}
-                {selectedProduct?.category === "Pains" && (
+                {/* ALLERGÈNES (SI SPÉCIFIÉ DANS LE PRODUIT) */}
+                {selectedProduct.allergens && (
+                  <div className="mb-4 flex items-center gap-2 text-red-600 bg-red-50 p-2 rounded border border-red-100">
+                    <span className="text-xs font-bold uppercase">Allergènes :</span>
+                    <span className="text-sm">{selectedProduct.allergens}</span>
+                  </div>
+                )}
+
+                {/* OPTIONS DYNAMIQUES DU PRODUIT */}
+                {selectedProduct.customOptions && selectedProduct.customOptions.length > 0 && (
+                  <div className="space-y-6 mb-6">
+                    {selectedProduct.customOptions.map((option, idx) => (
+                      <div key={idx}>
+                        <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
+                          <span className="w-1 h-4 bg-[#C5A065] rounded-full"></span>
+                          {option.name}
+                        </h4>
+                        <div className="flex gap-2 flex-wrap">
+                          {option.choices.map((choice) => (
+                            <button
+                              key={choice}
+                              type="button"
+                              onClick={() => setSelectedOptions(prev => ({ ...prev, [option.name]: choice }))}
+                              className={`flex-1 py-3 px-2 rounded text-sm font-medium transition-all min-w-[100px] ${
+                                selectedOptions[option.name] === choice
+                                  ? "bg-[#C5A065] text-white shadow-md"
+                                  : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                              }`}
+                            >
+                              {choice}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* OPTIONS POUR LES PAINS (Legacy support if not using customOptions) */}
+                {selectedProduct?.category === "Pains" && !selectedProduct.customOptions?.length && (
                   <>
                     <div className="mb-6">
                       <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
@@ -503,8 +558,8 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                   </div>
                 )}
 
-                {/* OPTIONS BOÎTE À LUNCH */}
-                {selectedProduct?.category === "Boîtes à lunch" && (
+                {/* OPTIONS BOÎTE À LUNCH (Legacy support) */}
+                {selectedProduct?.category === "Boîtes à lunch" && !selectedProduct.customOptions?.length && (
                   <>
                     <div className="mb-6">
                       <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">

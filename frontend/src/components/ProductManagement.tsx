@@ -50,6 +50,9 @@ export function ProductManagement() {
     minOrderQuantity: "1",
     maxOrderQuantity: "10",
     preparationTimeHours: "",
+    hasTaxes: true,
+    allergens: "",
+    customOptions: [] as Array<{ name: string; choices: string[] }>,
   });
 
   useEffect(() => {
@@ -144,6 +147,9 @@ export function ProductManagement() {
       minOrderQuantity: product.minOrderQuantity.toString(),
       maxOrderQuantity: product.maxOrderQuantity.toString(),
       preparationTimeHours: product.preparationTimeHours?.toString() || "",
+      hasTaxes: product.hasTaxes ?? true,
+      allergens: product.allergens || "",
+      customOptions: product.customOptions || [],
     });
     setIsEditModalOpen(true);
   };
@@ -183,6 +189,9 @@ export function ProductManagement() {
         preparationTimeHours: productForm.preparationTimeHours
           ? parseInt(productForm.preparationTimeHours)
           : undefined,
+        hasTaxes: productForm.hasTaxes,
+        allergens: productForm.allergens || undefined,
+        customOptions: productForm.customOptions.length > 0 ? productForm.customOptions : undefined,
       };
 
       const response = await productAPI.createProduct(productData);
@@ -198,6 +207,9 @@ export function ProductManagement() {
         minOrderQuantity: "1",
         maxOrderQuantity: "10",
         preparationTimeHours: "",
+        hasTaxes: true,
+        allergens: "",
+        customOptions: [],
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create product');
@@ -222,6 +234,9 @@ export function ProductManagement() {
         preparationTimeHours: productForm.preparationTimeHours
           ? parseInt(productForm.preparationTimeHours)
           : undefined,
+        hasTaxes: productForm.hasTaxes,
+        allergens: productForm.allergens || undefined,
+        customOptions: productForm.customOptions.length > 0 ? productForm.customOptions : undefined,
       };
 
       const response = await productAPI.updateProduct(selectedProduct.id, productData);
@@ -242,6 +257,9 @@ export function ProductManagement() {
         minOrderQuantity: "1",
         maxOrderQuantity: "10",
         preparationTimeHours: "",
+        hasTaxes: true,
+        allergens: "",
+        customOptions: [],
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update product');
@@ -467,6 +485,9 @@ export function ProductManagement() {
                 minOrderQuantity: "1",
                 maxOrderQuantity: "10",
                 preparationTimeHours: "",
+                hasTaxes: true,
+                allergens: "",
+                customOptions: [],
               });
             },
             disabled: isSubmitting,
@@ -629,6 +650,133 @@ export function ProductManagement() {
                   Produit disponible à la commande
                 </span>
               </label>
+            </div>
+
+            <div className="space-y-4 md:col-span-2 pt-4 border-t border-gray-100">
+              <h4 className="font-semibold text-gray-900">Options supplémentaires</h4>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="create-has-taxes"
+                  checked={productForm.hasTaxes}
+                  onChange={(e) =>
+                    setProductForm({
+                      ...productForm,
+                      hasTaxes: e.target.checked,
+                    })
+                  }
+                  className="w-5 h-5 text-[#C5A065] border-gray-300 rounded focus:ring-[#C5A065]"
+                />
+                <label htmlFor="create-has-taxes" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Appliquer les taxes
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Allergènes
+                </label>
+                <input
+                  type="text"
+                  value={productForm.allergens}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, allergens: e.target.value })
+                  }
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
+                  placeholder="Ex: Gluten, Lactose, Noix"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-700">
+                    Options personnalisables (ex: Taille, Tranchage)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newOpts = [...productForm.customOptions, { name: "", choices: [""] }];
+                      setProductForm({ ...productForm, customOptions: newOpts });
+                    }}
+                    className="text-sm text-[#C5A065] hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Ajouter une option
+                  </button>
+                </div>
+
+                {productForm.customOptions.map((opt, idx) => (
+                  <div key={idx} className="p-4 bg-gray-50 rounded-lg space-y-3 border border-gray-200">
+                    <div className="flex gap-2">
+                       <input
+                        type="text"
+                        placeholder="Nom de l'option (ex: Taille)"
+                        value={opt.name}
+                        onChange={(e) => {
+                          const newOpts = [...productForm.customOptions];
+                          newOpts[idx] = { ...newOpts[idx], name: e.target.value };
+                          setProductForm({ ...productForm, customOptions: newOpts });
+                        }}
+                        className="flex-1 p-2 border border-gray-200 rounded outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newOpts = productForm.customOptions.filter((_, i) => i !== idx);
+                          setProductForm({ ...productForm, customOptions: newOpts });
+                        }}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500 uppercase">Choix possibles</p>
+                      {opt.choices.map((choice, cidx) => (
+                        <div key={cidx} className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Choix (ex: 12 personnes)"
+                            value={choice}
+                            onChange={(e) => {
+                              const newOpts = [...productForm.customOptions];
+                              const newChoices = [...newOpts[idx].choices];
+                              newChoices[cidx] = e.target.value;
+                              newOpts[idx] = { ...newOpts[idx], choices: newChoices };
+                              setProductForm({ ...productForm, customOptions: newOpts });
+                            }}
+                            className="flex-1 p-2 border border-gray-200 rounded outline-none text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newOpts = [...productForm.customOptions];
+                              const newChoices = opt.choices.filter((_, i) => i !== cidx);
+                              newOpts[idx] = { ...newOpts[idx], choices: newChoices };
+                              setProductForm({ ...productForm, customOptions: newOpts });
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newOpts = [...productForm.customOptions];
+                          const newChoices = [...newOpts[idx].choices, ""];
+                          newOpts[idx] = { ...newOpts[idx], choices: newChoices };
+                          setProductForm({ ...productForm, customOptions: newOpts });
+                        }}
+                        className="text-xs text-[#C5A065] hover:underline"
+                      >
+                        + Ajouter un choix
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -664,6 +812,9 @@ export function ProductManagement() {
                 minOrderQuantity: "1",
                 maxOrderQuantity: "10",
                 preparationTimeHours: "",
+                hasTaxes: true,
+                allergens: "",
+                customOptions: [],
               });
             },
             disabled: isSubmitting,
@@ -826,6 +977,133 @@ export function ProductManagement() {
                   Produit disponible à la commande
                 </span>
               </label>
+            </div>
+
+            <div className="space-y-4 md:col-span-2 pt-4 border-t border-gray-100">
+              <h4 className="font-semibold text-gray-900">Options supplémentaires</h4>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="edit-has-taxes"
+                  checked={productForm.hasTaxes}
+                  onChange={(e) =>
+                    setProductForm({
+                      ...productForm,
+                      hasTaxes: e.target.checked,
+                    })
+                  }
+                  className="w-5 h-5 text-[#C5A065] border-gray-300 rounded focus:ring-[#C5A065]"
+                />
+                <label htmlFor="edit-has-taxes" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Appliquer les taxes
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Allergènes
+                </label>
+                <input
+                  type="text"
+                  value={productForm.allergens}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, allergens: e.target.value })
+                  }
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
+                  placeholder="Ex: Gluten, Lactose, Noix"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-700">
+                    Options personnalisables (ex: Taille, Tranchage)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newOpts = [...productForm.customOptions, { name: "", choices: [""] }];
+                      setProductForm({ ...productForm, customOptions: newOpts });
+                    }}
+                    className="text-sm text-[#C5A065] hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Ajouter une option
+                  </button>
+                </div>
+
+                {productForm.customOptions.map((opt, idx) => (
+                  <div key={idx} className="p-4 bg-gray-50 rounded-lg space-y-3 border border-gray-200">
+                    <div className="flex gap-2">
+                       <input
+                        type="text"
+                        placeholder="Nom de l'option (ex: Taille)"
+                        value={opt.name}
+                        onChange={(e) => {
+                          const newOpts = [...productForm.customOptions];
+                          newOpts[idx] = { ...newOpts[idx], name: e.target.value };
+                          setProductForm({ ...productForm, customOptions: newOpts });
+                        }}
+                        className="flex-1 p-2 border border-gray-200 rounded outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newOpts = productForm.customOptions.filter((_, i) => i !== idx);
+                          setProductForm({ ...productForm, customOptions: newOpts });
+                        }}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500 uppercase">Choix possibles</p>
+                      {opt.choices.map((choice, cidx) => (
+                        <div key={cidx} className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Choix (ex: 12 personnes)"
+                            value={choice}
+                            onChange={(e) => {
+                              const newOpts = [...productForm.customOptions];
+                              const newChoices = [...newOpts[idx].choices];
+                              newChoices[cidx] = e.target.value;
+                              newOpts[idx] = { ...newOpts[idx], choices: newChoices };
+                              setProductForm({ ...productForm, customOptions: newOpts });
+                            }}
+                            className="flex-1 p-2 border border-gray-200 rounded outline-none text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newOpts = [...productForm.customOptions];
+                              const newChoices = opt.choices.filter((_, i) => i !== cidx);
+                              newOpts[idx] = { ...newOpts[idx], choices: newChoices };
+                              setProductForm({ ...productForm, customOptions: newOpts });
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newOpts = [...productForm.customOptions];
+                          const newChoices = [...newOpts[idx].choices, ""];
+                          newOpts[idx] = { ...newOpts[idx], choices: newChoices };
+                          setProductForm({ ...productForm, customOptions: newOpts });
+                        }}
+                        className="text-xs text-[#C5A065] hover:underline"
+                      >
+                        + Ajouter un choix
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -940,6 +1218,39 @@ export function ProductManagement() {
                   {formatDate(selectedProduct.updatedAt)}
                 </p>
               </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">
+                  Taxes
+                </label>
+                <p className="text-base text-[#2D2A26] mt-1">
+                  {selectedProduct.hasTaxes ? "Taxes applicables" : "Sans taxes"}
+                </p>
+              </div>
+              {selectedProduct.allergens && (
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    Allergènes
+                  </label>
+                  <p className="text-base text-[#2D2A26] mt-1">
+                    {selectedProduct.allergens}
+                  </p>
+                </div>
+              )}
+              {selectedProduct.customOptions && selectedProduct.customOptions.length > 0 && (
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    Options supplémentaires
+                  </label>
+                  <div className="mt-2 space-y-2">
+                    {selectedProduct.customOptions.map((opt, idx) => (
+                      <div key={idx} className="p-2 bg-gray-50 rounded border border-gray-100">
+                        <span className="font-semibold text-sm">{opt.name} : </span>
+                        <span className="text-sm">{opt.choices.join(", ")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
