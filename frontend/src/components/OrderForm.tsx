@@ -114,7 +114,8 @@ export default function OrderForm({
       city: "",
       province: "",
       postalCode: "",
-      sameAsDelivery: true,
+      // sameAsDelivery only makes sense when there's a delivery address
+      sameAsDelivery: (initialData?.deliveryType || "pickup") === "delivery",
     },
     subtotal: 0,
     taxAmount: 0,
@@ -149,6 +150,24 @@ export default function OrderForm({
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  // Sync sameAsDelivery when delivery type changes
+  useEffect(() => {
+    if (formData.deliveryType === "pickup") {
+      // For pickup, sameAsDelivery makes no sense — show billing fields
+      setFormData((prev) => ({
+        ...prev,
+        billingAddress: {
+          ...prev.billingAddress,
+          street: prev.billingAddress?.street || "",
+          city: prev.billingAddress?.city || "",
+          province: prev.billingAddress?.province || "",
+          postalCode: prev.billingAddress?.postalCode || "",
+          sameAsDelivery: false,
+        },
+      }));
+    }
+  }, [formData.deliveryType]);
 
   const fetchProducts = async () => {
     try {
@@ -476,17 +495,20 @@ export default function OrderForm({
     }
 
     // AJOUT: Validation de l'adresse de facturation
-    if (!formData.billingAddress?.street.trim()) {
-      newErrors.billingAddress = "L'adresse de facturation est requise";
-    }
-    if (!formData.billingAddress?.city.trim()) {
-      newErrors.billingCity = "La ville de facturation est requise";
-    }
-    if (!formData.billingAddress?.province.trim()) {
-      newErrors.billingProvince = "La province de facturation est requise";
-    }
-    if (!formData.billingAddress?.postalCode.trim()) {
-      newErrors.billingPostalCode = "Le code postal de facturation est requis";
+    // Skip billing validation if sameAsDelivery is checked (address mirrors delivery)
+    if (!formData.billingAddress?.sameAsDelivery) {
+      if (!formData.billingAddress?.street.trim()) {
+        newErrors.billingAddress = "L'adresse de facturation est requise";
+      }
+      if (!formData.billingAddress?.city.trim()) {
+        newErrors.billingCity = "La ville de facturation est requise";
+      }
+      if (!formData.billingAddress?.province.trim()) {
+        newErrors.billingProvince = "La province de facturation est requise";
+      }
+      if (!formData.billingAddress?.postalCode.trim()) {
+        newErrors.billingPostalCode = "Le code postal de facturation est requis";
+      }
     }
 
     const hasValidItem = formData.items.some(
