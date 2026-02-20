@@ -35,16 +35,14 @@ const initializeApp = async () => {
       socketTimeoutMS: 45000,
     };
 
-    // Connect to MongoDB in background
-    mongoose
-      .connect(MONGODB_URI, mongooseOptions)
-      .then(() => {
-        console.log("✅ MONGOOSE CONNECTÉ");
-        validateSquareConfig();
-      })
-      .catch((err) => {
-        console.error("❌ ERREUR CONNEXION MONGOOSE:", err);
-      });
+    // Await MongoDB connection (required for serverless cold starts)
+    try {
+      await mongoose.connect(MONGODB_URI, mongooseOptions);
+      console.log("✅ MONGOOSE CONNECTÉ");
+      validateSquareConfig();
+    } catch (err) {
+      console.error("❌ ERREUR CONNEXION MONGOOSE:", err);
+    }
 
     // CORS
     app.use(

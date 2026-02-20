@@ -89,6 +89,7 @@ export async function getAllCategories(req: AuthRequest, res: Response) {
       },
     });
   } catch (error) {
+    console.error("❌ getAllCategories error:", error);
     throw new AppError("Failed to get categories", 500);
   }
 }
