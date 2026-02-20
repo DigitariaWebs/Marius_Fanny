@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -29,6 +29,7 @@ import {
 } from "./ui/dropdown-menu";
 import OrderForm from "./OrderForm";
 import OrderChangeHistory from "./OrderChangeHistory";
+import { orderAPI } from "../lib/OrderAPI";
 import type { Order } from "../types";
 
 export function OrderManagement() {
@@ -196,6 +197,65 @@ export function OrderManagement() {
   const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Charger les commandes depuis l'API au montage
+  useEffect(() => {
+    orderAPI.getOrders({ limit: 100 }).then((res) => {
+      const items = res.data?.items || [];
+      if (items.length > 0) {
+        const mapped: Order[] = items.map((o: any) => ({
+          id: o._id || o.id,
+          orderNumber: o.orderNumber || "",
+          clientId: 0,
+          client: {
+            id: 0,
+            firstName: o.clientInfo?.firstName || "",
+            lastName: o.clientInfo?.lastName || "",
+            email: o.clientInfo?.email || "",
+            phone: o.clientInfo?.phone || "",
+            status: "active" as const,
+            createdAt: o.createdAt,
+            updatedAt: o.updatedAt,
+            addresses: [],
+            orders: [],
+          },
+          orderDate: o.orderDate || o.createdAt,
+          pickupDate: o.pickupDate || o.createdAt,
+          pickupLocation: o.pickupLocation || "Laval",
+          deliveryType: o.deliveryType || "pickup",
+          deliveryDate: o.deliveryDate,
+          deliveryTimeSlot: o.deliveryTimeSlot,
+          deliveryAddress: o.deliveryAddress,
+          items: (o.items || []).map((item: any, idx: number) => ({
+            id: idx + 1,
+            orderId: 0,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            subtotal: item.amount,
+            productionStatus: "pending" as const,
+            notes: item.notes,
+          })),
+          subtotal: o.subtotal || 0,
+          taxAmount: o.taxAmount || 0,
+          deliveryFee: o.deliveryFee || 0,
+          total: o.total || 0,
+          depositAmount: o.depositAmount || 0,
+          depositPaid: o.depositPaid || false,
+          depositPaidAt: o.depositPaidAt,
+          balancePaid: o.balancePaid || false,
+          balancePaidAt: o.balancePaidAt,
+          paymentStatus: o.paymentStatus || "unpaid",
+          status: o.status || "pending",
+          source: "in_store" as const,
+          notes: o.notes,
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt,
+        }));
+        setOrders(mapped);
+      }
+    }).catch((err) => console.error("Failed to fetch orders:", err));
+  }, []);
+
   const clients = orders
     .map((order) => order.client)
     .filter(
@@ -206,13 +266,13 @@ export function OrderManagement() {
   // Fonction pour déterminer la couleur de la commande selon le type
   const getOrderColor = (order: Order) => {
     if (order.pickupLocation === "Montreal" && order.deliveryType === "pickup") {
-      return "bg-blue-50 border-l-4 border-blue-500 hover:bg-blue-100"; // Bleu pour ramassage Montréal
+      return "!bg-blue-50 border-l-4 !border-l-blue-500 hover:!bg-blue-100"; // Bleu pour ramassage Montréal
     } else if (order.deliveryType === "delivery") {
-      return "bg-yellow-50 border-l-4 border-yellow-500 hover:bg-yellow-100"; // Jaune pour livraison
+      return "!bg-yellow-50 border-l-4 !border-l-yellow-500 hover:!bg-yellow-100"; // Jaune pour livraison
     } else if (order.pickupLocation === "Laval" && order.deliveryType === "pickup") {
-      return "bg-white border-l-4 border-gray-300 hover:bg-gray-50"; // Blanc pour pick-up Laval
+      return "!bg-white border-l-4 !border-l-gray-300 hover:!bg-gray-50"; // Blanc pour pick-up Laval
     }
-    return "bg-white hover:bg-gray-50"; // Couleur par défaut
+    return "!bg-white hover:!bg-gray-50"; // Couleur par défaut
   };
 
   const getStatusBadge = (status: Order["status"]) => {
@@ -1056,10 +1116,115 @@ export function OrderManagement() {
         }}
       >
         <OrderForm
-          onSubmit={(formData) => {
-            console.log("Order form submitted:", formData);
-            // TODO: Implement actual order creation
-            setIsCreateModalOpen(false);
+          onSubmit={async (formData) => {
+            setIsSubmitting(true);
+            try {
+              // Build API payload
+              const apiItems = formData.items
+                .filter((item) => item.productId && item.quantity > 0)
+                .map((item) => ({
+                  productId: item.productId!,
+                  productName: item.productName,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
+                  amount: item.amount,
+                  notes: item.notes || undefined,
+                }));
+
+              const payload: any = {
+                clientInfo: {
+                  firstName: formData.firstName,
+                  lastName: formData.lastName,
+                  email: formData.email,
+                  phone: formData.phone,
+                },
+                pickupLocation: formData.pickupLocation,
+                deliveryType: formData.deliveryType,
+                items: apiItems,
+                notes: formData.notes || undefined,
+                paymentType: "full" as const,
+                depositPaid: false,
+              };
+
+              if (formData.date) {
+                payload.pickupDate = new Date(formData.date).toISOString();
+              }
+
+              if (formData.deliveryType === "delivery" && formData.deliveryAddress) {
+                payload.deliveryAddress = {
+                  street: formData.deliveryAddress.street,
+                  city: formData.deliveryAddress.city,
+                  province: formData.deliveryAddress.province,
+                  postalCode: formData.deliveryAddress.postalCode,
+                };
+                if (formData.date) {
+                  payload.deliveryDate = formData.date;
+                }
+              }
+
+              // Save to API (persists in DB + appears in production list)
+              const result = await orderAPI.createOrder(payload);
+              const saved = result.data;
+              const now = new Date().toISOString();
+
+              // Add to local list immediately
+              const newOrder: Order = {
+                id: saved?._id || String(Date.now()),
+                orderNumber: saved?.orderNumber || `ORD-${Date.now()}`,
+                clientId: formData.clientId || 0,
+                client: {
+                  id: formData.clientId || 0,
+                  firstName: formData.firstName,
+                  lastName: formData.lastName,
+                  email: formData.email,
+                  phone: formData.phone,
+                  status: "active",
+                  createdAt: now,
+                  updatedAt: now,
+                  addresses: [],
+                  orders: [],
+                },
+                orderDate: now,
+                pickupDate: formData.date ? new Date(formData.date).toISOString() : now,
+                pickupLocation: formData.pickupLocation,
+                deliveryType: formData.deliveryType,
+                deliveryAddress: formData.deliveryAddress
+                  ? { id: 0, type: "shipping", ...formData.deliveryAddress, isDefault: false }
+                  : undefined,
+                items: formData.items
+                  .filter((item) => item.productId && item.quantity > 0)
+                  .map((item, idx) => ({
+                    id: idx + 1,
+                    orderId: 0,
+                    productId: item.productId!,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    subtotal: item.amount,
+                    productionStatus: "pending" as const,
+                    notes: item.notes || undefined,
+                  })),
+                subtotal: saved?.subtotal ?? formData.subtotal,
+                taxAmount: saved?.taxAmount ?? formData.taxAmount,
+                deliveryFee: saved?.deliveryFee ?? formData.deliveryFee,
+                total: saved?.total ?? formData.total,
+                depositAmount: saved?.depositAmount ?? formData.depositAmount,
+                depositPaid: false,
+                balancePaid: false,
+                paymentStatus: "unpaid",
+                status: "pending",
+                source: "in_store",
+                notes: formData.notes || undefined,
+                createdAt: now,
+                updatedAt: now,
+              };
+              setOrders((prev) => [newOrder, ...prev]);
+              setIsCreateModalOpen(false);
+            } catch (err: any) {
+              console.error("Failed to create order:", err);
+              alert(err.message || "Erreur lors de la création de la commande");
+            } finally {
+              setIsSubmitting(false);
+            }
           }}
           onCancel={() => {
             setIsCreateModalOpen(false);

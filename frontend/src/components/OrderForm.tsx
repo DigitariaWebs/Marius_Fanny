@@ -485,13 +485,6 @@ export default function OrderForm({
       if (!formData.deliveryAddress?.province.trim()) {
         newErrors.deliveryProvince = "La province est requise";
       }
-      if (!deliveryZoneInfo?.isValid) {
-        newErrors.deliveryZone =
-          "Veuillez sélectionner un code postal de livraison valide";
-      }
-      if (minimumOrderError) {
-        newErrors.minimumOrder = minimumOrderError;
-      }
     }
 
     // AJOUT: Validation de l'adresse de facturation
