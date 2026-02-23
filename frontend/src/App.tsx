@@ -20,6 +20,8 @@ import Contact from "./components/Contact";
 import MonCompte from "./components/Moncompte";
 import DevenirPartenaire from "./components/DevenirPartenaire";
 import ProDashboard from "./components/ProDashboard";
+import CuisinierDashboard from "./components/CuisinierDashboard";
+import PatissierDashboard from "./components/PatissierDashboard";
 
 // Pages
 import User from "./pages/user";
@@ -302,6 +304,8 @@ const App: React.FC = () => {
             }
           />
           <Route path="/staff/delivery" element={<DeliveryDashboard />} />
+          <Route path="/staff/cuisinier" element={<CuisinierDashboard />} />
+          <Route path="/staff/patissier" element={<PatissierDashboard />} />
         </Routes>
       </div>
     </Router>

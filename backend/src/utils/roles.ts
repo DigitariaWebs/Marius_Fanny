@@ -9,6 +9,8 @@ export const USER_ROLES = {
   CUSTOMER_SERVICE: "customerService",
   ADMIN: "admin",
   DELIVERY_DRIVER: "deliveryDriver",
+  CUISINIER: "cuisinier",
+  PATISSIER: "patissier",
 } as const;
 
 export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
@@ -20,6 +22,8 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
   user: 1,
   pro: 1,
   staff: 2,
+  cuisinier: 2,
+  patissier: 2,
   deliveryDriver: 3,
   customerService: 4,
   admin: 5,
@@ -124,6 +128,8 @@ export function getRoleDisplayName(role: UserRole): string {
     customerService: "Customer Service",
     admin: "Administrator",
     deliveryDriver: "Delivery Driver",
+    cuisinier: "Cuisinier",
+    patissier: "Pâtissier",
   };
   return displayNames[role] || role;
 }
@@ -142,6 +148,8 @@ export function getRoleDescription(role: UserRole): string {
       "Customer service representative with support and management capabilities",
     admin: "Full system administrator with complete access and control",
     deliveryDriver: "Delivery driver with access to update delivery statuses",
+    cuisinier: "Cuisinier with access to production list for cooking items",
+    patissier: "Pâtissier with access to production list for pastries",
   };
   return descriptions[role] || "Unknown role";
 }

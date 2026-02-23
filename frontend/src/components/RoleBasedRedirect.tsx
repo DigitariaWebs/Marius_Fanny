@@ -31,6 +31,20 @@ export function RoleBasedRedirect({ children }: RoleBasedRedirectProps) {
             navigate("/staff/delivery", { replace: true });
             return;
           }
+
+          // If user is a cuisinier and NOT on their designated route
+          if (userRole === "cuisinier" && location.pathname !== "/staff/cuisinier") {
+            console.log("👨‍🍳 Redirecting cuisinier to their dashboard");
+            navigate("/staff/cuisinier", { replace: true });
+            return;
+          }
+
+          // If user is a patissier and NOT on their designated route
+          if (userRole === "patissier" && location.pathname !== "/staff/patissier") {
+            console.log("🧁 Redirecting patissier to their dashboard");
+            navigate("/staff/patissier", { replace: true });
+            return;
+          }
         }
 
         // Allow rendering for all other cases

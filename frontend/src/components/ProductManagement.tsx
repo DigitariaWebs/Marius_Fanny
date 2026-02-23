@@ -54,6 +54,7 @@ export function ProductManagement() {
     preparationTimeHours: "",
     hasTaxes: true,
     allergens: "",
+    productionType: "" as "" | "patisserie" | "cuisinier",
     customOptions: [] as Array<{ name: string; choices: string[] }>,
   });
 
@@ -182,6 +183,7 @@ export function ProductManagement() {
       preparationTimeHours: product.preparationTimeHours?.toString() || "",
       hasTaxes: product.hasTaxes ?? true,
       allergens: product.allergens || "",
+      productionType: (product.productionType || "") as "" | "patisserie" | "cuisinier",
       customOptions: product.customOptions || [],
     });
     setIsEditModalOpen(true);
@@ -224,6 +226,7 @@ export function ProductManagement() {
           : undefined,
         hasTaxes: productForm.hasTaxes,
         allergens: productForm.allergens || undefined,
+        productionType: productForm.productionType || undefined,
         customOptions: productForm.customOptions
           .filter(opt => opt.name.trim() !== "")
           .map(opt => ({
@@ -247,6 +250,7 @@ export function ProductManagement() {
         preparationTimeHours: "",
         hasTaxes: true,
         allergens: "",
+        productionType: "" as "" | "patisserie" | "cuisinier",
         customOptions: [],
       });
     } catch (err) {
@@ -274,6 +278,7 @@ export function ProductManagement() {
           : undefined,
         hasTaxes: productForm.hasTaxes,
         allergens: productForm.allergens || undefined,
+        productionType: productForm.productionType || undefined,
         customOptions: productForm.customOptions
           .filter(opt => opt.name.trim() !== "")
           .map(opt => ({
@@ -302,6 +307,7 @@ export function ProductManagement() {
         preparationTimeHours: "",
         hasTaxes: true,
         allergens: "",
+        productionType: "" as "" | "patisserie" | "cuisinier",
         customOptions: [],
       });
     } catch (err) {
@@ -530,6 +536,7 @@ export function ProductManagement() {
                 preparationTimeHours: "",
                 hasTaxes: true,
                 allergens: "",
+                productionType: "" as "" | "patisserie" | "cuisinier",
                 customOptions: [],
               });
             },
@@ -731,6 +738,23 @@ export function ProductManagement() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Type de Production
+                </label>
+                <select
+                  value={productForm.productionType}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, productionType: e.target.value as "" | "patisserie" | "cuisinier" })
+                  }
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
+                >
+                  <option value="">Non spécifié</option>
+                  <option value="patisserie">Pâtisserie</option>
+                  <option value="cuisinier">Cuisinier</option>
+                </select>
+              </div>
+
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-medium text-gray-700">
@@ -857,6 +881,7 @@ export function ProductManagement() {
                 preparationTimeHours: "",
                 hasTaxes: true,
                 allergens: "",
+                productionType: "" as "" | "patisserie" | "cuisinier",
                 customOptions: [],
               });
             },
@@ -1056,6 +1081,23 @@ export function ProductManagement() {
                   className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
                   placeholder="Ex: Gluten, Lactose, Noix"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Type de Production
+                </label>
+                <select
+                  value={productForm.productionType}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, productionType: e.target.value as "" | "patisserie" | "cuisinier" })
+                  }
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
+                >
+                  <option value="">Non spécifié</option>
+                  <option value="patisserie">Pâtisserie</option>
+                  <option value="cuisinier">Cuisinier</option>
+                </select>
               </div>
 
               <div className="space-y-3">

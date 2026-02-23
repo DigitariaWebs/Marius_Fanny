@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import Order from "../models/Order.js";
+import { Product } from "../models/Product.js";
 import type { ApiResponse, PaginatedResponse } from "../types.js";
 import type {
   CreateOrderInput,
@@ -189,25 +190,38 @@ export const getProductionList = async (
 
     const orders = await Order.find(query).sort({ createdAt: -1 });
 
+    // Get all unique product IDs from orders
+    const productIds = [...new Set(orders.flatMap(order => 
+      order.items.map(item => item.productId)
+    ))];
+
+    // Fetch product data for all products
+    const products = await Product.find({ id: { $in: productIds } });
+    const productMap = new Map(products.map(p => [p.id, p]));
+
     // Flatten orders into production items (one per product per order)
     const productionItems = orders.flatMap((order) =>
-      order.items.map((item, idx) => ({
-        id: `${order._id}-${idx}`,
-        orderId: order._id,
-        orderNumber: order.orderNumber,
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        customerName: `${order.clientInfo.firstName} ${order.clientInfo.lastName}`,
-        customerPhone: order.clientInfo.phone,
-        deliveryDate: order.deliveryDate || (order.pickupDate ? order.pickupDate.toISOString().split('T')[0] : order.orderDate.toISOString().split('T')[0]),
-        deliveryTimeSlot: order.deliveryTimeSlot || "Non spécifié",
-        deliveryType: order.deliveryType,
-        pickupLocation: order.pickupLocation,
-        orderStatus: order.status,
-        notes: item.notes || order.notes || "",
-      }))
+      order.items.map((item, idx) => {
+        const product = productMap.get(item.productId);
+        return {
+          id: `${order._id}-${idx}`,
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          productionType: product?.productionType || null,
+          customerName: `${order.clientInfo.firstName} ${order.clientInfo.lastName}`,
+          customerPhone: order.clientInfo.phone,
+          deliveryDate: order.deliveryDate || (order.pickupDate ? order.pickupDate.toISOString().split('T')[0] : order.orderDate.toISOString().split('T')[0]),
+          deliveryTimeSlot: order.deliveryTimeSlot || "Non spécifié",
+          deliveryType: order.deliveryType,
+          pickupLocation: order.pickupLocation,
+          orderStatus: order.status,
+          notes: item.notes || order.notes || "",
+        };
+      })
     );
 
     res.json({
