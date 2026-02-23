@@ -59,9 +59,14 @@ const Checkout: React.FC = () => {
     onClose: () => {},
   });
 
-  // Delivery time slots configuration
+  // Delivery time slots configuration - MODIFIÉ POUR RAMASSAGE
   const getAvailableTimeSlots = (selectedDate: string) => {
     if (!selectedDate) return [];
+
+    // Si c'est du ramassage, pas de créneaux fixes
+    if (state?.deliveryType === "pickup") {
+      return []; // Retourne un tableau vide pour indiquer qu'il n'y a pas de créneaux prédéfinis
+    }
 
     const date = new Date(selectedDate + "T00:00:00");
     const dayOfWeek = date.getDay(); // 0 = dimanche, 6 = samedi
@@ -194,8 +199,8 @@ const Checkout: React.FC = () => {
     }
   };
 
-  // Handle time slot selection
-  const handleTimeSlotChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  // Handle time slot selection - MODIFIÉ POUR RAMASSAGE
+  const handleTimeSlotChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
     setDeliveryTime(e.target.value);
     setTimeSlotError("");
   };
@@ -294,7 +299,8 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    if (!deliveryTime) {
+    // Pour le ramassage, pas besoin de créneau horaire
+    if (state.deliveryType === "delivery" && !deliveryTime) {
       alert("Veuillez sélectionner un créneau horaire.");
       return;
     }
@@ -306,7 +312,7 @@ const Checkout: React.FC = () => {
     }
 
     console.log(
-      `📅 [CHECKOUT] Delivery info collected: ${deliveryDate} - ${deliveryTime}, moving to payment step`,
+      `📅 [CHECKOUT] Delivery info collected: ${deliveryDate}${deliveryTime ? ` - ${deliveryTime}` : ''}, moving to payment step`,
     );
     setCurrentStep("payment");
   };
@@ -341,7 +347,7 @@ const Checkout: React.FC = () => {
         },
         deliveryType: state.deliveryType,
         deliveryDate: deliveryDate,
-        deliveryTimeSlot: deliveryTime,
+        deliveryTimeSlot: deliveryTime, // Sera vide pour ramassage
         deliveryAddress:
           state.deliveryType === "delivery" && state.postalCode
             ? {
@@ -365,7 +371,7 @@ const Checkout: React.FC = () => {
         paymentType: "full",
         depositPaid: true, // Payment was made
         squarePaymentId: paymentId,
-        notes: `Square Payment ID: ${paymentId} | Livraison prévue: ${deliveryDate} ${deliveryTime}`,
+        notes: `Square Payment ID: ${paymentId} | ${state.deliveryType === 'pickup' ? 'Ramassage' : 'Livraison'} prévu${state.deliveryType === 'pickup' ? '' : 'e'}: ${deliveryDate}${deliveryTime ? ` ${deliveryTime}` : ''}`,
       };
 
       const response = await fetch(`${normalizedApiUrl}/api/orders`, {
@@ -399,7 +405,7 @@ const Checkout: React.FC = () => {
               <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
               <div>
                 <p className="font-semibold">Commande confirmée</p>
-                <p>Nous livrons vos produits directement à la réception.</p>
+                <p>{state.deliveryType === 'pickup' ? 'Votre commande est prête pour le ramassage.' : 'Nous livrons vos produits directement à la réception.'}</p>
               </div>
             </div>
             <div className="space-y-2 text-stone-600 bg-stone-50 p-4 rounded-lg">
@@ -525,13 +531,13 @@ const Checkout: React.FC = () => {
               }}
             >
               {currentStep === "contact" && "Informations client"}
-              {currentStep === "delivery" && "Créneau de livraison"}
+              {currentStep === "delivery" && state.deliveryType === "delivery" ? "Créneau de livraison" : "Date de ramassage"}
               {currentStep === "payment" && "Paiement sécurisé"}
             </h1>
             <p className="text-stone-600">
               {currentStep === "contact" && "Renseignez vos coordonnées"}
               {currentStep === "delivery" &&
-                "Choisissez votre créneau de livraison"}
+                (state.deliveryType === "delivery" ? "Choisissez votre créneau de livraison" : "Choisissez votre date de ramassage")}
               {currentStep === "payment" &&
                 "Finalisez votre commande en toute sécurité"}
             </p>
@@ -614,14 +620,14 @@ const Checkout: React.FC = () => {
                       type="submit"
                       className="w-full bg-[#2D2A26] text-white py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-[#C5A065] transition-all shadow-lg"
                     >
-                      Suivant: Créneau de livraison
+                      Suivant: {state.deliveryType === "delivery" ? "Créneau de livraison" : "Date de ramassage"}
                       <ArrowLeft size={18} className="rotate-180" />
                     </button>
                   </form>
                 </div>
               )}
 
-              {/* Step 2: Delivery Time Slot */}
+              {/* Step 2: Delivery Time Slot - MODIFIÉ POUR RAMASSAGE */}
               {currentStep === "delivery" && (
                 <div className="bg-white rounded-2xl p-6 shadow-lg">
                   <div className="mb-4">
@@ -630,7 +636,7 @@ const Checkout: React.FC = () => {
                         2
                       </div>
                       <h2 className="text-xl font-serif text-[#2D2A26]">
-                        Créneau de livraison
+                        {state.deliveryType === "delivery" ? "Créneau de livraison" : "Date de ramassage"}
                       </h2>
                     </div>
                     <div className="w-full bg-stone-200 rounded-full h-2">
@@ -669,7 +675,7 @@ const Checkout: React.FC = () => {
                           .join(", ")}
                       </p>
                       <p className="text-xs mt-2 text-stone-600">
-                        📅 Livraison disponible à partir du{" "}
+                        📅 {state.deliveryType === "delivery" ? "Livraison" : "Ramassage"} disponible à partir du{" "}
                         {new Date(minDeliveryDate).toLocaleDateString("fr-CA", {
                           weekday: "long",
                           year: "numeric",
@@ -677,7 +683,7 @@ const Checkout: React.FC = () => {
                           day: "numeric",
                         })}
                       </p>
-                      {maxPreparationTime === 24 && (
+                      {maxPreparationTime === 24 && state.deliveryType === "delivery" && (
                         <p className="text-xs mt-2 text-stone-600 font-medium">
                           🕐 Pour une livraison le lendemain, commandez avant
                           12h (midi)
@@ -692,7 +698,7 @@ const Checkout: React.FC = () => {
                   >
                     <div>
                       <label className="block text-sm text-stone-600 mb-2">
-                        Date de livraison *
+                        Date *
                       </label>
                       <input
                         type="date"
@@ -713,7 +719,7 @@ const Checkout: React.FC = () => {
                       )}
                       {deliveryDate && !dateValidationError && (
                         <p className="mt-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
-                          ✅ Date valide! Livraison prévue le{" "}
+                          ✅ Date valide! {state.deliveryType === "delivery" ? "Livraison" : "Ramassage"} prévu le{" "}
                           {new Date(deliveryDate).toLocaleDateString("fr-CA", {
                             weekday: "long",
                             year: "numeric",
@@ -724,31 +730,57 @@ const Checkout: React.FC = () => {
                       )}
                     </div>
 
-                    <div>
-                      <label className="flex text-sm text-stone-600 mb-2 items-center gap-2">
-                        <Clock size={16} />
-                        Créneau horaire *
-                      </label>
-                      <select
-                        value={deliveryTime}
-                        onChange={handleTimeSlotChange}
-                        className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065] bg-white"
-                        required
-                        disabled={!deliveryDate || !!dateValidationError}
-                      >
-                        <option value="">Sélectionnez un créneau</option>
-                        {availableTimeSlots.map((slot, index) => (
-                          <option key={index} value={slot}>
-                            {slot}
-                          </option>
-                        ))}
-                      </select>
-                      {deliveryTime && (
-                        <p className="mt-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
-                          ✅ Créneau sélectionné: {deliveryTime}
-                        </p>
-                      )}
-                    </div>
+                    {/* Pour la livraison: sélecteur de créneaux */}
+                    {state.deliveryType === "delivery" && (
+                      <div>
+                        <label className="flex text-sm text-stone-600 mb-2 items-center gap-2">
+                          <Clock size={16} />
+                          Créneau horaire *
+                        </label>
+                        <select
+                          value={deliveryTime}
+                          onChange={handleTimeSlotChange}
+                          className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065] bg-white"
+                          required
+                          disabled={!deliveryDate || !!dateValidationError}
+                        >
+                          <option value="">Sélectionnez un créneau</option>
+                          {availableTimeSlots.map((slot, index) => (
+                            <option key={index} value={slot}>
+                              {slot}
+                            </option>
+                          ))}
+                        </select>
+                        {deliveryTime && (
+                          <p className="mt-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                            ✅ Créneau sélectionné: {deliveryTime}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Pour le ramassage: champ de texte libre */}
+                    {state.deliveryType === "pickup" && (
+                      <div>
+                        <label className="flex text-sm text-stone-600 mb-2 items-center gap-2">
+                          <Clock size={16} />
+                          Heure approximative (optionnel)
+                        </label>
+                        <input
+                          type="text"
+                          value={deliveryTime}
+                          onChange={handleTimeSlotChange}
+                          placeholder="Ex: Vers 14h, Après 17h, etc."
+                          className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065]"
+                          disabled={!deliveryDate || !!dateValidationError}
+                        />
+                        {deliveryTime && (
+                          <p className="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                            ℹ️ Vous avez indiqué: {deliveryTime}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex gap-3 pt-4">
                       <button
@@ -765,9 +797,9 @@ const Checkout: React.FC = () => {
                       </button>
                       <button
                         type="submit"
-                        disabled={!!dateValidationError || !deliveryTime}
+                        disabled={!!dateValidationError || (state.deliveryType === "delivery" && !deliveryTime)}
                         className={`flex-1 py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all shadow-lg ${
-                          dateValidationError || !deliveryTime
+                          (!!dateValidationError || (state.deliveryType === "delivery" && !deliveryTime))
                             ? "bg-stone-400 text-stone-600 cursor-not-allowed"
                             : "bg-[#2D2A26] text-white hover:bg-[#C5A065]"
                         }`}
@@ -808,8 +840,9 @@ const Checkout: React.FC = () => {
                       <strong>Client:</strong> {customerName}
                     </p>
                     <p className="text-sm text-stone-600">
-                      <strong>Livraison:</strong>{" "}
-                      {new Date(deliveryDate).toLocaleDateString("fr-CA")} - {deliveryTime}
+                      <strong>{state.deliveryType === "delivery" ? "Livraison" : "Ramassage"}:</strong>{" "}
+                      {new Date(deliveryDate).toLocaleDateString("fr-CA")}
+                      {deliveryTime && ` - ${deliveryTime}`}
                     </p>
                   </div>
                   <SquarePaymentForm
@@ -830,7 +863,7 @@ const Checkout: React.FC = () => {
                     className="w-full mt-4 bg-stone-200 text-stone-700 py-3 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-stone-300 transition-all"
                   >
                     <ArrowLeft size={18} />
-                    Retour au créneau
+                    Retour à la date
                   </button>
                 </div>
               )}
@@ -843,7 +876,7 @@ const Checkout: React.FC = () => {
                 <div className="flex items-center gap-2 mb-4">
                   <MapPin size={20} className="text-[#C5A065]" />
                   <h2 className="text-xl font-serif text-[#2D2A26]">
-                    Livraison
+                    {state.deliveryType === "delivery" ? "Livraison" : "Ramassage"}
                   </h2>
                 </div>
                 <p className="text-stone-600">
@@ -857,9 +890,11 @@ const Checkout: React.FC = () => {
                       : state.postalCode}
                   </span>
                 </p>
-                <p className="text-stone-600 text-sm mt-2">
-                  Frais de livraison: {state.deliveryFee.toFixed(2)} $
-                </p>
+                {state.deliveryType === "delivery" && (
+                  <p className="text-stone-600 text-sm mt-2">
+                    Frais de livraison: {state.deliveryFee.toFixed(2)} $
+                  </p>
+                )}
               </div>
 
               {/* Order Summary */}
@@ -918,10 +953,12 @@ const Checkout: React.FC = () => {
                     <span>Sous-total</span>
                     <span>{state.subtotal.toFixed(2)} $</span>
                   </div>
-                  <div className="flex justify-between text-stone-600">
-                    <span>Livraison</span>
-                    <span>{state.deliveryFee.toFixed(2)} $</span>
-                  </div>
+                  {state.deliveryType === "delivery" && (
+                    <div className="flex justify-between text-stone-600">
+                      <span>Livraison</span>
+                      <span>{state.deliveryFee.toFixed(2)} $</span>
+                    </div>
+                  )}
                   {state.taxes > 0 && (
                     <div className="flex justify-between text-stone-600">
                       <span>Taxes</span>
