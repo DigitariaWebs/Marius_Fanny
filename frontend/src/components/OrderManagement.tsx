@@ -17,6 +17,7 @@ import {
   MapPin,
   UserCircle,
   DollarSign,
+  Check,
 } from "lucide-react";
 import { DataTable } from "./ui/DataTable";
 import { Modal } from "./ui/modal";
@@ -27,13 +28,34 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 import OrderForm from "./OrderForm";
 import OrderChangeHistory from "./OrderChangeHistory";
 import { orderAPI } from "../lib/OrderAPI";
 import type { Order } from "../types";
 
+// Interface étendue pour inclure le statut d'emballage
+interface OrderItemWithPacking {
+  id: number;
+  productId: number;
+  product?: { id: number; name: string; price: number };
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  productionStatus: string;
+  notes?: string;
+  isPacked?: boolean;
+}
+
+// Interface étendue pour Order
+interface OrderWithPacking extends Omit<Order, 'items'> {
+  items: OrderItemWithPacking[];
+}
+
 export function OrderManagement() {
-  const [orders, setOrders] = useState<Order[]>([
+  const [orders, setOrders] = useState<OrderWithPacking[]>([
     {
       id: "1",
       orderNumber: "ORD-2024-001",
@@ -54,12 +76,33 @@ export function OrderManagement() {
       pickupDate: "2024-01-25T15:00:00Z",
       pickupLocation: "Montreal",
       deliveryType: "pickup",
-      items: [],
-      subtotal: 85.0,
-      taxAmount: 12.73,
+      items: [
+        {
+          id: 1,
+          productId: 101,
+          product: { id: 101, name: "Gâteau au chocolat", price: 35.00 },
+          quantity: 2,
+          unitPrice: 35.00,
+          subtotal: 70.00,
+          productionStatus: "pending",
+          isPacked: false
+        },
+        {
+          id: 2,
+          productId: 102,
+          product: { id: 102, name: "Tarte aux pommes", price: 25.00 },
+          quantity: 1,
+          unitPrice: 25.00,
+          subtotal: 25.00,
+          productionStatus: "pending",
+          isPacked: false
+        }
+      ],
+      subtotal: 95.0,
+      taxAmount: 14.21,
       deliveryFee: 0,
-      total: 97.73,
-      depositAmount: 48.87,
+      total: 109.21,
+      depositAmount: 54.61,
       depositPaid: true,
       depositPaidAt: "2024-01-20T10:35:00Z",
       balancePaid: false,
@@ -99,7 +142,18 @@ export function OrderManagement() {
         isDefault: true,
       },
       deliverySlot: "10:00-12:00",
-      items: [],
+      items: [
+        {
+          id: 3,
+          productId: 103,
+          product: { id: 103, name: "Croissants (x6)", price: 12.00 },
+          quantity: 3,
+          unitPrice: 12.00,
+          subtotal: 36.00,
+          productionStatus: "ready",
+          isPacked: true
+        }
+      ],
       subtotal: 125.0,
       taxAmount: 18.69,
       deliveryFee: 15.0,
@@ -149,7 +203,6 @@ export function OrderManagement() {
       createdAt: "2024-01-22T09:00:00Z",
       updatedAt: "2024-01-22T09:00:00Z",
     },
-    // NOUVELLE COMMANDE LAVAL (pick-up)
     {
       id: "4",
       orderNumber: "ORD-2024-004",
@@ -170,7 +223,18 @@ export function OrderManagement() {
       pickupDate: "2024-01-28T14:00:00Z",
       pickupLocation: "Laval",
       deliveryType: "pickup",
-      items: [],
+      items: [
+        {
+          id: 4,
+          productId: 104,
+          product: { id: 104, name: "Pain au levain", price: 8.00 },
+          quantity: 2,
+          unitPrice: 8.00,
+          subtotal: 16.00,
+          productionStatus: "in_progress",
+          isPacked: false
+        }
+      ],
       subtotal: 95.0,
       taxAmount: 14.21,
       deliveryFee: 0,
@@ -187,6 +251,11 @@ export function OrderManagement() {
     },
   ]);
 
+  const [filteredOrders, setFilteredOrders] = useState<OrderWithPacking[]>(orders);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedOrderForProducts, setSelectedOrderForProducts] = useState<OrderWithPacking | null>(null);
+  const [isProductsModalOpen, setIsProductsModalOpen] = useState(false);
+  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -197,12 +266,25 @@ export function OrderManagement() {
   const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Filtrer par date
+  useEffect(() => {
+    if (selectedDate) {
+      const filtered = orders.filter(order => {
+        const orderDate = new Date(order.orderDate).toISOString().split('T')[0];
+        return orderDate === selectedDate;
+      });
+      setFilteredOrders(filtered);
+    } else {
+      setFilteredOrders(orders);
+    }
+  }, [selectedDate, orders]);
+
   // Charger les commandes depuis l'API au montage
   useEffect(() => {
     orderAPI.getOrders({ limit: 100 }).then((res) => {
       const items = res.data?.items || [];
       if (items.length > 0) {
-        const mapped: Order[] = items.map((o: any) => ({
+        const mapped: OrderWithPacking[] = items.map((o: any) => ({
           id: o._id || o.id,
           orderNumber: o.orderNumber || "",
           clientId: 0,
@@ -232,8 +314,10 @@ export function OrderManagement() {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             subtotal: item.amount,
-            productionStatus: "pending" as const,
+            productionStatus: item.productionStatus || "pending",
             notes: item.notes,
+            product: item.product,
+            isPacked: item.productionStatus === "ready"
           })),
           subtotal: o.subtotal || 0,
           taxAmount: o.taxAmount || 0,
@@ -252,6 +336,7 @@ export function OrderManagement() {
           updatedAt: o.updatedAt,
         }));
         setOrders(mapped);
+        setFilteredOrders(mapped);
       }
     }).catch((err) => console.error("Failed to fetch orders:", err));
   }, []);
@@ -266,13 +351,13 @@ export function OrderManagement() {
   // Fonction pour déterminer la couleur de la commande selon le type
   const getOrderColor = (order: Order) => {
     if (order.pickupLocation === "Montreal" && order.deliveryType === "pickup") {
-      return "!bg-blue-50 border-l-4 !border-l-blue-500 hover:!bg-blue-100"; // Bleu pour ramassage Montréal
+      return "!bg-blue-50 border-l-4 !border-l-blue-500 hover:!bg-blue-100 cursor-pointer";
     } else if (order.deliveryType === "delivery") {
-      return "!bg-yellow-50 border-l-4 !border-l-yellow-500 hover:!bg-yellow-100"; // Jaune pour livraison
+      return "!bg-yellow-50 border-l-4 !border-l-yellow-500 hover:!bg-yellow-100 cursor-pointer";
     } else if (order.pickupLocation === "Laval" && order.deliveryType === "pickup") {
-      return "!bg-white border-l-4 !border-l-gray-300 hover:!bg-gray-50"; // Blanc pour pick-up Laval
+      return "!bg-white border-l-4 !border-l-gray-300 hover:!bg-gray-50 cursor-pointer";
     }
-    return "!bg-white hover:!bg-gray-50"; // Couleur par défaut
+    return "!bg-white hover:!bg-gray-50 cursor-pointer";
   };
 
   const getStatusBadge = (status: Order["status"]) => {
@@ -344,50 +429,49 @@ export function OrderManagement() {
     }).format(amount);
   };
 
-  const filters = [
-    {
-      key: "status",
-      label: "Statut de commande",
-      options: [
-        { value: "all", label: "Tous les statuts" },
-        { value: "pending", label: "En attente" },
-        { value: "confirmed", label: "Confirmée" },
-        { value: "in_production", label: "En production" },
-        { value: "ready", label: "Prête" },
-        { value: "completed", label: "Complétée" },
-        { value: "cancelled", label: "Annulée" },
-      ],
-    },
-    {
-      key: "paymentStatus",
-      label: "Paiement",
-      options: [
-        { value: "all", label: "Tous les paiements" },
-        { value: "unpaid", label: "Non payé" },
-        { value: "deposit_paid", label: "Dépôt payé" },
-        { value: "paid", label: "Payé" },
-      ],
-    },
-    {
-      key: "pickupLocation",
-      label: "Lieu",
-      options: [
-        { value: "all", label: "Tous les lieux" },
-        { value: "Montreal", label: "Montréal" },
-        { value: "Laval", label: "Laval" },
-      ],
-    },
-    {
-      key: "source",
-      label: "Source",
-      options: [
-        { value: "all", label: "Toutes les sources" },
-        { value: "online", label: "En ligne" },
-        { value: "phone", label: "Téléphone" },
-        { value: "in_store", label: "En magasin" },
-      ],
-    },
-  ];
+  // Fonction pour voir les produits d'une commande
+  const handleViewProducts = (order: OrderWithPacking) => {
+    console.log("Ouverture des produits pour:", order.orderNumber);
+    setSelectedOrderForProducts(order);
+    setIsProductsModalOpen(true);
+  };
+
+  // Fonction pour emballer un produit
+  const handlePackItem = (orderId: string, itemId: number) => {
+    setOrders(prevOrders => 
+      prevOrders.map(order => {
+        if (order.id === orderId) {
+          const updatedItems = order.items.map(item =>
+            item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item
+          );
+          
+          const allPacked = updatedItems.every(item => item.isPacked);
+          
+          return {
+            ...order,
+            items: updatedItems,
+            status: allPacked ? "ready" : order.status,
+          };
+        }
+        return order;
+      })
+    );
+    
+    if (selectedOrderForProducts && selectedOrderForProducts.id === orderId) {
+      setSelectedOrderForProducts(prev => {
+        if (!prev) return null;
+        const updatedItems = prev.items.map(item =>
+          item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item
+        );
+        const allPacked = updatedItems.every(item => item.isPacked);
+        return {
+          ...prev,
+          items: updatedItems,
+          status: allPacked ? "ready" : prev.status
+        };
+      });
+    }
+  };
 
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order);
@@ -409,7 +493,9 @@ export function OrderManagement() {
 
     setIsSubmitting(true);
     setTimeout(() => {
-      setOrders(orders.filter((o) => o.id !== orderToDelete.id));
+      const newOrders = orders.filter((o) => o.id !== orderToDelete.id);
+      setOrders(newOrders);
+      setFilteredOrders(newOrders);
       setIsDeleteModalOpen(false);
       setOrderToDelete(null);
       setIsSubmitting(false);
@@ -426,11 +512,11 @@ export function OrderManagement() {
 
     setIsSubmitting(true);
     setTimeout(() => {
-      setOrders(
-        orders.map((o) =>
-          o.id === orderToCancel.id ? { ...o, status: "cancelled" } : o,
-        ),
+      const updatedOrders = orders.map((o) =>
+        o.id === orderToCancel.id ? { ...o, status: "cancelled" } : o,
       );
+      setOrders(updatedOrders);
+      setFilteredOrders(updatedOrders);
       setIsCancelModalOpen(false);
       setOrderToCancel(null);
       setIsSubmitting(false);
@@ -438,17 +524,28 @@ export function OrderManagement() {
   };
 
   const handleUpdateStatus = (orderId: string, newStatus: Order["status"]) => {
-    setOrders(
-      orders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)),
-    );
+    const updatedOrders = orders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o));
+    setOrders(updatedOrders);
+    setFilteredOrders(updatedOrders);
   };
 
+  // MODIFICATION: Ajout du onClick sur le numéro de commande
   const columns = [
     {
       key: "orderNumber",
       label: "Numéro",
       sortable: true,
-      render: (order: Order) => order.orderNumber,
+      render: (order: OrderWithPacking) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleViewProducts(order);
+          }}
+          className="text-left w-full hover:text-[#C5A065] transition-colors font-medium"
+        >
+          {order.orderNumber}
+        </button>
+      ),
     },
     {
       key: "client",
@@ -486,7 +583,7 @@ export function OrderManagement() {
       label: "Actions",
       render: (order: Order) => (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button className="p-2 hover:bg-gray-100 rounded">
               <MoreVertical className="h-4 w-4" />
             </button>
@@ -585,10 +682,35 @@ export function OrderManagement() {
       </header>
 
       <div className="p-4 md:p-8">
+        {/* SEULEMENT LE FILTRE PAR DATE */}
+        <div className="mb-4 flex items-center gap-4">
+          <div className="w-64">
+            <Label htmlFor="date-filter" className="text-xs text-gray-600">
+              FILTRER PAR DATE:
+            </Label>
+            <Input
+              id="date-filter"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+          {selectedDate && (
+            <button
+              onClick={() => setSelectedDate("")}
+              className="text-sm text-[#C5A065] hover:text-[#B38F55] mt-6"
+            >
+              Effacer le filtre
+            </button>
+          )}
+        </div>
+
+        {/* DataTable */}
         <DataTable
-          data={orders}
+          data={filteredOrders}
           columns={columns}
-          filters={filters}
+          filters={[]}
           searchPlaceholder="Rechercher par numéro, client ou téléphone..."
           getSearchValue={getSearchValue}
           itemsPerPage={10}
@@ -596,6 +718,112 @@ export function OrderManagement() {
           rowClassName={(order: Order) => getOrderColor(order)}
         />
       </div>
+
+      {/* MODAL DES PRODUITS AVEC BOUTONS EMBALLER */}
+      <Modal
+        open={isProductsModalOpen}
+        onOpenChange={setIsProductsModalOpen}
+        type="details"
+        title={`Produits de la commande ${selectedOrderForProducts?.orderNumber}`}
+        description={`Client: ${selectedOrderForProducts?.client.firstName} ${selectedOrderForProducts?.client.lastName}`}
+        icon={<Package className="h-6 w-6 text-[#C5A065]" />}
+        size="lg"
+        actions={{
+          secondary: {
+            label: "Fermer",
+            onClick: () => {
+              setIsProductsModalOpen(false);
+              setSelectedOrderForProducts(null);
+            },
+          },
+        }}
+      >
+        {selectedOrderForProducts && (
+          <div className="space-y-4">
+            {/* Indicateur de commande prête */}
+            {selectedOrderForProducts.items.length > 0 && 
+             selectedOrderForProducts.items.every(item => item.isPacked) && (
+              <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-center">
+                <span className="text-green-800 font-semibold text-sm flex items-center justify-center gap-2">
+                  <CheckCircle className="w-5 h-5" />
+                  ✅ COMMANDE PRÊTE - Tous les produits sont emballés
+                </span>
+              </div>
+            )}
+
+            {selectedOrderForProducts.items.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Aucun produit dans cette commande
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Produit</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Quantité</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Prix unitaire</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Sous-total</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Emballage</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {selectedOrderForProducts.items.map((item) => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-3 text-sm">
+                          {item.product?.name ?? `Produit #${item.productId}`}
+                        </td>
+                        <td className="px-4 py-3 text-sm">{item.quantity}</td>
+                        <td className="px-4 py-3 text-sm">{formatCurrency(item.unitPrice)}</td>
+                        <td className="px-4 py-3 text-sm">{formatCurrency(item.subtotal)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {!item.isPacked ? (
+                            <Button
+                              onClick={() => handlePackItem(selectedOrderForProducts.id, item.id)}
+                              size="sm"
+                              className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              Emballer
+                            </Button>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
+                              <Check className="w-3 h-3 mr-1" />
+                              Emballé
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            <div className="flex justify-end pt-4 border-t">
+              <div className="w-64 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Sous-total:</span>
+                  <span className="font-medium">{formatCurrency(selectedOrderForProducts.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Taxes:</span>
+                  <span className="font-medium">{formatCurrency(selectedOrderForProducts.taxAmount)}</span>
+                </div>
+                {selectedOrderForProducts.deliveryFee > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Livraison:</span>
+                    <span className="font-medium">{formatCurrency(selectedOrderForProducts.deliveryFee)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-bold border-t pt-2">
+                  <span>Total:</span>
+                  <span>{formatCurrency(selectedOrderForProducts.total)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Details Modal */}
       <Modal
@@ -858,7 +1086,7 @@ export function OrderManagement() {
                         selectedOrder.items.map((item) => (
                           <tr key={item.id}>
                             <td className="px-4 py-3 text-sm">
-                              {item.product?.name ?? "Produit inconnu"}
+                              {item.product?.name ?? `Produit #${item.productId}`}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               {item.quantity}
@@ -1119,7 +1347,6 @@ export function OrderManagement() {
           onSubmit={async (formData) => {
             setIsSubmitting(true);
             try {
-              // Build API payload
               const apiItems = formData.items
                 .filter((item) => item.productId && item.quantity > 0)
                 .map((item) => ({
@@ -1162,13 +1389,11 @@ export function OrderManagement() {
                 }
               }
 
-              // Save to API (persists in DB + appears in production list)
               const result = await orderAPI.createOrder(payload);
               const saved = result.data;
               const now = new Date().toISOString();
 
-              // Add to local list immediately
-              const newOrder: Order = {
+              const newOrder: OrderWithPacking = {
                 id: saved?._id || String(Date.now()),
                 orderNumber: saved?.orderNumber || `ORD-${Date.now()}`,
                 clientId: formData.clientId || 0,
@@ -1200,8 +1425,9 @@ export function OrderManagement() {
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     subtotal: item.amount,
-                    productionStatus: "pending" as const,
+                    productionStatus: "pending",
                     notes: item.notes || undefined,
+                    isPacked: false
                   })),
                 subtotal: saved?.subtotal ?? formData.subtotal,
                 taxAmount: saved?.taxAmount ?? formData.taxAmount,
@@ -1218,6 +1444,7 @@ export function OrderManagement() {
                 updatedAt: now,
               };
               setOrders((prev) => [newOrder, ...prev]);
+              setFilteredOrders((prev) => [newOrder, ...prev]);
               setIsCreateModalOpen(false);
             } catch (err: any) {
               console.error("Failed to create order:", err);
@@ -1264,11 +1491,19 @@ export function OrderManagement() {
         }}
       >
         <OrderForm
-          onSubmit={(formData) => {
-            console.log("Order form submitted:", formData);
-            // TODO: Implement actual order update
-            setIsEditModalOpen(false);
-            setSelectedOrder(null);
+          onSubmit={async (formData) => {
+            setIsSubmitting(true);
+            try {
+              console.log("Updating order:", formData);
+              setTimeout(() => {
+                setIsEditModalOpen(false);
+                setSelectedOrder(null);
+                setIsSubmitting(false);
+              }, 500);
+            } catch (err) {
+              console.error(err);
+              setIsSubmitting(false);
+            }
           }}
           onCancel={() => {
             setIsEditModalOpen(false);
@@ -1295,6 +1530,16 @@ export function OrderManagement() {
                         postalCode: selectedOrder.deliveryAddress.postalCode,
                       }
                     : undefined,
+                  items: selectedOrder.items.map(item => ({
+                    id: `edit-${item.id}`,
+                    productId: item.productId,
+                    productName: item.product?.name || "Produit",
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    amount: item.subtotal,
+                    notes: item.notes || "",
+                    isPacked: item.productionStatus === "ready"
+                  }))
                 }
               : undefined
           }
