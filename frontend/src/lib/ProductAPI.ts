@@ -1,30 +1,9 @@
+import type { Product } from '../types';
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Ensure API_URL has protocol
 const normalizedApiUrl = API_URL.startsWith('http') ? API_URL : `https://${API_URL}`;
-
-export interface Product {
-  id: number;
-  name: string;
-  category: string;
-  price: number;
-  available: boolean;
-  minOrderQuantity: number;
-  maxOrderQuantity: number;
-  description?: string;
-  image?: string;
-  createdAt: string;
-  updatedAt: string;
-  sales?: number;
-  revenue?: number;
-  preparationTimeHours?: number;
-  hasTaxes?: boolean;
-  allergens?: string;
-  customOptions?: Array<{
-    name: string;
-    choices: string[];
-  }>;
-}
 
 export interface CreateProductData {
   name: string;
@@ -38,6 +17,8 @@ export interface CreateProductData {
   preparationTimeHours?: number;
   hasTaxes?: boolean;
   allergens?: string;
+  productionType: "patisserie" | "cuisinier";
+  targetAudience: "clients" | "pro";
   customOptions?: Array<{
     name: string;
     choices: string[];
@@ -56,6 +37,8 @@ export interface UpdateProductData {
   preparationTimeHours?: number;
   hasTaxes?: boolean;
   allergens?: string;
+  productionType?: "patisserie" | "cuisinier";
+  targetAudience?: "clients" | "pro";
   customOptions?: Array<{
     name: string;
     choices: string[];
@@ -107,8 +90,9 @@ class ProductAPI {
     return response.json();
   }
 
-  async getAllProducts(page = 1, limit = 10): Promise<PaginatedResponse<Product>> {
-    return this.request<PaginatedResponse<Product>>(`?page=${page}&limit=${limit}`);
+  async getAllProducts(page = 1, limit = 10, targetAudience?: "clients" | "pro"): Promise<PaginatedResponse<Product>> {
+    const audience = targetAudience ? `&targetAudience=${targetAudience}` : "";
+    return this.request<PaginatedResponse<Product>>(`?page=${page}&limit=${limit}${audience}`);
   }
 
   async getProductById(id: number): Promise<ApiResponse<Product>> {

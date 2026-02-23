@@ -227,7 +227,7 @@ const ProductionList: React.FC = () => {
     </div>
   );
 
-  // Vue par liste (produits groupés)
+  // Vue par liste (produits groupés) - MODIFIÉE AVEC LABELS AU-DESSUS DES CHECKBOXES
   const ListView = () => (
     <div className="space-y-6">
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
@@ -237,14 +237,12 @@ const ProductionList: React.FC = () => {
               <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Produit</th>
               <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Quantité totale</th>
               <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Allergies</th>
-              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Progression</th>
+              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">À faire / Fait</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
             {filteredGroups.map(group => {
-              const doneCount = group.items.filter(i => i.done).length;
               const totalCount = group.items.length;
-              const progress = Math.round((doneCount / totalCount) * 100);
               
               return (
                 <tr key={group.productId} className="hover:bg-stone-50/50 transition-colors">
@@ -277,36 +275,45 @@ const ProductionList: React.FC = () => {
                     )}
                   </td>
                   <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-green-500 rounded-full transition-all duration-300"
-                          style={{ width: `${progress}%` }}
-                        />
+                    {/* En-tête avec les labels À faire / Fait */}
+                    <div className="flex items-center gap-4 mb-2 text-xs font-medium">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-amber-500 rounded"></div>
+                        <span>À faire</span>
                       </div>
-                      <span className="text-xs font-medium text-stone-600 min-w-[40px]">
-                        {doneCount}/{totalCount}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-green-500 rounded"></div>
+                        <span>Fait</span>
+                      </div>
                     </div>
                     
-                    {/* Mini-liste des commandes individuelles avec checkbox */}
-                    <div className="mt-2 space-y-1">
+                    {/* Liste des commandes individuelles avec checkbox */}
+                    <div className="space-y-2">
                       {group.items.map(item => (
-                        <div key={item.id} className="flex items-center gap-2 text-xs">
+                        <div key={item.id} className="flex items-center gap-2 text-sm">
                           <input
                             type="checkbox"
                             checked={item.done}
                             onChange={() => toggleDone(item.id)}
                             className="w-4 h-4 rounded border-stone-300 text-[#C5A065] focus:ring-[#C5A065]"
                           />
-                          <span className={item.done ? "line-through text-stone-400" : "text-stone-600"}>
+                          <span className={item.done ? "line-through text-stone-400" : "text-stone-700 font-medium"}>
                             {item.orderNumber} - {item.customerName}
                           </span>
                           {item.allergies && (
-                            <span className="text-red-500 text-[10px]">⚠️</span>
+                            <span className="text-red-500 text-xs" title={item.allergies}>⚠️</span>
                           )}
+                          {/* Petit indicateur de statut */}
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${item.done ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {item.done ? 'Fait' : 'À faire'}
+                          </span>
                         </div>
                       ))}
+                    </div>
+                    
+                    {/* Indicateur global du groupe */}
+                    <div className="mt-3 text-xs text-stone-500 border-t border-stone-100 pt-2">
+                      {group.items.filter(i => i.done).length} sur {totalCount} fait
                     </div>
                   </td>
                 </tr>

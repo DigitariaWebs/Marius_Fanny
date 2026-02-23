@@ -12,9 +12,15 @@ export async function getAllProducts(req: AuthRequest, res: Response) {
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
+    // Build filter: optionally restrict by targetAudience
+    const filter: Record<string, unknown> = {};
+    if (req.query.targetAudience === "clients" || req.query.targetAudience === "pro") {
+      filter.targetAudience = req.query.targetAudience;
+    }
+
     const [products, total] = await Promise.all([
-      Product.find().skip(skip).limit(limit).sort({ createdAt: -1 }),
-      Product.countDocuments(),
+      Product.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }),
+      Product.countDocuments(filter),
     ]);
 
     res.json({
@@ -76,6 +82,8 @@ export async function createProduct(req: AuthRequest, res: Response) {
       hasTaxes,
       allergens,
       customOptions,
+      productionType,
+      targetAudience,
     } = req.body;
 
     // Get the next ID
@@ -96,6 +104,8 @@ export async function createProduct(req: AuthRequest, res: Response) {
       hasTaxes,
       allergens,
       customOptions,
+      productionType,
+      targetAudience,
     });
 
     await product.save();

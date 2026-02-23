@@ -54,7 +54,8 @@ export function ProductManagement() {
     preparationTimeHours: "",
     hasTaxes: true,
     allergens: "",
-    productionType: "" as "" | "patisserie" | "cuisinier",
+    productionType: "patisserie" as "patisserie" | "cuisinier",
+    targetAudience: "clients" as "clients" | "pro",
     customOptions: [] as Array<{ name: string; choices: string[] }>,
   });
 
@@ -183,7 +184,8 @@ export function ProductManagement() {
       preparationTimeHours: product.preparationTimeHours?.toString() || "",
       hasTaxes: product.hasTaxes ?? true,
       allergens: product.allergens || "",
-      productionType: (product.productionType || "") as "" | "patisserie" | "cuisinier",
+      productionType: product.productionType,
+      targetAudience: product.targetAudience,
       customOptions: product.customOptions || [],
     });
     setIsEditModalOpen(true);
@@ -226,7 +228,8 @@ export function ProductManagement() {
           : undefined,
         hasTaxes: productForm.hasTaxes,
         allergens: productForm.allergens || undefined,
-        productionType: productForm.productionType || undefined,
+        productionType: productForm.productionType,
+        targetAudience: productForm.targetAudience,
         customOptions: productForm.customOptions
           .filter(opt => opt.name.trim() !== "")
           .map(opt => ({
@@ -250,7 +253,8 @@ export function ProductManagement() {
         preparationTimeHours: "",
         hasTaxes: true,
         allergens: "",
-        productionType: "" as "" | "patisserie" | "cuisinier",
+        productionType: "patisserie" as "patisserie" | "cuisinier",
+        targetAudience: "clients" as "clients" | "pro",
         customOptions: [],
       });
     } catch (err) {
@@ -278,7 +282,8 @@ export function ProductManagement() {
           : undefined,
         hasTaxes: productForm.hasTaxes,
         allergens: productForm.allergens || undefined,
-        productionType: productForm.productionType || undefined,
+        productionType: productForm.productionType,
+        targetAudience: productForm.targetAudience,
         customOptions: productForm.customOptions
           .filter(opt => opt.name.trim() !== "")
           .map(opt => ({
@@ -307,7 +312,8 @@ export function ProductManagement() {
         preparationTimeHours: "",
         hasTaxes: true,
         allergens: "",
-        productionType: "" as "" | "patisserie" | "cuisinier",
+        productionType: "patisserie" as "patisserie" | "cuisinier",
+        targetAudience: "clients" as "clients" | "pro",
         customOptions: [],
       });
     } catch (err) {
@@ -536,7 +542,8 @@ export function ProductManagement() {
                 preparationTimeHours: "",
                 hasTaxes: true,
                 allergens: "",
-                productionType: "" as "" | "patisserie" | "cuisinier",
+                productionType: "patisserie" as "patisserie" | "cuisinier",
+                targetAudience: "clients" as "clients" | "pro",
                 customOptions: [],
               });
             },
@@ -740,18 +747,33 @@ export function ProductManagement() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
-                  Type de Production
+                  Type de Production *
                 </label>
                 <select
                   value={productForm.productionType}
                   onChange={(e) =>
-                    setProductForm({ ...productForm, productionType: e.target.value as "" | "patisserie" | "cuisinier" })
+                    setProductForm({ ...productForm, productionType: e.target.value as "patisserie" | "cuisinier" })
                   }
                   className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
                 >
-                  <option value="">Non spécifié</option>
                   <option value="patisserie">Pâtisserie</option>
                   <option value="cuisinier">Cuisinier</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Public Cible *
+                </label>
+                <select
+                  value={productForm.targetAudience}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, targetAudience: e.target.value as "clients" | "pro" })
+                  }
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
+                >
+                  <option value="clients">Clients uniquement</option>
+                  <option value="pro">Professionnels uniquement</option>
                 </select>
               </div>
 
@@ -881,7 +903,8 @@ export function ProductManagement() {
                 preparationTimeHours: "",
                 hasTaxes: true,
                 allergens: "",
-                productionType: "" as "" | "patisserie" | "cuisinier",
+                productionType: "patisserie" as "patisserie" | "cuisinier",
+                targetAudience: "clients" as "clients" | "pro",
                 customOptions: [],
               });
             },
@@ -1085,18 +1108,33 @@ export function ProductManagement() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
-                  Type de Production
+                  Type de Production *
                 </label>
                 <select
                   value={productForm.productionType}
                   onChange={(e) =>
-                    setProductForm({ ...productForm, productionType: e.target.value as "" | "patisserie" | "cuisinier" })
+                    setProductForm({ ...productForm, productionType: e.target.value as "patisserie" | "cuisinier" })
                   }
                   className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
                 >
-                  <option value="">Non spécifié</option>
                   <option value="patisserie">Pâtisserie</option>
                   <option value="cuisinier">Cuisinier</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Public Cible *
+                </label>
+                <select
+                  value={productForm.targetAudience}
+                  onChange={(e) =>
+                    setProductForm({ ...productForm, targetAudience: e.target.value as "clients" | "pro" })
+                  }
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
+                >
+                  <option value="clients">Clients uniquement</option>
+                  <option value="pro">Professionnels uniquement</option>
                 </select>
               </div>
 

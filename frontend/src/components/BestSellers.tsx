@@ -76,7 +76,9 @@ const BestSellers: React.FC<BestSellersProps> = ({ onAddToCart }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       sales: 100,
-      revenue: 1995
+      revenue: 1995,
+      productionType: "patisserie" as const,
+      targetAudience: "clients" as const,
     },
     {
       id: 2,
@@ -90,7 +92,9 @@ const BestSellers: React.FC<BestSellersProps> = ({ onAddToCart }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       sales: 85,
-      revenue: 1780.75
+      revenue: 1780.75,
+      productionType: "patisserie" as const,
+      targetAudience: "clients" as const,
     },
     {
       id: 3,
@@ -104,7 +108,9 @@ const BestSellers: React.FC<BestSellersProps> = ({ onAddToCart }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       sales: 120,
-      revenue: 4500
+      revenue: 4500,
+      productionType: "patisserie" as const,
+      targetAudience: "clients" as const,
     },
     {
       id: 4,
@@ -118,7 +124,9 @@ const BestSellers: React.FC<BestSellersProps> = ({ onAddToCart }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       sales: 90,
-      revenue: 2655
+      revenue: 2655,
+      productionType: "patisserie" as const,
+      targetAudience: "clients" as const,
     },
     {
       id: 5,
@@ -132,7 +140,9 @@ const BestSellers: React.FC<BestSellersProps> = ({ onAddToCart }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       sales: 60,
-      revenue: 2577
+      revenue: 2577,
+      productionType: "cuisinier" as const,
+      targetAudience: "clients" as const,
     },
     {
       id: 6,
@@ -146,7 +156,9 @@ const BestSellers: React.FC<BestSellersProps> = ({ onAddToCart }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       sales: 200,
-      revenue: 3300
+      revenue: 3300,
+      productionType: "patisserie" as const,
+      targetAudience: "clients" as const,
     },
     {
       id: 7,
@@ -160,7 +172,9 @@ const BestSellers: React.FC<BestSellersProps> = ({ onAddToCart }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       sales: 150,
-      revenue: 3742.5
+      revenue: 3742.5,
+      productionType: "patisserie" as const,
+      targetAudience: "clients" as const,
     },
   ];
 

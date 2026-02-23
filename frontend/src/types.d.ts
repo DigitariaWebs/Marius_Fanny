@@ -35,7 +35,8 @@ export interface Product {
   preparationTimeHours?: number; // Hours required to prepare the product
   hasTaxes?: boolean;
   allergens?: string;
-  productionType?: "patisserie" | "cuisinier";
+  productionType: "patisserie" | "cuisinier";
+  targetAudience: "clients" | "pro";
   customOptions?: Array<{
     name: string;
     choices: string[];

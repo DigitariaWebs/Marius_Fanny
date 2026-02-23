@@ -17,7 +17,8 @@ export interface IProduct {
   preparationTimeHours?: number;
   hasTaxes?: boolean;
   allergens?: string;
-  productionType?: "patisserie" | "cuisinier";
+  productionType: "patisserie" | "cuisinier";
+  targetAudience: "clients" | "pro";
   customOptions?: Array<{
     name: string;
     choices: string[];
@@ -41,7 +42,8 @@ const productSchema = new Schema<IProduct>({
   preparationTimeHours: { type: Number },
   hasTaxes: { type: Boolean, default: true },
   allergens: { type: String },
-  productionType: { type: String, enum: ['patisserie', 'cuisinier'] },
+  productionType: { type: String, enum: ['patisserie', 'cuisinier'], required: true },
+  targetAudience: { type: String, enum: ['clients', 'pro'], required: true },
   customOptions: [{
     name: { type: String, required: true },
     choices: [{ type: String, required: true }]

@@ -109,7 +109,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
       setError(null);
       const [catRes, prodRes] = await Promise.all([
         categoryAPI.getAllCategories(),
-        productAPI.getAllProducts(),
+        productAPI.getAllProducts(1, 100, "clients"),
       ]);
 
       // Rebuild tree from parentId to handle any shape from API

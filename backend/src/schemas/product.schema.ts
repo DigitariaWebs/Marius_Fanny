@@ -20,7 +20,8 @@ export const productSchema = z.object({
   preparationTimeHours: z.number().int().positive().optional(),
   hasTaxes: z.boolean().default(true),
   allergens: z.string().optional(),
-  productionType: z.enum(["patisserie", "cuisinier"]).optional(),
+  productionType: z.enum(["patisserie", "cuisinier"]),
+  targetAudience: z.enum(["clients", "pro"]),
   customOptions: z.array(z.object({
     name: z.string().min(1),
     choices: z.array(z.string().min(1)),
@@ -42,7 +43,8 @@ export const createProductSchema = z.object({
   preparationTimeHours: z.number().int().positive().optional(),
   hasTaxes: z.boolean().optional().default(true),
   allergens: z.string().optional(),
-  productionType: z.enum(["patisserie", "cuisinier"]).optional(),
+  productionType: z.enum(["patisserie", "cuisinier"]),
+  targetAudience: z.enum(["clients", "pro"]),
   customOptions: z.array(z.object({
     name: z.string().min(1),
     choices: z.array(z.string().min(1)),
@@ -65,6 +67,7 @@ export const updateProductSchema = z.object({
   hasTaxes: z.boolean().optional(),
   allergens: z.string().optional(),
   productionType: z.enum(["patisserie", "cuisinier"]).optional(),
+  targetAudience: z.enum(["clients", "pro"]).optional(),
   customOptions: z.array(z.object({
     name: z.string().min(1),
     choices: z.array(z.string().min(1)),

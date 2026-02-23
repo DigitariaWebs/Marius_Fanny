@@ -84,7 +84,7 @@ export default function ProDashboard() {
       let hasMore = true;
 
       while (hasMore) {
-        const response = await productAPI.getAllProducts(page, 100);
+        const response = await productAPI.getAllProducts(page, 100, "pro");
         allProds = [...allProds, ...response.data.products];
         if (page >= response.data.pagination.totalPages) {
           hasMore = false;
