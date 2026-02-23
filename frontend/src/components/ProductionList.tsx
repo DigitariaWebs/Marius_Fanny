@@ -13,7 +13,9 @@ import {
   Eye,
   MapPin,
   Phone,
-  RefreshCw
+  RefreshCw,
+  LayoutGrid,
+  List
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -34,36 +36,45 @@ interface ProductionItem {
   pickupLocation: string;
   orderStatus: string;
   notes: string;
-  // Local-only production tracking
-  productionStatus: "à produire" | "en cours" | "produit" | "urgent";
+  allergies?: string; // Ajout des allergies
+  // Simple statut: fait ou pas fait
+  done: boolean;
+}
+
+interface GroupedProduct {
+  productId: number;
+  productName: string;
+  totalQuantity: number;
+  items: ProductionItem[];
+  allergies: string[]; // Liste des allergies uniques pour ce produit
 }
 
 const ProductionList: React.FC = () => {
   const [productionItems, setProductionItems] = useState<ProductionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "à produire" | "en cours" | "urgent">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [viewMode, setViewMode] = useState<"list" | "orders">("list"); // Deux vues
 
-  // Load saved production statuses from localStorage
-  const loadSavedStatuses = (): Record<string, ProductionItem["productionStatus"]> => {
+  // Load saved "done" statuses from localStorage
+  const loadSavedStatuses = (): Record<string, boolean> => {
     try {
-      const saved = localStorage.getItem(`production-statuses-${selectedDate}`);
+      const saved = localStorage.getItem(`production-done-${selectedDate}`);
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   };
 
   const saveStatuses = (items: ProductionItem[]) => {
-    const statuses: Record<string, string> = {};
+    const statuses: Record<string, boolean> = {};
     items.forEach((item) => {
-      if (item.productionStatus !== "à produire") {
-        statuses[item.id] = item.productionStatus;
+      if (item.done) {
+        statuses[item.id] = item.done;
       }
     });
-    localStorage.setItem(`production-statuses-${selectedDate}`, JSON.stringify(statuses));
+    localStorage.setItem(`production-done-${selectedDate}`, JSON.stringify(statuses));
   };
 
   // Fetch production data from API
@@ -94,7 +105,9 @@ const ProductionList: React.FC = () => {
 
       const items: ProductionItem[] = apiItems.map((item: any) => ({
         ...item,
-        productionStatus: savedStatuses[item.id] || "à produire",
+        // Extraire les allergies si présentes dans les notes ou un champ dédié
+        allergies: item.allergies || item.notes?.match(/allergie?[^.]*/i)?.[0] || null,
+        done: savedStatuses[item.id] || false,
       }));
 
       setProductionItems(items);
@@ -106,39 +119,51 @@ const ProductionList: React.FC = () => {
     }
   };
 
-  const updateProductionStatus = (itemId: string, newStatus: ProductionItem["productionStatus"]) => {
+  const toggleDone = (itemId: string) => {
     setProductionItems(prev => {
       const updated = prev.map(item =>
-        item.id === itemId ? { ...item, productionStatus: newStatus } : item
+        item.id === itemId ? { ...item, done: !item.done } : item
       );
       saveStatuses(updated);
       return updated;
     });
   };
 
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case "urgent": return "bg-red-100 text-red-700 border-red-200";
-      case "à produire": return "bg-amber-100 text-amber-700 border-amber-200";
-      case "en cours": return "bg-blue-100 text-blue-700 border-blue-200";
-      case "produit": return "bg-green-100 text-green-700 border-green-200";
-      default: return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch(status) {
-      case "urgent": return <AlertCircle size={16} className="text-red-700" />;
-      case "à produire": return <Package size={16} className="text-amber-700" />;
-      case "en cours": return <Clock size={16} className="text-blue-700" />;
-      case "produit": return <CheckCircle2 size={16} className="text-green-700" />;
-      default: return null;
-    }
-  };
+  // Grouper les produits pour la vue liste
+  const groupedProducts: GroupedProduct[] = React.useMemo(() => {
+    const groups = new Map<number, GroupedProduct>();
+    
+    productionItems.forEach(item => {
+      if (!groups.has(item.productId)) {
+        groups.set(item.productId, {
+          productId: item.productId,
+          productName: item.productName,
+          totalQuantity: 0,
+          items: [],
+          allergies: []
+        });
+      }
+      
+      const group = groups.get(item.productId)!;
+      group.totalQuantity += item.quantity;
+      group.items.push(item);
+      
+      // Collecter les allergies uniques
+      if (item.allergies) {
+        const allergies = item.allergies.split(',').map(a => a.trim());
+        allergies.forEach(allergy => {
+          if (!group.allergies.includes(allergy)) {
+            group.allergies.push(allergy);
+          }
+        });
+      }
+    });
+    
+    return Array.from(groups.values());
+  }, [productionItems]);
 
   // Filtrer les articles
   const filteredItems = productionItems.filter(item => {
-    if (filter !== "all" && item.productionStatus !== filter) return false;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       return (
@@ -150,108 +175,241 @@ const ProductionList: React.FC = () => {
     return true;
   });
 
-  const urgentItems = filteredItems.filter(item => item.productionStatus === "urgent");
-  const toProduceItems = filteredItems.filter(item => item.productionStatus === "à produire");
-  const inProgressItems = filteredItems.filter(item => item.productionStatus === "en cours");
-  const producedItems = filteredItems.filter(item => item.productionStatus === "produit");
+  const filteredGroups = groupedProducts.filter(group => {
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      return group.productName.toLowerCase().includes(term);
+    }
+    return true;
+  });
 
-  const ProductionCard = ({ item }: { item: ProductionItem }) => (
-    <div className="bg-white rounded-xl border border-stone-200 p-4 hover:shadow-md transition-all">
-      <div className="flex items-start justify-between mb-3">
+  const doneItems = filteredItems.filter(item => item.done);
+  const notDoneItems = filteredItems.filter(item => !item.done);
+
+  // Vue par commandes (comme avant mais avec checkbox)
+  const OrdersView = () => (
+    <div className="space-y-4">
+      {notDoneItems.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-              {item.orderNumber}
-            </span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(item.productionStatus)}`}>
-              <span className="flex items-center gap-1">
-                {getStatusIcon(item.productionStatus)}
-                {item.productionStatus}
-              </span>
-            </span>
+          <h3 className="text-lg font-bold text-amber-700 mb-3">À faire ({notDoneItems.length})</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {notDoneItems.map(item => (
+              <ProductionCard key={item.id} item={item} onToggle={toggleDone} />
+            ))}
           </div>
-          <h3 className="text-lg font-serif text-[#2D2A26]">{item.productName}</h3>
-          <p className="text-sm text-stone-500">× {item.quantity}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-stone-400">Client</p>
-          <p className="text-sm font-medium text-[#2D2A26]">{item.customerName}</p>
-          {item.customerPhone && (
-            <p className="text-xs text-stone-400 flex items-center gap-1 justify-end mt-0.5">
-              <Phone size={10} />
-              {item.customerPhone}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4 mb-3 text-sm flex-wrap">
-        <div className="flex items-center gap-1 text-stone-500">
-          <Calendar size={14} />
-          <span>{new Date(item.deliveryDate).toLocaleDateString('fr-CA')}</span>
-        </div>
-        <div className="flex items-center gap-1 text-stone-500">
-          <Clock size={14} />
-          <span>{item.deliveryTimeSlot}</span>
-        </div>
-        <div className="flex items-center gap-1 text-stone-500">
-          <MapPin size={14} />
-          <span>{item.deliveryType === "pickup" ? `Cueillette - ${item.pickupLocation}` : "Livraison"}</span>
-        </div>
-      </div>
-
-      {item.notes && (
-        <div className="mb-3 p-2 bg-stone-50 rounded-lg text-xs text-stone-600 border border-stone-100">
-          📝 {item.notes}
         </div>
       )}
 
-      <div className="flex gap-2 mt-2">
-        {item.productionStatus === "à produire" && (
-          <>
-            <button
-              onClick={() => updateProductionStatus(item.id, "urgent")}
-              className="flex-1 py-2 px-3 bg-red-50 text-red-700 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors border border-red-200"
-            >
-              <AlertCircle size={14} className="inline mr-1" />
-              Urgent
-            </button>
-            <button
-              onClick={() => updateProductionStatus(item.id, "en cours")}
-              className="flex-1 py-2 px-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors border border-blue-200"
-            >
-              <Clock size={14} className="inline mr-1" />
-              Commencer
-            </button>
-          </>
-        )}
-        {item.productionStatus === "urgent" && (
-          <button
-            onClick={() => updateProductionStatus(item.id, "en cours")}
-            className="flex-1 py-2 px-3 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors border border-blue-200"
-          >
-            <Clock size={14} className="inline mr-1" />
-            Commencer
-          </button>
-        )}
-        {item.productionStatus === "en cours" && (
-          <button
-            onClick={() => updateProductionStatus(item.id, "produit")}
-            className="flex-1 py-2 px-3 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors border border-green-200"
-          >
-            <CheckCircle2 size={14} className="inline mr-1" />
-            Terminer
-          </button>
-        )}
-        {item.productionStatus === "produit" && (
-          <button
-            onClick={() => updateProductionStatus(item.id, "à produire")}
-            className="flex-1 py-2 px-3 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors border border-amber-200"
-          >
-            <Package size={14} className="inline mr-1" />
-            Reproduire
-          </button>
-        )}
+      {doneItems.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-green-700 mb-3">Fait ({doneItems.length})</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {doneItems.map(item => (
+              <ProductionCard key={item.id} item={item} onToggle={toggleDone} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {filteredItems.length === 0 && (
+        <div className="bg-stone-50 rounded-2xl p-12 text-center border border-stone-200">
+          <ChefHat size={48} className="mx-auto mb-4 text-stone-400" />
+          <h3 className="text-xl font-serif text-stone-500 mb-2">
+            Aucun article à produire
+          </h3>
+          <p className="text-stone-400">
+            {searchTerm 
+              ? "Aucun résultat ne correspond à votre recherche" 
+              : "Toutes les commandes sont à jour pour cette date"}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
+  // Vue par liste (produits groupés)
+  const ListView = () => (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-stone-50 border-b border-stone-200">
+            <tr>
+              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Produit</th>
+              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Quantité totale</th>
+              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Allergies</th>
+              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Progression</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-stone-100">
+            {filteredGroups.map(group => {
+              const doneCount = group.items.filter(i => i.done).length;
+              const totalCount = group.items.length;
+              const progress = Math.round((doneCount / totalCount) * 100);
+              
+              return (
+                <tr key={group.productId} className="hover:bg-stone-50/50 transition-colors">
+                  <td className="py-3 px-4">
+                    <div className="font-medium text-[#2D2A26]">{group.productName}</div>
+                    <div className="text-xs text-stone-400 mt-1">
+                      {totalCount} commande{totalCount > 1 ? 's' : ''}
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="text-lg font-bold text-[#C5A065]">
+                      {group.totalQuantity}
+                    </span>
+                    <span className="text-xs text-stone-400 ml-1">unités</span>
+                  </td>
+                  <td className="py-3 px-4">
+                    {group.allergies.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {group.allergies.map((allergy, idx) => (
+                          <span 
+                            key={idx}
+                            className="px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-xs border border-red-200"
+                          >
+                            ⚠️ {allergy}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-stone-400">-</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-green-500 rounded-full transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium text-stone-600 min-w-[40px]">
+                        {doneCount}/{totalCount}
+                      </span>
+                    </div>
+                    
+                    {/* Mini-liste des commandes individuelles avec checkbox */}
+                    <div className="mt-2 space-y-1">
+                      {group.items.map(item => (
+                        <div key={item.id} className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={item.done}
+                            onChange={() => toggleDone(item.id)}
+                            className="w-4 h-4 rounded border-stone-300 text-[#C5A065] focus:ring-[#C5A065]"
+                          />
+                          <span className={item.done ? "line-through text-stone-400" : "text-stone-600"}>
+                            {item.orderNumber} - {item.customerName}
+                          </span>
+                          {item.allergies && (
+                            <span className="text-red-500 text-[10px]">⚠️</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {filteredGroups.length === 0 && (
+        <div className="bg-stone-50 rounded-2xl p-12 text-center border border-stone-200">
+          <Package size={48} className="mx-auto mb-4 text-stone-400" />
+          <h3 className="text-xl font-serif text-stone-500 mb-2">
+            Aucun produit à fabriquer
+          </h3>
+          <p className="text-stone-400">
+            {searchTerm 
+              ? "Aucun résultat ne correspond à votre recherche" 
+              : "Toutes les commandes sont à jour pour cette date"}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
+  const ProductionCard = ({ item, onToggle }: { item: ProductionItem; onToggle: (id: string) => void }) => (
+    <div className="bg-white rounded-xl border border-stone-200 p-4 hover:shadow-md transition-all">
+      <div className="flex items-start gap-3">
+        {/* Checkbox */}
+        <input
+          type="checkbox"
+          checked={item.done}
+          onChange={() => onToggle(item.id)}
+          className="mt-1 w-5 h-5 rounded border-stone-300 text-[#C5A065] focus:ring-[#C5A065]"
+        />
+        
+        <div className="flex-1">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">
+                  {item.orderNumber}
+                </span>
+                {item.done ? (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 size={16} />
+                      Fait
+                    </span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-amber-100 text-amber-700 border-amber-200">
+                    <span className="flex items-center gap-1">
+                      <Clock size={16} />
+                      À faire
+                    </span>
+                  </span>
+                )}
+              </div>
+              <h3 className="text-lg font-serif text-[#2D2A26]">{item.productName}</h3>
+              <p className="text-sm text-stone-500">× {item.quantity}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-stone-400">Client</p>
+              <p className="text-sm font-medium text-[#2D2A26]">{item.customerName}</p>
+              {item.customerPhone && (
+                <p className="text-xs text-stone-400 flex items-center gap-1 justify-end mt-0.5">
+                  <Phone size={10} />
+                  {item.customerPhone}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 mb-3 text-sm flex-wrap">
+            <div className="flex items-center gap-1 text-stone-500">
+              <Calendar size={14} />
+              <span>{new Date(item.deliveryDate).toLocaleDateString('fr-CA')}</span>
+            </div>
+            <div className="flex items-center gap-1 text-stone-500">
+              <Clock size={14} />
+              <span>{item.deliveryTimeSlot}</span>
+            </div>
+            <div className="flex items-center gap-1 text-stone-500">
+              <MapPin size={14} />
+              <span>{item.deliveryType === "pickup" ? `Cueillette - ${item.pickupLocation}` : "Livraison"}</span>
+            </div>
+          </div>
+
+          {/* Allergies */}
+          {item.allergies && (
+            <div className="mb-2 p-2 bg-red-50 rounded-lg text-xs text-red-700 border border-red-200">
+              <span className="font-bold">⚠️ Allergie: </span>
+              {item.allergies}
+            </div>
+          )}
+
+          {item.notes && !item.allergies && (
+            <div className="mb-2 p-2 bg-stone-50 rounded-lg text-xs text-stone-600 border border-stone-100">
+              📝 {item.notes}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -304,6 +462,31 @@ const ProductionList: React.FC = () => {
             </p>
           </div>
           <div className="flex gap-2">
+            {/* Toggle vue liste/commandes */}
+            <div className="flex border border-stone-200 rounded-lg overflow-hidden mr-2">
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 transition-colors ${
+                  viewMode === "list" 
+                    ? "bg-[#C5A065] text-white" 
+                    : "bg-white text-stone-600 hover:bg-stone-50"
+                }`}
+                title="Vue par produit"
+              >
+                <LayoutGrid size={20} />
+              </button>
+              <button
+                onClick={() => setViewMode("orders")}
+                className={`p-2 transition-colors ${
+                  viewMode === "orders" 
+                    ? "bg-[#C5A065] text-white" 
+                    : "bg-white text-stone-600 hover:bg-stone-50"
+                }`}
+                title="Vue par commande"
+              >
+                <List size={20} />
+              </button>
+            </div>
             <button
               onClick={fetchProductionData}
               className="p-2 border border-stone-200 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors"
@@ -345,108 +528,47 @@ const ProductionList: React.FC = () => {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Produit, commande, client..."
+                placeholder={viewMode === "list" ? "Produit..." : "Produit, commande, client..."}
                 className="w-full pl-10 pr-4 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065]"
               />
             </div>
           </div>
 
-          <div className="flex-1">
-            <label className="block text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">
-              Filtrer
-            </label>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
-              className="w-full px-4 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065]"
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="urgent">Urgent</option>
-              <option value="à produire">À produire</option>
-              <option value="en cours">En cours</option>
-            </select>
-          </div>
+          {viewMode === "orders" && (
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">
+                Statut
+              </label>
+              <select
+                className="w-full px-4 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065]"
+              >
+                <option value="all">Tous</option>
+                <option value="notdone">À faire</option>
+                <option value="done">Fait</option>
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-red-50 rounded-xl p-3 border border-red-200">
-          <p className="text-xs text-red-600 font-bold">Urgent</p>
-          <p className="text-2xl font-bold text-red-700">{urgentItems.length}</p>
-        </div>
+      {/* Statistiques simplifiées */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
-          <p className="text-xs text-amber-600 font-bold">À produire</p>
-          <p className="text-2xl font-bold text-amber-700">{toProduceItems.length}</p>
-        </div>
-        <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
-          <p className="text-xs text-blue-600 font-bold">En cours</p>
-          <p className="text-2xl font-bold text-blue-700">{inProgressItems.length}</p>
+          <p className="text-xs text-amber-600 font-bold">À faire</p>
+          <p className="text-2xl font-bold text-amber-700">
+            {productionItems.filter(i => !i.done).length}
+          </p>
         </div>
         <div className="bg-green-50 rounded-xl p-3 border border-green-200">
-          <p className="text-xs text-green-600 font-bold">Produit</p>
-          <p className="text-2xl font-bold text-green-700">{producedItems.length}</p>
+          <p className="text-xs text-green-600 font-bold">Fait</p>
+          <p className="text-2xl font-bold text-green-700">
+            {productionItems.filter(i => i.done).length}
+          </p>
         </div>
       </div>
 
-      <div className="space-y-6">
-        {urgentItems.length > 0 && (
-          <div>
-            <h3 className="text-lg font-bold text-red-700 mb-3">Urgent ({urgentItems.length})</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {urgentItems.map(item => (
-                <ProductionCard key={item.id} item={item} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {toProduceItems.length > 0 && (
-          <div>
-            <h3 className="text-lg font-bold text-amber-700 mb-3">À produire ({toProduceItems.length})</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {toProduceItems.map(item => (
-                <ProductionCard key={item.id} item={item} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {inProgressItems.length > 0 && (
-          <div>
-            <h3 className="text-lg font-bold text-blue-700 mb-3">En cours ({inProgressItems.length})</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {inProgressItems.map(item => (
-                <ProductionCard key={item.id} item={item} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {producedItems.length > 0 && (
-          <div>
-            <h3 className="text-lg font-bold text-green-700 mb-3">Produit ({producedItems.length})</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {producedItems.map(item => (
-                <ProductionCard key={item.id} item={item} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {filteredItems.length === 0 && (
-          <div className="bg-stone-50 rounded-2xl p-12 text-center border border-stone-200">
-            <ChefHat size={48} className="mx-auto mb-4 text-stone-400" />
-            <h3 className="text-xl font-serif text-stone-500 mb-2">
-              Aucun article à produire
-            </h3>
-            <p className="text-stone-400">
-              {searchTerm 
-                ? "Aucun résultat ne correspond à votre recherche" 
-                : "Toutes les commandes sont à jour pour cette date"}
-            </p>
-          </div>
-        )}
-      </div>
+      {/* Affichage selon la vue */}
+      {viewMode === "list" ? <ListView /> : <OrdersView />}
     </div>
   );
 };

@@ -89,7 +89,6 @@ export function ProductManagement() {
       ]);
       setProducts(productsRes.data.products);
       setCategories(categoriesRes.data.categories);
-      // Set default category to first available category
       if (categoriesRes.data.categories.length > 0) {
         const flattened = flattenCategoriesWithIndentation(categoriesRes.data.categories);
         if (flattened.length > 0) {

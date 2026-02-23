@@ -371,8 +371,8 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
         <header className="mb-20 text-center relative">
           <h1
-            className="text-6xl md:text-7xl mb-6"
-            style={{ fontFamily: styles.fontScript, color: styles.dark }}
+            className="text-5xl md:text-6xl font-bold mb-6 text-[#2D2A26]"
+            style={{ fontFamily: '"Arial", "Helvetica", sans-serif' }}
           >
             {subCategory ? subCategory.title : currentCategory.title}
           </h1>
