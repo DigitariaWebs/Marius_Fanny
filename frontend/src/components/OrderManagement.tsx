@@ -502,38 +502,30 @@ export function OrderManagement() {
 
   // Fonction pour emballer un produit
   const handlePackItem = (orderId: string, itemId: number) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => {
-        if (order.id === orderId) {
-          const updatedItems = order.items.map(item =>
-            item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item
-          );
-          
-          const allPacked = updatedItems.every(item => item.isPacked);
-          
-          return {
-            ...order,
-            items: updatedItems,
-            status: allPacked ? "ready" : order.status,
-          };
-        }
-        return order;
-      })
-    );
-    
-    if (selectedOrderForProducts && selectedOrderForProducts.id === orderId) {
-      setSelectedOrderForProducts(prev => {
-        if (!prev) return null;
-        const updatedItems = prev.items.map(item =>
-          item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item
+    let updatedSelectedOrder: OrderWithPacking | null = null;
+
+    setOrders((prevOrders) =>
+      prevOrders.map((order) => {
+        if (order.id !== orderId) return order;
+
+        const updatedItems = order.items.map((item) =>
+          item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item,
         );
-        const allPacked = updatedItems.every(item => item.isPacked);
-        return {
-          ...prev,
+        const allPacked = updatedItems.every((item) => item.productionStatus === "ready");
+        const updatedOrder = {
+          ...order,
           items: updatedItems,
-          status: allPacked ? "ready" : prev.status
+          status: allPacked ? "ready" : order.status,
         };
-      });
+
+        updatedSelectedOrder = updatedOrder;
+        return updatedOrder;
+      }),
+    );
+
+    // Keep modal state in sync with the source of truth to prevent visual rollback.
+    if (selectedOrderForProducts?.id === orderId && updatedSelectedOrder) {
+      setSelectedOrderForProducts(updatedSelectedOrder);
     }
   };
 
@@ -887,8 +879,8 @@ export function OrderManagement() {
         {selectedOrderForProducts && (
           <div className="space-y-4">
             {/* Indicateur de commande prete */}
-            {selectedOrderForProducts.items.length > 0 && 
-             selectedOrderForProducts.items.every(item => item.isPacked) && (
+            {selectedOrderForProducts.items.length > 0 &&
+              selectedOrderForProducts.items.every((item) => item.productionStatus === "ready") && (
               <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-center">
                 <span className="text-green-800 font-semibold text-sm flex items-center justify-center gap-2">
                   <CheckCircle className="w-5 h-5" />
@@ -923,7 +915,7 @@ export function OrderManagement() {
                         <td className="px-4 py-3 text-sm">{formatCurrency(item.unitPrice)}</td>
                         <td className="px-4 py-3 text-sm">{formatCurrency(item.subtotal)}</td>
                         <td className="px-4 py-3 text-sm">
-                          {!item.isPacked ? (
+                          {item.productionStatus !== "ready" ? (
                             <Button
                               onClick={() => handlePackItem(selectedOrderForProducts.id, item.id)}
                               size="sm"
