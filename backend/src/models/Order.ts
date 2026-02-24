@@ -336,26 +336,47 @@ const OrderSchema = new Schema<IOrder>(
 OrderSchema.pre("validate", async function () {
   if (this.isNew && !this.orderNumber) {
     // Generate order number format: MF-YYYYMMDD-XXXX
+    // Sequence is global, limited to 0000-1000 and loops only after 1000.
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "");
+    const maxSequence = 1000;
 
-    // Find the last order of the day using this.constructor to avoid circular dependency
+    // Find the latest generated order number to continue a global sequence.
     const OrderModel = this.constructor as mongoose.Model<IOrder>;
-    const lastOrder = await OrderModel.findOne({
-      orderNumber: new RegExp(`^MF-${dateStr}-`),
+    const latestOrder = await OrderModel.findOne({
+      orderNumber: /^MF-\d{8}-\d{4}$/i,
     })
-      .sort({ orderNumber: -1 })
-      .limit(1);
+      .select("orderNumber")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    let sequence = 1;
-    if (lastOrder && lastOrder.orderNumber) {
-      const match = lastOrder.orderNumber.match(/-(\d{4})$/);
-      if (match) {
-        sequence = parseInt(match[1]) + 1;
+    let lastSequence = -1;
+    const latestMatch = latestOrder?.orderNumber?.match(/-(\d{4})$/);
+    if (latestMatch) {
+      const parsed = parseInt(latestMatch[1], 10);
+      if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= maxSequence) {
+        lastSequence = parsed;
       }
     }
 
-    this.orderNumber = `MF-${dateStr}-${sequence.toString().padStart(4, "0")}`;
+    let sequence = (lastSequence + 1) % (maxSequence + 1);
+
+    // Ensure uniqueness for the current date when sequence loops.
+    let attempts = 0;
+    while (attempts <= maxSequence) {
+      const candidate = `MF-${dateStr}-${sequence.toString().padStart(4, "0")}`;
+      const exists = await OrderModel.exists({ orderNumber: candidate });
+      if (!exists) {
+        this.orderNumber = candidate;
+        break;
+      }
+      sequence = (sequence + 1) % (maxSequence + 1);
+      attempts += 1;
+    }
+
+    if (!this.orderNumber) {
+      throw new Error(`Order number limit reached for date ${dateStr} (0000-1000).`);
+    }
   }
   
   // Add creation entry to change history for new orders

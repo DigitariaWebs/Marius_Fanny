@@ -455,6 +455,44 @@ export function OrderManagement() {
     }).format(amount);
   };
 
+  const formatOrderNumber = (orderNumber: string) => {
+    const trimmed = orderNumber.trim();
+    const mfMatch = trimmed.match(/^(MF-\d{8}-)(\d{1,4})$/i);
+    if (mfMatch) {
+      return mfMatch[2].padStart(4, "0");
+    }
+
+    if (!/^\d+$/.test(trimmed)) return orderNumber;
+    const numeric = Number(trimmed);
+    if (Number.isNaN(numeric) || numeric < 0 || numeric > 1000) return orderNumber;
+    return String(numeric).padStart(4, "0");
+  };
+
+  const extractOrderDateCode = (order: OrderWithPacking) => {
+    const mfMatch = order.orderNumber.trim().match(/^MF-(\d{8})-\d{1,4}$/i);
+    if (mfMatch) return mfMatch[1];
+    return new Date(order.orderDate).toISOString().slice(0, 10).replace(/-/g, "");
+  };
+
+  const orderNumberCounts = filteredOrders.reduce<Record<string, number>>((acc, order) => {
+    const shortNumber = formatOrderNumber(order.orderNumber);
+    acc[shortNumber] = (acc[shortNumber] || 0) + 1;
+    return acc;
+  }, {});
+
+  const getOrderDisplayNumber = (order: OrderWithPacking) => {
+    const shortNumber = formatOrderNumber(order.orderNumber);
+    if ((orderNumberCounts[shortNumber] || 0) <= 1) return shortNumber;
+    return `${shortNumber} (${extractOrderDateCode(order)})`;
+  };
+
+  const generateFallbackOrderNumber = (isoDate: string) => {
+    const datePart = isoDate.slice(0, 10).replace(/-/g, "");
+    const prefix = `MF-${datePart}-`;
+    const nextSequence = orders.filter((order) => order.orderNumber.startsWith(prefix)).length + 1;
+    return `${prefix}${String(nextSequence).padStart(4, "0")}`;
+  };
+
   // Fonction pour voir les produits d'une commande
   const handleViewProducts = (order: OrderWithPacking) => {
     console.log("Ouverture des produits pour:", order.orderNumber);
@@ -578,7 +616,7 @@ export function OrderManagement() {
 
         return `
           <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${order.orderNumber}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${getOrderDisplayNumber(order)}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${clientName}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${formatDate(order.orderDate)}</td>
             <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${productsSummary}</td>
@@ -641,7 +679,7 @@ export function OrderManagement() {
           }}
           className="text-left w-full hover:text-[#C5A065] transition-colors font-medium"
         >
-          {order.orderNumber}
+          {getOrderDisplayNumber(order)}
         </button>
       ),
     },
@@ -751,7 +789,7 @@ export function OrderManagement() {
   ];
 
   const getSearchValue = (order: OrderWithPacking) => {
-    return `${order.orderNumber} ${order.client.firstName} ${order.client.lastName} ${order.client.phone}`;
+    return `${order.orderNumber} ${formatOrderNumber(order.orderNumber)} ${getOrderDisplayNumber(order)} ${order.client.firstName} ${order.client.lastName} ${order.client.phone}`;
   };
 
   return (
@@ -832,7 +870,7 @@ export function OrderManagement() {
         open={isProductsModalOpen}
         onOpenChange={setIsProductsModalOpen}
         type="details"
-        title={`Produits de la commande ${selectedOrderForProducts?.orderNumber}`}
+        title={`Produits de la commande ${selectedOrderForProducts ? formatOrderNumber(selectedOrderForProducts.orderNumber) : ""}`}
         description={`Client: ${selectedOrderForProducts?.client.firstName} ${selectedOrderForProducts?.client.lastName}`}
         icon={<Package className="h-6 w-6 text-[#C5A065]" />}
         size="lg"
@@ -1012,7 +1050,7 @@ export function OrderManagement() {
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-(--bakery-text)">
-                          {selectedOrder.orderNumber}
+                          {formatOrderNumber(selectedOrder.orderNumber)}
                         </h3>
                         <div className="flex items-center gap-2 mt-1">
                           {getPaymentBadge(selectedOrder.paymentStatus)}
@@ -1503,7 +1541,7 @@ export function OrderManagement() {
 
               const newOrder: OrderWithPacking = {
                 id: saved?._id || String(Date.now()),
-                orderNumber: saved?.orderNumber || `ORD-${Date.now()}`,
+                orderNumber: saved?.orderNumber || generateFallbackOrderNumber(now),
                 clientId: formData.clientId || 0,
                 client: {
                   id: formData.clientId || 0,
@@ -1695,7 +1733,7 @@ export function OrderManagement() {
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="space-y-2">
                 <p className="font-medium text-gray-900">
-                  {orderToDelete.orderNumber}
+                  {formatOrderNumber(orderToDelete.orderNumber)}
                 </p>
                 <p className="text-sm text-gray-600">
                   Client: {orderToDelete.client.firstName}{" "}
@@ -1754,7 +1792,7 @@ export function OrderManagement() {
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="space-y-2">
                 <p className="font-medium text-gray-900">
-                  {orderToCancel.orderNumber}
+                  {formatOrderNumber(orderToCancel.orderNumber)}
                 </p>
                 <p className="text-sm text-gray-600">
                   Client: {orderToCancel.client.firstName}{" "}
