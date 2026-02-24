@@ -17,6 +17,8 @@ import {
   MapPin,
   UserCircle,
   DollarSign,
+  Check,
+  Printer,
 } from "lucide-react";
 import { DataTable } from "./ui/DataTable";
 import { Modal } from "./ui/modal";
@@ -27,13 +29,32 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 import OrderForm from "./OrderForm";
 import OrderChangeHistory from "./OrderChangeHistory";
 import { orderAPI } from "../lib/OrderAPI";
 import type { Order } from "../types";
 
+interface OrderItemWithPacking {
+  id: number;
+  productId: number;
+  product?: { id: number; name: string; price: number };
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  productionStatus: string;
+  notes?: string;
+  isPacked?: boolean;
+}
+
+interface OrderWithPacking extends Omit<Order, 'items'> {
+  items: OrderItemWithPacking[];
+}
+
 export function OrderManagement() {
-  const [orders, setOrders] = useState<Order[]>([
+  const [orders, setOrders] = useState<OrderWithPacking[]>([
     {
       id: "1",
       orderNumber: "ORD-2024-001",
@@ -54,12 +75,33 @@ export function OrderManagement() {
       pickupDate: "2024-01-25T15:00:00Z",
       pickupLocation: "Montreal",
       deliveryType: "pickup",
-      items: [],
-      subtotal: 85.0,
-      taxAmount: 12.73,
+      items: [
+        {
+          id: 1,
+          productId: 101,
+          product: { id: 101, name: "Gateau au chocolat", price: 35.00 },
+          quantity: 2,
+          unitPrice: 35.00,
+          subtotal: 70.00,
+          productionStatus: "pending",
+          isPacked: false
+        },
+        {
+          id: 2,
+          productId: 102,
+          product: { id: 102, name: "Tarte aux pommes", price: 25.00 },
+          quantity: 1,
+          unitPrice: 25.00,
+          subtotal: 25.00,
+          productionStatus: "pending",
+          isPacked: false
+        }
+      ],
+      subtotal: 95.0,
+      taxAmount: 14.21,
       deliveryFee: 0,
-      total: 97.73,
-      depositAmount: 48.87,
+      total: 109.21,
+      depositAmount: 54.61,
       depositPaid: true,
       depositPaidAt: "2024-01-20T10:35:00Z",
       balancePaid: false,
@@ -99,7 +141,18 @@ export function OrderManagement() {
         isDefault: true,
       },
       deliverySlot: "10:00-12:00",
-      items: [],
+      items: [
+        {
+          id: 3,
+          productId: 103,
+          product: { id: 103, name: "Croissants (x6)", price: 12.00 },
+          quantity: 3,
+          unitPrice: 12.00,
+          subtotal: 36.00,
+          productionStatus: "ready",
+          isPacked: true
+        }
+      ],
       subtotal: 125.0,
       taxAmount: 18.69,
       deliveryFee: 15.0,
@@ -149,7 +202,6 @@ export function OrderManagement() {
       createdAt: "2024-01-22T09:00:00Z",
       updatedAt: "2024-01-22T09:00:00Z",
     },
-    // NOUVELLE COMMANDE LAVAL (pick-up)
     {
       id: "4",
       orderNumber: "ORD-2024-004",
@@ -170,7 +222,18 @@ export function OrderManagement() {
       pickupDate: "2024-01-28T14:00:00Z",
       pickupLocation: "Laval",
       deliveryType: "pickup",
-      items: [],
+      items: [
+        {
+          id: 4,
+          productId: 104,
+          product: { id: 104, name: "Pain au levain", price: 8.00 },
+          quantity: 2,
+          unitPrice: 8.00,
+          subtotal: 16.00,
+          productionStatus: "in_progress",
+          isPacked: false
+        }
+      ],
       subtotal: 95.0,
       taxAmount: 14.21,
       deliveryFee: 0,
@@ -187,73 +250,123 @@ export function OrderManagement() {
     },
   ]);
 
+  const [filteredOrders, setFilteredOrders] = useState<OrderWithPacking[]>(orders);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedOrderForProducts, setSelectedOrderForProducts] = useState<OrderWithPacking | null>(null);
+  const [isProductsModalOpen, setIsProductsModalOpen] = useState(false);
+  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
-  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithPacking | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<OrderWithPacking | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<OrderWithPacking | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filtrer par date
+  useEffect(() => {
+    if (selectedDate) {
+      const filtered = orders.filter(order => {
+        const orderDate = (order.orderDate || "").split("T")[0];
+        return orderDate === selectedDate;
+      });
+      setFilteredOrders(filtered);
+    } else {
+      setFilteredOrders(orders);
+    }
+  }, [selectedDate, orders]);
 
   // Charger les commandes depuis l'API au montage
   useEffect(() => {
-    orderAPI.getOrders({ limit: 100 }).then((res) => {
-      const items = res.data?.items || [];
-      if (items.length > 0) {
-        const mapped: Order[] = items.map((o: any) => ({
-          id: o._id || o.id,
-          orderNumber: o.orderNumber || "",
-          clientId: 0,
-          client: {
-            id: 0,
-            firstName: o.clientInfo?.firstName || "",
-            lastName: o.clientInfo?.lastName || "",
-            email: o.clientInfo?.email || "",
-            phone: o.clientInfo?.phone || "",
-            status: "active" as const,
-            createdAt: o.createdAt,
-            updatedAt: o.updatedAt,
-            addresses: [],
-            orders: [],
-          },
-          orderDate: o.orderDate || o.createdAt,
-          pickupDate: o.pickupDate || o.createdAt,
-          pickupLocation: o.pickupLocation || "Laval",
-          deliveryType: o.deliveryType || "pickup",
-          deliveryDate: o.deliveryDate,
-          deliveryTimeSlot: o.deliveryTimeSlot,
-          deliveryAddress: o.deliveryAddress,
-          items: (o.items || []).map((item: any, idx: number) => ({
-            id: idx + 1,
-            orderId: 0,
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            subtotal: item.amount,
-            productionStatus: "pending" as const,
-            notes: item.notes,
-          })),
-          subtotal: o.subtotal || 0,
-          taxAmount: o.taxAmount || 0,
-          deliveryFee: o.deliveryFee || 0,
-          total: o.total || 0,
-          depositAmount: o.depositAmount || 0,
-          depositPaid: o.depositPaid || false,
-          depositPaidAt: o.depositPaidAt,
-          balancePaid: o.balancePaid || false,
-          balancePaidAt: o.balancePaidAt,
-          paymentStatus: o.paymentStatus || "unpaid",
-          status: o.status || "pending",
-          source: "in_store" as const,
-          notes: o.notes,
-          createdAt: o.createdAt,
-          updatedAt: o.updatedAt,
-        }));
-        setOrders(mapped);
+    const fetchOrders = async () => {
+      try {
+        const res = await orderAPI.getOrders({ limit: 100 });
+        const items = res.data?.items || [];
+        
+        if (items.length > 0) {
+          const mapped: OrderWithPacking[] = items.map((o: any) => {
+            // S'assurer que les items ont des produits avec des noms
+            const orderItems = (o.items || []).map((item: any, idx: number) => {
+              let productName = `Produit #${item.productId}`; // Nom par defaut
+              let productPrice = item.unitPrice || 0;
+              if (item.product) {
+                productName = item.product.name || productName;
+                productPrice = item.product.price || productPrice;
+              } else if (item.productName) {
+                productName = item.productName;
+              }
+              
+              return {
+                id: idx + 1,
+                orderId: 0,
+                productId: item.productId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                subtotal: item.amount || (item.quantity * item.unitPrice),
+                productionStatus: item.productionStatus || "pending",
+                notes: item.notes,
+                product: {
+                  id: item.productId,
+                  name: productName,
+                  price: productPrice
+                },
+                isPacked: item.productionStatus === "ready" || item.isPacked === true
+              };
+            });
+
+            return {
+              id: o._id || o.id,
+              orderNumber: o.orderNumber || "",
+              clientId: 0,
+              client: {
+                id: 0,
+                firstName: o.clientInfo?.firstName || "",
+                lastName: o.clientInfo?.lastName || "",
+                email: o.clientInfo?.email || "",
+                phone: o.clientInfo?.phone || "",
+                status: "active" as const,
+                createdAt: o.createdAt,
+                updatedAt: o.updatedAt,
+                addresses: [],
+                orders: [],
+              },
+              orderDate: o.orderDate || o.createdAt,
+              pickupDate: o.pickupDate || o.createdAt,
+              pickupLocation: o.pickupLocation || "Laval",
+              deliveryType: o.deliveryType || "pickup",
+              deliveryDate: o.deliveryDate,
+              deliveryTimeSlot: o.deliveryTimeSlot,
+              deliveryAddress: o.deliveryAddress,
+              items: orderItems,
+              subtotal: o.subtotal || 0,
+              taxAmount: o.taxAmount || 0,
+              deliveryFee: o.deliveryFee || 0,
+              total: o.total || 0,
+              depositAmount: o.depositAmount || 0,
+              depositPaid: o.depositPaid || false,
+              depositPaidAt: o.depositPaidAt,
+              balancePaid: o.balancePaid || false,
+              balancePaidAt: o.balancePaidAt,
+              paymentStatus: o.paymentStatus || "unpaid",
+              status: o.status || "pending",
+              source: "in_store" as const,
+              notes: o.notes,
+              createdAt: o.createdAt,
+              updatedAt: o.updatedAt,
+            };
+          });
+          
+          setOrders(mapped);
+          setFilteredOrders(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch orders:", err);
       }
-    }).catch((err) => console.error("Failed to fetch orders:", err));
+    };
+
+    fetchOrders();
   }, []);
 
   const clients = orders
@@ -262,17 +375,15 @@ export function OrderManagement() {
       (client, index, self) =>
         index === self.findIndex((c) => c.id === client.id),
     );
-
-  // Fonction pour déterminer la couleur de la commande selon le type
-  const getOrderColor = (order: Order) => {
+  const getOrderColor = (order: OrderWithPacking) => {
     if (order.pickupLocation === "Montreal" && order.deliveryType === "pickup") {
-      return "!bg-blue-50 border-l-4 !border-l-blue-500 hover:!bg-blue-100"; // Bleu pour ramassage Montréal
+      return "!bg-blue-50 border-l-4 !border-l-blue-500 hover:!bg-blue-100 cursor-pointer";
     } else if (order.deliveryType === "delivery") {
-      return "!bg-yellow-50 border-l-4 !border-l-yellow-500 hover:!bg-yellow-100"; // Jaune pour livraison
+      return "!bg-yellow-50 border-l-4 !border-l-yellow-500 hover:!bg-yellow-100 cursor-pointer";
     } else if (order.pickupLocation === "Laval" && order.deliveryType === "pickup") {
-      return "!bg-white border-l-4 !border-l-gray-300 hover:!bg-gray-50"; // Blanc pour pick-up Laval
+      return "!bg-white border-l-4 !border-l-gray-300 hover:!bg-gray-50 cursor-pointer";
     }
-    return "!bg-white hover:!bg-gray-50"; // Couleur par défaut
+    return "!bg-white hover:!bg-gray-50 cursor-pointer";
   };
 
   const getStatusBadge = (status: Order["status"]) => {
@@ -282,19 +393,19 @@ export function OrderManagement() {
         className: "bg-yellow-100 text-yellow-800",
       },
       confirmed: {
-        label: "Confirmée",
+        label: "Confirmee",
         className: "bg-blue-100 text-blue-800",
       },
       in_production: {
         label: "En production",
         className: "bg-purple-100 text-purple-800",
       },
-      ready: { label: "Prête", className: "bg-green-100 text-green-800" },
+      ready: { label: "Prete", className: "bg-green-100 text-green-800" },
       completed: {
-        label: "Complétée",
+        label: "Completee",
         className: "bg-gray-100 text-gray-800",
       },
-      cancelled: { label: "Annulée", className: "bg-red-100 text-red-800" },
+      cancelled: { label: "Annulee", className: "bg-red-100 text-red-800" },
     };
 
     const config = statusConfig[status];
@@ -309,12 +420,12 @@ export function OrderManagement() {
 
   const getPaymentBadge = (paymentStatus: Order["paymentStatus"]) => {
     const paymentConfig = {
-      unpaid: { label: "Non payé", className: "bg-red-100 text-red-800" },
+      unpaid: { label: "Non payer", className: "bg-red-100 text-red-800" },
       deposit_paid: {
-        label: "Dépôt payé",
+        label: "Depot payer",
         className: "bg-yellow-100 text-yellow-800",
       },
-      paid: { label: "Payé", className: "bg-green-100 text-green-800" },
+      paid: { label: "Payer", className: "bg-green-100 text-green-800" },
     };
 
     const config = paymentConfig[paymentStatus];
@@ -344,62 +455,61 @@ export function OrderManagement() {
     }).format(amount);
   };
 
-  const filters = [
-    {
-      key: "status",
-      label: "Statut de commande",
-      options: [
-        { value: "all", label: "Tous les statuts" },
-        { value: "pending", label: "En attente" },
-        { value: "confirmed", label: "Confirmée" },
-        { value: "in_production", label: "En production" },
-        { value: "ready", label: "Prête" },
-        { value: "completed", label: "Complétée" },
-        { value: "cancelled", label: "Annulée" },
-      ],
-    },
-    {
-      key: "paymentStatus",
-      label: "Paiement",
-      options: [
-        { value: "all", label: "Tous les paiements" },
-        { value: "unpaid", label: "Non payé" },
-        { value: "deposit_paid", label: "Dépôt payé" },
-        { value: "paid", label: "Payé" },
-      ],
-    },
-    {
-      key: "pickupLocation",
-      label: "Lieu",
-      options: [
-        { value: "all", label: "Tous les lieux" },
-        { value: "Montreal", label: "Montréal" },
-        { value: "Laval", label: "Laval" },
-      ],
-    },
-    {
-      key: "source",
-      label: "Source",
-      options: [
-        { value: "all", label: "Toutes les sources" },
-        { value: "online", label: "En ligne" },
-        { value: "phone", label: "Téléphone" },
-        { value: "in_store", label: "En magasin" },
-      ],
-    },
-  ];
+  // Fonction pour voir les produits d'une commande
+  const handleViewProducts = (order: OrderWithPacking) => {
+    console.log("Ouverture des produits pour:", order.orderNumber);
+    setSelectedOrderForProducts(order);
+    setIsProductsModalOpen(true);
+  };
 
-  const handleViewDetails = (order: Order) => {
+  // Fonction pour emballer un produit
+  const handlePackItem = (orderId: string, itemId: number) => {
+    setOrders(prevOrders => 
+      prevOrders.map(order => {
+        if (order.id === orderId) {
+          const updatedItems = order.items.map(item =>
+            item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item
+          );
+          
+          const allPacked = updatedItems.every(item => item.isPacked);
+          
+          return {
+            ...order,
+            items: updatedItems,
+            status: allPacked ? "ready" : order.status,
+          };
+        }
+        return order;
+      })
+    );
+    
+    if (selectedOrderForProducts && selectedOrderForProducts.id === orderId) {
+      setSelectedOrderForProducts(prev => {
+        if (!prev) return null;
+        const updatedItems = prev.items.map(item =>
+          item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item
+        );
+        const allPacked = updatedItems.every(item => item.isPacked);
+        return {
+          ...prev,
+          items: updatedItems,
+          status: allPacked ? "ready" : prev.status
+        };
+      });
+    }
+  };
+
+  const handleViewDetails = (order: OrderWithPacking) => {
     setSelectedOrder(order);
     setIsDetailsModalOpen(true);
   };
 
-  const handleEdit = (order: Order) => {
+  const handleEdit = (order: OrderWithPacking) => {
     setSelectedOrder(order);
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteClick = (order: Order) => {
+  const handleDeleteClick = (order: OrderWithPacking) => {
     setOrderToDelete(order);
     setIsDeleteModalOpen(true);
   };
@@ -409,14 +519,16 @@ export function OrderManagement() {
 
     setIsSubmitting(true);
     setTimeout(() => {
-      setOrders(orders.filter((o) => o.id !== orderToDelete.id));
+      const newOrders = orders.filter((o) => o.id !== orderToDelete.id);
+      setOrders(newOrders);
+      setFilteredOrders(newOrders);
       setIsDeleteModalOpen(false);
       setOrderToDelete(null);
       setIsSubmitting(false);
     }, 500);
   };
 
-  const handleCancelClick = (order: Order) => {
+  const handleCancelClick = (order: OrderWithPacking) => {
     setOrderToCancel(order);
     setIsCancelModalOpen(true);
   };
@@ -426,67 +538,150 @@ export function OrderManagement() {
 
     setIsSubmitting(true);
     setTimeout(() => {
-      setOrders(
-        orders.map((o) =>
-          o.id === orderToCancel.id ? { ...o, status: "cancelled" } : o,
-        ),
+      const updatedOrders: OrderWithPacking[] = orders.map((o) =>
+        o.id === orderToCancel.id ? { ...o, status: "cancelled" } : o,
       );
+      setOrders(updatedOrders);
+      setFilteredOrders(updatedOrders);
       setIsCancelModalOpen(false);
       setOrderToCancel(null);
       setIsSubmitting(false);
     }, 500);
   };
 
-  const handleUpdateStatus = (orderId: string, newStatus: Order["status"]) => {
-    setOrders(
-      orders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)),
+  const handleUpdateStatus = (orderId: string, newStatus: OrderWithPacking["status"]) => {
+    const updatedOrders: OrderWithPacking[] = orders.map((o) =>
+      o.id === orderId ? { ...o, status: newStatus } : o,
     );
+    setOrders(updatedOrders);
+    setFilteredOrders(updatedOrders);
+  };
+
+  const handlePrintOrders = () => {
+    if (filteredOrders.length === 0) return;
+
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) return;
+
+    const ordersRows = filteredOrders
+      .map((order) => {
+        const clientName = `${order.client.firstName} ${order.client.lastName}`.trim();
+        const productsSummary =
+          order.items.length > 0
+            ? order.items
+                .map((item) => {
+                  const productName = item.product?.name ?? `Produit #${item.productId}`;
+                  return `${productName} (x${item.quantity})`;
+                })
+                .join("<br />")
+            : "Aucun produit";
+
+        return `
+          <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${order.orderNumber}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${clientName}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${formatDate(order.orderDate)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${productsSummary}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(order.total)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${order.status}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const grandTotal = filteredOrders.reduce((sum, order) => sum + order.total, 0);
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Liste des commandes</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; padding: 24px; color: #1f2937;">
+          <h1 style="margin: 0 0 8px; color: #C5A065;">Liste des commandes</h1>
+          <p style="margin: 0 0 16px;">
+            Nombre de commandes: ${filteredOrders.length}<br />
+            Filtre date: ${selectedDate || "Aucun"}
+          </p>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+            <thead>
+              <tr style="background: #f9fafb;">
+                <th style="padding: 8px; text-align: left;">Numero</th>
+                <th style="padding: 8px; text-align: left;">Client</th>
+                <th style="padding: 8px; text-align: left;">Date commande</th>
+                <th style="padding: 8px; text-align: left;">Produits</th>
+                <th style="padding: 8px; text-align: right;">Total</th>
+                <th style="padding: 8px; text-align: left;">Statut</th>
+              </tr>
+            </thead>
+            <tbody>${ordersRows}</tbody>
+          </table>
+          <div style="text-align: right;">
+            <div style="font-weight: 700; font-size: 18px; margin-top: 8px;">
+              Total global: ${formatCurrency(grandTotal)}
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const columns = [
     {
       key: "orderNumber",
-      label: "Numéro",
+      label: "numero de commande",
       sortable: true,
-      render: (order: Order) => order.orderNumber,
+      render: (order: OrderWithPacking) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleViewProducts(order);
+          }}
+          className="text-left w-full hover:text-[#C5A065] transition-colors font-medium"
+        >
+          {order.orderNumber}
+        </button>
+      ),
     },
     {
       key: "client",
       label: "Client",
       sortable: true,
-      render: (order: Order) =>
+      render: (order: OrderWithPacking) =>
         `${order.client.firstName} ${order.client.lastName}`,
     },
     {
       key: "orderDate",
       label: "Date de commande",
       sortable: true,
-      render: (order: Order) => formatDate(order.orderDate),
+      render: (order: OrderWithPacking) => formatDate(order.orderDate),
     },
     {
       key: "total",
       label: "Total",
       sortable: true,
-      render: (order: Order) => formatCurrency(order.total),
+      render: (order: OrderWithPacking) => formatCurrency(order.total),
     },
     {
       key: "paymentStatus",
       label: "Paiement",
       sortable: true,
-      render: (order: Order) => getPaymentBadge(order.paymentStatus),
+      render: (order: OrderWithPacking) => getPaymentBadge(order.paymentStatus),
     },
     {
       key: "status",
       label: "Statut",
       sortable: true,
-      render: (order: Order) => getStatusBadge(order.status),
+      render: (order: OrderWithPacking) => getStatusBadge(order.status),
     },
     {
       key: "actions",
       label: "Actions",
-      render: (order: Order) => (
+      render: (order: OrderWithPacking) => (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button className="p-2 hover:bg-gray-100 rounded">
               <MoreVertical className="h-4 w-4" />
             </button>
@@ -494,7 +689,7 @@ export function OrderManagement() {
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => handleViewDetails(order)}>
               <Eye className="h-4 w-4 mr-2" />
-              Voir détails
+              Voir details
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleEdit(order)}>
               <Edit className="h-4 w-4 mr-2" />
@@ -525,7 +720,7 @@ export function OrderManagement() {
                     onClick={() => handleUpdateStatus(order.id, "ready")}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Marquer prête
+                    Marquer prete
                   </DropdownMenuItem>
                 )}
                 {order.status === "ready" && (
@@ -533,7 +728,7 @@ export function OrderManagement() {
                     onClick={() => handleUpdateStatus(order.id, "completed")}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Marquer complétée
+                    Marquer completee
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => handleCancelClick(order)}>
@@ -555,7 +750,7 @@ export function OrderManagement() {
     },
   ];
 
-  const getSearchValue = (order: Order) => {
+  const getSearchValue = (order: OrderWithPacking) => {
     return `${order.orderNumber} ${order.client.firstName} ${order.client.lastName} ${order.client.phone}`;
   };
 
@@ -571,7 +766,7 @@ export function OrderManagement() {
               Gestion des Commandes
             </h2>
             <p className="text-[9px] font-black uppercase tracking-[0.3em] text-stone-500">
-              Gérer toutes les commandes (en ligne, téléphone, en magasin)
+              Gerer toutes les commandes (en ligne, telephone, en magasin)
             </p>
           </div>
           <button
@@ -585,25 +780,166 @@ export function OrderManagement() {
       </header>
 
       <div className="p-4 md:p-8">
+        {/* Filtre par date */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
+          <div className="sm:w-56">
+            <Label htmlFor="order-date-filter" className="text-xs text-gray-600">
+              Date de commande
+            </Label>
+            <Input
+              id="order-date-filter"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </div>
+          {selectedDate && (
+            <Button
+              onClick={() => setSelectedDate("")}
+              variant="ghost"
+              size="sm"
+              className="text-[#C5A065] hover:text-[#B38F55]"
+            >
+              Effacer
+            </Button>
+          )}
+          <Button
+            onClick={handlePrintOrders}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={filteredOrders.length === 0}
+          >
+            <Printer className="h-4 w-4" />
+            Imprimer toutes les commandes
+          </Button>
+        </div>
+
         <DataTable
-          data={orders}
+          data={filteredOrders}
           columns={columns}
-          filters={filters}
-          searchPlaceholder="Rechercher par numéro, client ou téléphone..."
+          filters={[]}
+          searchPlaceholder="Rechercher par numero, client ou telephone..."
           getSearchValue={getSearchValue}
           itemsPerPage={10}
           selectable={false}
-          rowClassName={(order: Order) => getOrderColor(order)}
+          rowClassName={(order: OrderWithPacking) => getOrderColor(order)}
         />
       </div>
 
-      {/* Details Modal */}
+      {/* MODAL DES PRODUITS AVEC BOUTONS EMBALLER */}
+      <Modal
+        open={isProductsModalOpen}
+        onOpenChange={setIsProductsModalOpen}
+        type="details"
+        title={`Produits de la commande ${selectedOrderForProducts?.orderNumber}`}
+        description={`Client: ${selectedOrderForProducts?.client.firstName} ${selectedOrderForProducts?.client.lastName}`}
+        icon={<Package className="h-6 w-6 text-[#C5A065]" />}
+        size="lg"
+        actions={{
+          secondary: {
+            label: "Fermer",
+            onClick: () => {
+              setIsProductsModalOpen(false);
+              setSelectedOrderForProducts(null);
+            },
+          },
+        }}
+      >
+        {selectedOrderForProducts && (
+          <div className="space-y-4">
+            {/* Indicateur de commande prete */}
+            {selectedOrderForProducts.items.length > 0 && 
+             selectedOrderForProducts.items.every(item => item.isPacked) && (
+              <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-center">
+                <span className="text-green-800 font-semibold text-sm flex items-center justify-center gap-2">
+                  <CheckCircle className="w-5 h-5" />
+                  COMMANDE PRETE - Tous les produits sont emballes
+                </span>
+              </div>
+            )}
+
+            {selectedOrderForProducts.items.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                Aucun produit dans cette commande
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Produit</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Quantite</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Prix unitaire</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Sous-total</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Emballage</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {selectedOrderForProducts.items.map((item) => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-3 text-sm">
+                          {item.product?.name ?? `Produit #${item.productId}`}
+                        </td>
+                        <td className="px-4 py-3 text-sm">{item.quantity}</td>
+                        <td className="px-4 py-3 text-sm">{formatCurrency(item.unitPrice)}</td>
+                        <td className="px-4 py-3 text-sm">{formatCurrency(item.subtotal)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {!item.isPacked ? (
+                            <Button
+                              onClick={() => handlePackItem(selectedOrderForProducts.id, item.id)}
+                              size="sm"
+                              className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              Emballer
+                            </Button>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
+                              <Check className="w-3 h-3 mr-1" />
+                              Emballe
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            <div className="flex justify-end pt-4 border-t">
+              <div className="w-64 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Sous-total:</span>
+                  <span className="font-medium">{formatCurrency(selectedOrderForProducts.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Taxes:</span>
+                  <span className="font-medium">{formatCurrency(selectedOrderForProducts.taxAmount)}</span>
+                </div>
+                {selectedOrderForProducts.deliveryFee > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Livraison:</span>
+                    <span className="font-medium">{formatCurrency(selectedOrderForProducts.deliveryFee)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-bold border-t pt-2">
+                  <span>Total:</span>
+                  <span>{formatCurrency(selectedOrderForProducts.total)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      
       <Modal
         open={isDetailsModalOpen}
         onOpenChange={setIsDetailsModalOpen}
         type="details"
-        title="Détails de la Commande"
-        description="Informations complètes sur la commande"
+        title="Details de la Commande"
+        description="Informations completes sur la commande"
         icon={<Eye className="h-6 w-6 text-(--bakery-gold)" />}
         size="xl"
         actions={{
@@ -658,7 +994,7 @@ export function OrderManagement() {
             {/* Tabs */}
             <Tabs defaultValue="details" className="w-full">
               <TabsList className="w-full grid grid-cols-5">
-                <TabsTrigger value="details">Détails</TabsTrigger>
+                <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="items">
                   Articles ({selectedOrder.items.length})
                 </TabsTrigger>
@@ -684,7 +1020,7 @@ export function OrderManagement() {
                       </div>
                     </div>
                     <div className="text-right text-sm text-(--bakery-text-secondary)">
-                      <p>Commandée le</p>
+                      <p>Commandee le</p>
                       <p className="font-medium text-(--bakery-text)">
                         {formatDate(selectedOrder.orderDate)}
                       </p>
@@ -724,7 +1060,7 @@ export function OrderManagement() {
                           <Phone className="w-5 h-5 text-(--bakery-gold)" />
                           <div>
                             <p className="text-xs text-(--bakery-text-secondary)">
-                              Téléphone
+                              Telephone
                             </p>
                             <p className="text-sm font-medium text-(--bakery-text)">
                               {selectedOrder.client.phone}
@@ -797,7 +1133,7 @@ export function OrderManagement() {
                             <Clock className="w-5 h-5 text-(--bakery-gold)" />
                             <div>
                               <p className="text-xs text-(--bakery-text-secondary)">
-                                Créneau horaire
+                                Creneau horaire
                               </p>
                               <p className="text-sm font-medium text-(--bakery-text)">
                                 {selectedOrder.deliveryTimeSlot}
@@ -831,7 +1167,7 @@ export function OrderManagement() {
                           Produit
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                          Quantité
+                          Quantite
                         </th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
                           Prix unitaire
@@ -858,7 +1194,7 @@ export function OrderManagement() {
                         selectedOrder.items.map((item) => (
                           <tr key={item.id}>
                             <td className="px-4 py-3 text-sm">
-                              {item.product?.name ?? "Produit inconnu"}
+                              {item.product?.name ?? `Produit #${item.productId}`}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               {item.quantity}
@@ -880,7 +1216,7 @@ export function OrderManagement() {
                                 }`}
                               >
                                 {item.productionStatus === "ready"
-                                  ? "Prêt"
+                                  ? "Pret"
                                   : item.productionStatus === "in_progress"
                                     ? "En cours"
                                     : "En attente"}
@@ -929,7 +1265,7 @@ export function OrderManagement() {
                     <div className="flex justify-between items-center">
                       <div>
                         <div className="font-semibold text-gray-900">
-                          Dépôt (50%)
+                          Depot (50%)
                         </div>
                         <div className="text-sm text-gray-600 mt-1">
                           {formatCurrency(selectedOrder.depositAmount)}
@@ -939,7 +1275,7 @@ export function OrderManagement() {
                         {selectedOrder.depositPaid ? (
                           <>
                             <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                              Payé
+                              Paye
                             </span>
                             {selectedOrder.depositPaidAt && (
                               <div className="text-xs text-gray-500 mt-1">
@@ -949,7 +1285,7 @@ export function OrderManagement() {
                           </>
                         ) : (
                           <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-                            Non payé
+                            Non paye
                           </span>
                         )}
                       </div>
@@ -972,7 +1308,7 @@ export function OrderManagement() {
                         {selectedOrder.balancePaid ? (
                           <>
                             <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                              Payé
+                              Paye
                             </span>
                             {selectedOrder.balancePaidAt && (
                               <div className="text-xs text-gray-500 mt-1">
@@ -982,7 +1318,7 @@ export function OrderManagement() {
                           </>
                         ) : (
                           <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                            Dû au retrait
+                            Du au retrait
                           </span>
                         )}
                       </div>
@@ -1013,7 +1349,7 @@ export function OrderManagement() {
                     {selectedOrder.deliverySlot && (
                       <div>
                         <h3 className="font-semibold text-gray-900 mb-2">
-                          Créneau horaire
+                          Creneau horaire
                         </h3>
                         <div className="flex items-center gap-2 text-sm text-gray-700">
                           <Clock className="h-4 w-4" />
@@ -1062,7 +1398,7 @@ export function OrderManagement() {
                                 Livraison inter-succursale
                               </h3>
                               <p className="text-sm text-blue-700">
-                                Cette commande sera livrée de Laval à Montréal
+                                Cette commande sera livree de Laval a Montreal
                                 le{" "}
                                 {formatDate(
                                   selectedOrder.interLocationDeliveryDate,
@@ -1093,7 +1429,7 @@ export function OrderManagement() {
         onOpenChange={setIsCreateModalOpen}
         type="form"
         title="Nouvelle Commande"
-        description="Créer une nouvelle commande"
+        description="Creer une nouvelle commande"
         icon={<Plus className="h-6 w-6 text-[#C5A065]" />}
         size="xl"
         actions={{
@@ -1119,7 +1455,6 @@ export function OrderManagement() {
           onSubmit={async (formData) => {
             setIsSubmitting(true);
             try {
-              // Build API payload
               const apiItems = formData.items
                 .filter((item) => item.productId && item.quantity > 0)
                 .map((item) => ({
@@ -1162,13 +1497,11 @@ export function OrderManagement() {
                 }
               }
 
-              // Save to API (persists in DB + appears in production list)
               const result = await orderAPI.createOrder(payload);
               const saved = result.data;
               const now = new Date().toISOString();
 
-              // Add to local list immediately
-              const newOrder: Order = {
+              const newOrder: OrderWithPacking = {
                 id: saved?._id || String(Date.now()),
                 orderNumber: saved?.orderNumber || `ORD-${Date.now()}`,
                 clientId: formData.clientId || 0,
@@ -1200,8 +1533,14 @@ export function OrderManagement() {
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     subtotal: item.amount,
-                    productionStatus: "pending" as const,
+                    productionStatus: "pending",
                     notes: item.notes || undefined,
+                    product: {
+                      id: item.productId!,
+                      name: item.productName || `Produit #${item.productId}`,
+                      price: item.unitPrice
+                    },
+                    isPacked: false
                   })),
                 subtotal: saved?.subtotal ?? formData.subtotal,
                 taxAmount: saved?.taxAmount ?? formData.taxAmount,
@@ -1218,10 +1557,11 @@ export function OrderManagement() {
                 updatedAt: now,
               };
               setOrders((prev) => [newOrder, ...prev]);
+              setFilteredOrders((prev) => [newOrder, ...prev]);
               setIsCreateModalOpen(false);
             } catch (err: any) {
               console.error("Failed to create order:", err);
-              alert(err.message || "Erreur lors de la création de la commande");
+              alert(err.message || "Erreur lors de la creation de la commande");
             } finally {
               setIsSubmitting(false);
             }
@@ -1264,11 +1604,19 @@ export function OrderManagement() {
         }}
       >
         <OrderForm
-          onSubmit={(formData) => {
-            console.log("Order form submitted:", formData);
-            // TODO: Implement actual order update
-            setIsEditModalOpen(false);
-            setSelectedOrder(null);
+          onSubmit={async (formData) => {
+            setIsSubmitting(true);
+            try {
+              console.log("Updating order:", formData);
+              setTimeout(() => {
+                setIsEditModalOpen(false);
+                setSelectedOrder(null);
+                setIsSubmitting(false);
+              }, 500);
+            } catch (err) {
+              console.error(err);
+              setIsSubmitting(false);
+            }
           }}
           onCancel={() => {
             setIsEditModalOpen(false);
@@ -1295,6 +1643,16 @@ export function OrderManagement() {
                         postalCode: selectedOrder.deliveryAddress.postalCode,
                       }
                     : undefined,
+                  items: selectedOrder.items.map(item => ({
+                    id: `edit-${item.id}`,
+                    productId: item.productId,
+                    productName: item.product?.name || `Produit #${item.productId}`,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    amount: item.subtotal,
+                    notes: item.notes || "",
+                    isPacked: item.productionStatus === "ready"
+                  }))
                 }
               : undefined
           }
@@ -1309,7 +1667,7 @@ export function OrderManagement() {
         onOpenChange={setIsDeleteModalOpen}
         type="warning"
         title="Confirmer la suppression"
-        description="Cette action est irréversible"
+        description="Cette action est irreversible"
         icon={<Trash2 className="h-6 w-6 text-red-600" />}
         actions={{
           primary: {
@@ -1332,7 +1690,7 @@ export function OrderManagement() {
         {orderToDelete && (
           <div className="space-y-4">
             <p className="text-gray-700">
-              Êtes-vous sûr de vouloir supprimer cette commande ?
+              Etes-vous sur de vouloir supprimer cette commande ?
             </p>
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="space-y-2">
@@ -1355,7 +1713,7 @@ export function OrderManagement() {
               </div>
             </div>
             <p className="text-sm text-red-600">
-              Cette action est irréversible. Toutes les données associées à
+              Cette action est irreversible. Toutes les donnees associees a
               cette commande seront perdues.
             </p>
           </div>
@@ -1368,7 +1726,7 @@ export function OrderManagement() {
         onOpenChange={setIsCancelModalOpen}
         type="warning"
         title="Annuler la commande"
-        description="Le statut de la commande sera changé en annulé"
+        description="Le statut de la commande sera change en annule"
         icon={<XCircle className="h-6 w-6 text-amber-600" />}
         actions={{
           primary: {
@@ -1391,7 +1749,7 @@ export function OrderManagement() {
         {orderToCancel && (
           <div className="space-y-4">
             <p className="text-gray-700">
-              Êtes-vous sûr de vouloir annuler cette commande ?
+              Etes-vous sur de vouloir annuler cette commande ?
             </p>
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="space-y-2">
@@ -1411,7 +1769,7 @@ export function OrderManagement() {
               </div>
             </div>
             <p className="text-sm text-amber-600">
-              La commande restera dans le système mais ne sera plus traitée.
+              La commande restera dans le systeme mais ne sera plus traitee.
             </p>
           </div>
         )}

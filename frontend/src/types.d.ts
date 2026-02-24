@@ -35,7 +35,7 @@ export interface Product {
   preparationTimeHours?: number; // Hours required to prepare the product
   hasTaxes?: boolean;
   allergens?: string;
-  productionType: "patisserie" | "cuisinier";
+  productionType: "patisserie" | "cuisinier" | "four";
   targetAudience: "clients" | "pro";
   customOptions?: Array<{
     name: string;
@@ -350,7 +350,7 @@ export interface UserWithRole {
   emailVerified: boolean;
   name: string;
   image?: string | null;
-  role?: "user" | "pro" | "staff" | "customerService" | "admin" | "deliveryDriver" | "cuisinier" | "patissier";
+  role?: "user" | "pro" | "staff" | "customerService" | "admin" | "deliveryDriver" | "cuisinier" | "patissier" | "four";
   user_metadata?: {
     [key: string]: any;
   }; 

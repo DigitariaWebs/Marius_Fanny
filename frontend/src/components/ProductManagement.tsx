@@ -54,14 +54,14 @@ export function ProductManagement() {
     preparationTimeHours: "",
     hasTaxes: true,
     allergens: "",
-    productionType: "patisserie" as "patisserie" | "cuisinier",
+    productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
     targetAudience: "clients" as "clients" | "pro",
     customOptions: [] as Array<{ name: string; choices: string[] }>,
   });
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, []); 
 
   const flattenCategoriesWithIndentation = (cats: any[] = [], level: number = 0): Array<{ id: number; name: string; display: string }> => {
     const result: Array<{ id: number; name: string; display: string }> = [];
@@ -253,7 +253,7 @@ export function ProductManagement() {
         preparationTimeHours: "",
         hasTaxes: true,
         allergens: "",
-        productionType: "patisserie" as "patisserie" | "cuisinier",
+        productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
         targetAudience: "clients" as "clients" | "pro",
         customOptions: [],
       });
@@ -312,7 +312,7 @@ export function ProductManagement() {
         preparationTimeHours: "",
         hasTaxes: true,
         allergens: "",
-        productionType: "patisserie" as "patisserie" | "cuisinier",
+        productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
         targetAudience: "clients" as "clients" | "pro",
         customOptions: [],
       });
@@ -542,7 +542,7 @@ export function ProductManagement() {
                 preparationTimeHours: "",
                 hasTaxes: true,
                 allergens: "",
-                productionType: "patisserie" as "patisserie" | "cuisinier",
+                productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
                 targetAudience: "clients" as "clients" | "pro",
                 customOptions: [],
               });
@@ -752,12 +752,13 @@ export function ProductManagement() {
                 <select
                   value={productForm.productionType}
                   onChange={(e) =>
-                    setProductForm({ ...productForm, productionType: e.target.value as "patisserie" | "cuisinier" })
+                    setProductForm({ ...productForm, productionType: e.target.value as "patisserie" | "cuisinier" | "four" })
                   }
                   className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
                 >
                   <option value="patisserie">Pâtisserie</option>
                   <option value="cuisinier">Cuisinier</option>
+                  <option value="four">Four</option>
                 </select>
               </div>
 
@@ -903,7 +904,7 @@ export function ProductManagement() {
                 preparationTimeHours: "",
                 hasTaxes: true,
                 allergens: "",
-                productionType: "patisserie" as "patisserie" | "cuisinier",
+                productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
                 targetAudience: "clients" as "clients" | "pro",
                 customOptions: [],
               });
@@ -1113,12 +1114,13 @@ export function ProductManagement() {
                 <select
                   value={productForm.productionType}
                   onChange={(e) =>
-                    setProductForm({ ...productForm, productionType: e.target.value as "patisserie" | "cuisinier" })
+                    setProductForm({ ...productForm, productionType: e.target.value as "patisserie" | "cuisinier" | "four" })
                   }
                   className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
                 >
                   <option value="patisserie">Pâtisserie</option>
                   <option value="cuisinier">Cuisinier</option>
+                  <option value="four">Four</option>
                 </select>
               </div>
 

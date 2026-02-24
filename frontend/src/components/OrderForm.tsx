@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Package } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -44,6 +44,7 @@ interface OrderFormProps {
   initialData?: Partial<OrderFormData>;
   isSubmitting?: boolean;
   clients?: Client[];
+  onViewProducts?: () => void;
 }
 
 interface OrderFormData {
@@ -63,7 +64,6 @@ interface OrderFormData {
     province: string;
     postalCode: string;
   };
-  // AJOUT: Adresse de facturation
   billingAddress?: {
     street: string;
     city: string;
@@ -87,6 +87,7 @@ interface OrderFormItem {
   unitPrice: number;
   amount: number;
   notes: string;
+  isPacked?: boolean;
 }
 
 export default function OrderForm({
@@ -95,34 +96,40 @@ export default function OrderForm({
   initialData,
   isSubmitting = false,
   clients = [],
+  onViewProducts,
 }: OrderFormProps) {
-  const [formData, setFormData] = useState<OrderFormData>({
-    date: initialData?.date || new Date().toISOString().split("T")[0],
-    clientId: initialData?.clientId,
-    firstName: initialData?.firstName || "",
-    lastName: initialData?.lastName || "",
-    phone: initialData?.phone || "",
-    email: initialData?.email || "",
-    items: initialData?.items || [],
-    notes: initialData?.notes || "",
-    pickupLocation: initialData?.pickupLocation || "Laval",
-    deliveryType: initialData?.deliveryType || "pickup",
-    deliveryAddress: initialData?.deliveryAddress,
-    // AJOUT: Initialisation de l'adresse de facturation
-    billingAddress: initialData?.billingAddress || {
-      street: "",
-      city: "",
-      province: "",
-      postalCode: "",
-      // sameAsDelivery only makes sense when there's a delivery address
-      sameAsDelivery: (initialData?.deliveryType || "pickup") === "delivery",
-    },
-    subtotal: 0,
-    taxAmount: 0,
-    deliveryFee: initialData?.deliveryFee || 0,
-    total: 0,
-    depositAmount: 0,
-    balance: 0,
+  const [formData, setFormData] = useState<OrderFormData>(() => {
+    const initialItems = initialData?.items?.map(item => ({
+      ...item,
+      isPacked: false
+    })) || [];
+    
+    return {
+      date: initialData?.date || new Date().toISOString().split("T")[0],
+      clientId: initialData?.clientId,
+      firstName: initialData?.firstName || "",
+      lastName: initialData?.lastName || "",
+      phone: initialData?.phone || "",
+      email: initialData?.email || "",
+      items: initialItems,
+      notes: initialData?.notes || "",
+      pickupLocation: initialData?.pickupLocation || "Laval",
+      deliveryType: initialData?.deliveryType || "pickup",
+      deliveryAddress: initialData?.deliveryAddress,
+      billingAddress: initialData?.billingAddress || {
+        street: "",
+        city: "",
+        province: "",
+        postalCode: "",
+        sameAsDelivery: (initialData?.deliveryType || "pickup") === "delivery",
+      },
+      subtotal: 0,
+      taxAmount: 0,
+      deliveryFee: initialData?.deliveryFee || 0,
+      total: 0,
+      depositAmount: 0,
+      balance: 0,
+    };
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -132,7 +139,6 @@ export default function OrderForm({
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(
     null,
   );
-  // AJOUT: État pour l'adresse de facturation sélectionnée
   const [selectedBillingAddressId, setSelectedBillingAddressId] = useState<
     number | null
   >(null);
@@ -151,10 +157,11 @@ export default function OrderForm({
     fetchProducts();
   }, []);
 
-  // Sync sameAsDelivery when delivery type changes
+  const allProductsPacked = formData.items.length > 0 && 
+    formData.items.every(item => item.isPacked);
+
   useEffect(() => {
     if (formData.deliveryType === "pickup") {
-      // For pickup, sameAsDelivery makes no sense — show billing fields
       setFormData((prev) => ({
         ...prev,
         billingAddress: {
@@ -275,6 +282,15 @@ export default function OrderForm({
     }));
   };
 
+  const handlePackItem = (id: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) =>
+        item.id === id ? { ...item, isPacked: true } : item
+      ),
+    }));
+  };
+
   const handleProductSelect = (itemId: string, productId: number) => {
     const product = products.find((p) => p.id === productId);
     if (!product) return;
@@ -291,6 +307,7 @@ export default function OrderForm({
             quantity,
             unitPrice: product.price,
             amount: quantity * product.price,
+            isPacked: false,
           };
         }
         return item;
@@ -348,6 +365,7 @@ export default function OrderForm({
       unitPrice: 0,
       amount: 0,
       notes: "",
+      isPacked: false,
     };
     setFormData((prev) => ({
       ...prev,
@@ -414,7 +432,6 @@ export default function OrderForm({
     }
   };
 
-  // AJOUT: Fonction pour sélectionner l'adresse de facturation
   const handleBillingAddressSelect = (addressId: number) => {
     if (!selectedClient) return;
 
@@ -436,7 +453,6 @@ export default function OrderForm({
     }
   };
 
-  // AJOUT: Fonction pour copier l'adresse de livraison
   const copyDeliveryToBilling = () => {
     if (formData.deliveryAddress) {
       setFormData((prev) => ({
@@ -487,8 +503,6 @@ export default function OrderForm({
       }
     }
 
-    // AJOUT: Validation de l'adresse de facturation
-    // Skip billing validation if sameAsDelivery is checked (address mirrors delivery)
     if (!formData.billingAddress?.sameAsDelivery) {
       if (!formData.billingAddress?.street.trim()) {
         newErrors.billingAddress = "L'adresse de facturation est requise";
@@ -550,9 +564,9 @@ export default function OrderForm({
 
   return (
     <form id="order-form" onSubmit={handleSubmit} className="space-y-6">
-      {/* SECTION 1: Informations client */}
-      <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-200">
-        <div>
+      {/* SECTION 1: En-tête avec DATE SEULEMENT (plus de filtres !) */}
+      <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+        <div className="w-48">
           <Label htmlFor="date" className="text-xs text-gray-600">
             DATE:
           </Label>
@@ -567,7 +581,23 @@ export default function OrderForm({
             <p className="text-xs text-red-500 mt-1">{errors.date}</p>
           )}
         </div>
+        
+        {/* Bouton pour voir les produits */}
+        {onViewProducts && (
+          <Button
+            type="button"
+            onClick={onViewProducts}
+            variant="outline"
+            className="flex items-center gap-2 text-[#C5A065] border-[#C5A065] hover:bg-[#C5A065] hover:text-white"
+          >
+            <Package className="w-4 h-4" />
+            Voir les produits
+          </Button>
+        )}
+      </div>
 
+      {/* SECTION 2: Informations client */}
+      <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-200">
         <div>
           <Label htmlFor="email" className="text-xs text-gray-600">
             EMAIL:
@@ -687,7 +717,7 @@ export default function OrderForm({
         </div>
       </div>
 
-      {/* SECTION 2: Type de commande (Ramassage/Livraison) */}
+      {/* SECTION 3: Type de commande */}
       <div className="pb-4 border-b border-gray-200">
         <div className="mb-4">
           <Label className="text-xs text-gray-600 mb-2">TYPE:</Label>
@@ -745,7 +775,7 @@ export default function OrderForm({
         )}
       </div>
 
-      {/* SECTION 3: Adresse de livraison (uniquement pour livraison) */}
+      {/* SECTION 4: Adresse de livraison */}
       {formData.deliveryType === "delivery" && (
         <div className="space-y-4 pb-4 border-b border-gray-200">
           <Label className="text-xs text-gray-600">ADRESSE DE LIVRAISON:</Label>
@@ -953,8 +983,7 @@ export default function OrderForm({
         </div>
       )}
 
-      {/* ===== SECTION 4: ADRESSE DE FACTURATION ===== */}
-      {/* C'EST ICI QUE TU LA TROUVES !!! */}
+      {/* SECTION 5: Adresse de facturation */}
       <div className="space-y-4 pb-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <Label className="text-xs font-bold text-gray-700 uppercase">
@@ -974,7 +1003,6 @@ export default function OrderForm({
           )}
         </div>
 
-        {/* Checkbox "Identique à la livraison" */}
         {formData.deliveryAddress && (
           <div className="flex items-center space-x-2 mb-2">
             <input
@@ -1005,7 +1033,6 @@ export default function OrderForm({
           </div>
         )}
 
-        {/* Adresses enregistrées pour facturation */}
         {selectedClient &&
           selectedClient.addresses.length > 0 &&
           !formData.billingAddress?.sameAsDelivery && (
@@ -1050,7 +1077,6 @@ export default function OrderForm({
             </div>
           )}
 
-        {/* Champs pour nouvelle adresse de facturation */}
         {!formData.billingAddress?.sameAsDelivery && (
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
@@ -1185,7 +1211,6 @@ export default function OrderForm({
           </div>
         )}
 
-        {/* Affichage quand c'est identique */}
         {formData.billingAddress?.sameAsDelivery && formData.deliveryAddress && (
           <div className="bg-green-50 p-3 rounded-lg border border-green-100">
             <div className="flex items-start gap-2">
@@ -1205,7 +1230,7 @@ export default function OrderForm({
         )}
       </div>
 
-      {/* SECTION 5: Articles */}
+      {/* SECTION 6: Articles avec boutons d'emballage */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <Label className="text-xs text-gray-600">ARTICLES:</Label>
@@ -1221,6 +1246,15 @@ export default function OrderForm({
           </Button>
         </div>
 
+        {/* Indicateur de commande prête */}
+        {allProductsPacked && (
+          <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg text-center">
+            <span className="text-green-800 font-semibold text-sm">
+              ✅ COMMANDE PRÊTE - Tous les produits sont emballés
+            </span>
+          </div>
+        )}
+
         {errors.items && (
           <p className="text-xs text-red-500 mb-2">{errors.items}</p>
         )}
@@ -1233,6 +1267,7 @@ export default function OrderForm({
                 <TableHead className="w-24 text-xs">QTÉ</TableHead>
                 <TableHead className="w-28 text-xs">PRIX</TableHead>
                 <TableHead className="w-28 text-xs">MONTANT</TableHead>
+                <TableHead className="w-24 text-xs">EMBALLAGE</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -1304,6 +1339,25 @@ export default function OrderForm({
                         </div>
                       </TableCell>
                       <TableCell>
+                        {/* Bouton Emballer */}
+                        {item.productId && !item.isPacked && (
+                          <Button
+                            type="button"
+                            onClick={() => handlePackItem(item.id)}
+                            size="sm"
+                            className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Emballer
+                          </Button>
+                        )}
+                        {item.isPacked && (
+                          <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
+                            <Check className="w-3 h-3 mr-1" />
+                            Emballé
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Button
                           type="button"
                           variant="ghost"
@@ -1317,7 +1371,7 @@ export default function OrderForm({
                     </TableRow>
                     {item.productId && (
                       <TableRow>
-                        <TableCell colSpan={5} className="bg-gray-50 py-2">
+                        <TableCell colSpan={6} className="bg-gray-50 py-2">
                           <Textarea
                             value={item.notes}
                             onChange={(e) =>
@@ -1348,7 +1402,7 @@ export default function OrderForm({
         </div>
       )}
 
-      {/* SECTION 6: Notes */}
+      {/* SECTION 7: Notes */}
       <div>
         <Label htmlFor="notes" className="text-xs text-gray-600">
           NOTE:
@@ -1362,7 +1416,7 @@ export default function OrderForm({
         />
       </div>
 
-      {/* SECTION 7: Totaux */}
+      {/* SECTION 8: Totaux */}
       <div className="border-t border-gray-200 pt-4">
         <div className="ml-auto space-y-2">
           <div className="flex justify-between items-center text-sm">

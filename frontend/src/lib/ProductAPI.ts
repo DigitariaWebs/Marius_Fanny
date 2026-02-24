@@ -17,7 +17,7 @@ export interface CreateProductData {
   preparationTimeHours?: number;
   hasTaxes?: boolean;
   allergens?: string;
-  productionType: "patisserie" | "cuisinier";
+  productionType: "patisserie" | "cuisinier" | "four";
   targetAudience: "clients" | "pro";
   customOptions?: Array<{
     name: string;
@@ -37,7 +37,7 @@ export interface UpdateProductData {
   preparationTimeHours?: number;
   hasTaxes?: boolean;
   allergens?: string;
-  productionType?: "patisserie" | "cuisinier";
+  productionType?: "patisserie" | "cuisinier" | "four";
   targetAudience?: "clients" | "pro";
   customOptions?: Array<{
     name: string;

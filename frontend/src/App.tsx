@@ -22,6 +22,7 @@ import DevenirPartenaire from "./components/DevenirPartenaire";
 import ProDashboard from "./components/ProDashboard";
 import CuisinierDashboard from "./components/CuisinierDashboard";
 import PatissierDashboard from "./components/PatissierDashboard";
+import FourDashboard from "./components/FourDashboard";
 
 // Pages
 import User from "./pages/user";
@@ -306,6 +307,7 @@ const App: React.FC = () => {
           <Route path="/staff/delivery" element={<DeliveryDashboard />} />
           <Route path="/staff/cuisinier" element={<CuisinierDashboard />} />
           <Route path="/staff/patissier" element={<PatissierDashboard />} />
+          <Route path="/staff/four" element={<FourDashboard />} />
         </Routes>
       </div>
     </Router>
