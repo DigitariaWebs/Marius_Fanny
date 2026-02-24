@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   ChefHat, 
-  Clock, 
   Package, 
   CheckCircle2, 
   AlertCircle,
@@ -32,7 +31,7 @@ interface ProductionItem {
   productName: string;
   quantity: number;
   unitPrice: number;
-  productionType?: "patisserie" | "cuisinier" | null;
+  productionType?: "patisserie" | "cuisinier" | "four" | null;
   customerName: string;
   customerPhone: string;
   deliveryDate: string;
@@ -48,6 +47,7 @@ interface GroupedProduct {
   productId: number;
   productName: string;
   totalQuantity: number;
+  done: boolean;
   items: ProductionItem[];
 }
 
@@ -72,9 +72,7 @@ function NavItem({ icon, label, active = false, onClick }: NavItemProps) {
         }
       `}
     >
-      <span
-        className={`${active ? "scale-110" : "group-hover:scale-110"} transition-transform`}
-      >
+      <span className={`${active ? "scale-110" : "group-hover:scale-110"} transition-transform`}>
         {icon}
       </span>
       <span className="font-medium text-sm">{label}</span>
@@ -87,6 +85,7 @@ function NavItem({ icon, label, active = false, onClick }: NavItemProps) {
 
 const CuisinierDashboard: React.FC = () => {
   const [productionItems, setProductionItems] = useState<ProductionItem[]>([]);
+  const [productDoneMap, setProductDoneMap] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -97,21 +96,25 @@ const CuisinierDashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
-  const loadSavedStatuses = (): Record<string, boolean> => {
+  const loadSavedStatuses = (): { items: Record<string, boolean>; products: Record<number, boolean> } => {
     try {
       const saved = localStorage.getItem(`cuisinier-done-${selectedDate}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch { return {}; }
+      return saved ? JSON.parse(saved) : { items: {}, products: {} };
+    } catch { return { items: {}, products: {} }; }
   };
 
-  const saveStatuses = (items: ProductionItem[]) => {
-    const statuses: Record<string, boolean> = {};
+  const saveStatuses = (
+    items: ProductionItem[],
+    products: Record<number, boolean>
+  ) => {
+    const itemStatuses: Record<string, boolean> = {};
     items.forEach((item) => {
-      if (item.done) {
-        statuses[item.id] = item.done;
-      }
+      if (item.done) itemStatuses[item.id] = true;
     });
-    localStorage.setItem(`cuisinier-done-${selectedDate}`, JSON.stringify(statuses));
+    localStorage.setItem(
+      `cuisinier-done-${selectedDate}`,
+      JSON.stringify({ items: itemStatuses, products })
+    );
   };
 
   useEffect(() => {
@@ -136,17 +139,17 @@ const CuisinierDashboard: React.FC = () => {
       }
 
       const data = await response.json();
-      const savedStatuses = loadSavedStatuses();
+      const saved = loadSavedStatuses();
 
-      // Filter only items for cuisinier (productionType === "cuisinier" or null for backward compatibility)
       const cuisinierItems = (data.data?.items || [])
-        .filter((item: ProductionItem) => !item.productionType || item.productionType === "cuisinier")
+        .filter((item: ProductionItem) => item.productionType === "cuisinier")
         .map((item: ProductionItem) => ({
           ...item,
-          done: savedStatuses[item.id] || false,
+          done: saved.items[item.id] || false,
         }));
 
       setProductionItems(cuisinierItems);
+      setProductDoneMap(saved.products || {});
     } catch (err: any) {
       console.error("Error loading production data:", err);
       setError(err.message);
@@ -155,12 +158,20 @@ const CuisinierDashboard: React.FC = () => {
     }
   };
 
-  const toggleDone = (itemId: string) => {
+  const toggleProductDone = (productId: number) => {
+    setProductDoneMap((prev) => {
+      const updated = { ...prev, [productId]: !prev[productId] };
+      saveStatuses(productionItems, updated);
+      return updated;
+    });
+  };
+
+  const toggleItemDone = (itemId: string) => {
     setProductionItems((prev) => {
       const updated = prev.map((item) =>
         item.id === itemId ? { ...item, done: !item.done } : item
       );
-      saveStatuses(updated);
+      saveStatuses(updated, productDoneMap);
       return updated;
     });
   };
@@ -181,6 +192,7 @@ const CuisinierDashboard: React.FC = () => {
           productId: item.productId,
           productName: item.productName,
           totalQuantity: 0,
+          done: false,
           items: [],
         };
       }
@@ -188,36 +200,29 @@ const CuisinierDashboard: React.FC = () => {
       acc[item.productId].items.push(item);
       return acc;
     }, {} as Record<number, GroupedProduct>)
-  );
+  ).map((g) => ({ ...g, done: productDoneMap[g.productId] || false }));
 
   const filteredProducts = groupedProducts.filter((product) =>
     product.productName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalItemsToProduce = productionItems.reduce(
-    (sum, item) => sum + item.quantity,
-    0
+  const filteredItems = productionItems.filter((item) =>
+    item.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.orderNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const completedItems = productionItems.filter((item) => item.done).length;
-  const completionPercentage =
-    productionItems.length > 0
-      ? Math.round((completedItems / productionItems.length) * 100)
-      : 0;
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const totalProducts = groupedProducts.length;
+  const completedProducts = groupedProducts.filter((p) => productDoneMap[p.productId]).length;
+  const completionPercentage =
+    totalProducts > 0 ? Math.round((completedProducts / totalProducts) * 100) : 0;
+
+  const handlePrint = () => window.print();
 
   const handleExport = () => {
     const csvContent = [
-      ["Produit", "Quantité Totale", "Client", "Date Livraison", "Notes"],
-      ...productionItems.map((item) => [
-        item.productName,
-        item.quantity,
-        item.customerName,
-        item.deliveryDate,
-        item.notes,
-      ]),
+      ["Produit", "Quantité Totale"],
+      ...groupedProducts.map((p) => [p.productName, p.totalQuantity]),
     ]
       .map((row) => row.join(","))
       .join("\n");
@@ -265,7 +270,6 @@ const CuisinierDashboard: React.FC = () => {
         <GoldenBackground />
       </div>
 
-      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
@@ -281,23 +285,17 @@ const CuisinierDashboard: React.FC = () => {
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}
       >
-        {/* Brand Header */}
         <div className="p-6 border-b border-stone-200/50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1
-                className="text-2xl mb-1"
-                style={{
-                  fontFamily: '"Great Vibes", cursive',
-                  color: "#C5A065",
-                }}
-              >
-                Marius & Fanny
-              </h1>
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-stone-500">
-                Cuisinier
-              </p>
-            </div>
+          <div>
+            <h1
+              className="text-2xl mb-1"
+              style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}
+            >
+              Marius & Fanny
+            </h1>
+            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-stone-500">
+              Cuisinier
+            </p>
           </div>
           <button
             onClick={() => setIsMobileMenuOpen(false)}
@@ -307,24 +305,17 @@ const CuisinierDashboard: React.FC = () => {
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
-          {/* Production Section */}
           <div className="pb-4">
             <p className="text-[9px] font-black text-stone-400 uppercase tracking-[0.3em] mb-3 px-3">
               Production
             </p>
             <div className="space-y-2">
-              <NavItem
-                icon={<ChefHat size={20} />}
-                label="Liste de production"
-                active={true}
-              />
+              <NavItem icon={<ChefHat size={20} />} label="Liste de production" active={true} />
             </div>
           </div>
         </nav>
 
-        {/* Logout */}
         <div className="p-4 border-t border-stone-200/50">
           <button
             onClick={handleLogout}
@@ -338,18 +329,11 @@ const CuisinierDashboard: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto relative z-10">
-        {/* Mobile Header */}
         <div className="md:hidden bg-white/80 backdrop-blur-md border-b border-stone-200 p-4 flex items-center justify-between sticky top-0 z-30">
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="text-stone-600 hover:text-[#C5A065]"
-          >
+          <button onClick={() => setIsMobileMenuOpen(true)} className="text-stone-600 hover:text-[#C5A065]">
             <Menu size={24} />
           </button>
-          <h1
-            className="text-xl"
-            style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}
-          >
+          <h1 className="text-xl" style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}>
             Marius & Fanny
           </h1>
           <div className="w-6" />
@@ -364,64 +348,34 @@ const CuisinierDashboard: React.FC = () => {
                 <div>
                   <h2
                     className="text-3xl md:text-4xl mb-1"
-                    style={{
-                      fontFamily: '"Great Vibes", cursive',
-                      color: "#C5A065",
-                    }}
+                    style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}
                   >
                     Liste de Production - Cuisinier
                   </h2>
-                  <p className="text-stone-600">
-                    Gestion des produits à cuisiner
-                  </p>
+                  <p className="text-stone-600">Gestion des produits à cuisiner</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 print:hidden">
-                <button
-                  onClick={handlePrint}
-                  className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg"
-                  title="Imprimer"
-                >
+                <button onClick={handlePrint} className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg" title="Imprimer">
                   <Printer className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={handleExport}
-                  className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg"
-                  title="Exporter CSV"
-                >
+                <button onClick={handleExport} className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg" title="Exporter CSV">
                   <Download className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={fetchProductionData}
-                  className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg"
-                  title="Actualiser"
-                >
+                <button onClick={fetchProductionData} className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg" title="Actualiser">
                   <RefreshCw className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {/* Stats — 3 cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="bg-amber-50 rounded-lg p-4 border border-amber-200/50">
                 <div className="flex items-center gap-3">
                   <Package className="w-6 h-6 text-amber-600" />
                   <div>
                     <p className="text-sm text-stone-600">Total Produits</p>
-                    <p className="text-2xl font-bold text-stone-900">
-                      {filteredProducts.length}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200/50">
-                <div className="flex items-center gap-3">
-                  <Clock className="w-6 h-6 text-blue-600" />
-                  <div>
-                    <p className="text-sm text-stone-600">Quantité Totale</p>
-                    <p className="text-2xl font-bold text-stone-900">
-                      {totalItemsToProduce}
-                    </p>
+                    <p className="text-2xl font-bold text-stone-900">{totalProducts}</p>
                   </div>
                 </div>
               </div>
@@ -431,7 +385,7 @@ const CuisinierDashboard: React.FC = () => {
                   <div>
                     <p className="text-sm text-stone-600">Complété</p>
                     <p className="text-2xl font-bold text-stone-900">
-                      {completedItems}/{productionItems.length}
+                      {completedProducts}/{totalProducts}
                     </p>
                   </div>
                 </div>
@@ -441,9 +395,7 @@ const CuisinierDashboard: React.FC = () => {
                   <AlertCircle className="w-6 h-6 text-purple-600" />
                   <div>
                     <p className="text-sm text-stone-600">Progression</p>
-                    <p className="text-2xl font-bold text-stone-900">
-                      {completionPercentage}%
-                    </p>
+                    <p className="text-2xl font-bold text-stone-900">{completionPercentage}%</p>
                   </div>
                 </div>
               </div>
@@ -456,7 +408,7 @@ const CuisinierDashboard: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
                   <input
                     type="text"
-                    placeholder="Rechercher un produit..."
+                    placeholder="Rechercher..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-[#C5A065] focus:border-transparent"
@@ -476,126 +428,97 @@ const CuisinierDashboard: React.FC = () => {
                 <button
                   onClick={() => setViewMode("list")}
                   className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                    viewMode === "list"
-                      ? "bg-white shadow-sm text-[#C5A065]"
-                      : "text-stone-600"
+                    viewMode === "list" ? "bg-white shadow-sm text-[#C5A065]" : "text-stone-600"
                   }`}
                 >
                   <LayoutGrid className="w-4 h-4" />
-                  Regroupé
+                  Produits
                 </button>
                 <button
                   onClick={() => setViewMode("orders")}
                   className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                    viewMode === "orders"
-                      ? "bg-white shadow-sm text-[#C5A065]"
-                      : "text-stone-600"
+                    viewMode === "orders" ? "bg-white shadow-sm text-[#C5A065]" : "text-stone-600"
                   }`}
                 >
                   <List className="w-4 h-4" />
-                  Par Commande
+                  Commandes
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Production List */}
+          {/* ── VUE PRODUITS ── */}
           {viewMode === "list" ? (
-            <div className="space-y-4">
+            <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm border border-stone-200/50 overflow-hidden">
               {filteredProducts.length === 0 ? (
-                <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm p-8 text-center border border-stone-200/50">
+                <div className="p-8 text-center">
                   <Package className="w-12 h-12 text-stone-400 mx-auto mb-4" />
-                  <p className="text-stone-600">
-                    Aucun produit à produire pour cette date
-                  </p>
+                  <p className="text-stone-600">Aucun produit à produire pour cette date</p>
                 </div>
               ) : (
-                filteredProducts.map((product) => (
-                  <div
-                    key={product.productId}
-                    className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm p-6 border border-stone-200/50"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-stone-900">
-                          {product.productName}
-                        </h3>
-                        <p className="text-sm text-stone-600">
-                          Quantité totale: {product.totalQuantity}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-stone-600">
-                          {product.items.filter((i) => i.done).length} /{" "}
-                          {product.items.length} commandes terminées
-                        </p>
-                      </div>
-                    </div>
+                <>
+                  {/* Column headers */}
+                  <div className="flex items-center gap-4 px-6 py-3 bg-stone-50 border-b border-stone-200">
+                    <div className="w-7 shrink-0" />
+                    <span className="flex-1 text-xs font-black uppercase tracking-widest text-stone-400">
+                      Produit
+                    </span>
+                    <span className="shrink-0 text-xs font-black uppercase tracking-widest text-stone-400 min-w-[3rem] text-right">
+                      Quantité
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-stone-100">
+                    {filteredProducts.map((product) => (
+                      <li
+                        key={product.productId}
+                        className={`flex items-center gap-4 px-6 py-4 transition-colors ${
+                          product.done ? "bg-green-50" : "hover:bg-stone-50"
+                        }`}
+                      >
+                        <button
+                          onClick={() => toggleProductDone(product.productId)}
+                          className="shrink-0"
+                          title="Marquer comme fait"
+                        >
+                          {product.done ? (
+                            <CheckCircle2 className="w-7 h-7 text-green-500" />
+                          ) : (
+                            <div className="w-7 h-7 border-2 border-stone-300 rounded-full hover:border-[#C5A065] transition-colors" />
+                          )}
+                        </button>
 
-                    <div className="space-y-2">
-                      {product.items.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`flex items-center gap-4 p-4 rounded-lg border ${
-                            item.done
-                              ? "bg-green-50 border-green-200"
-                              : "bg-stone-50 border-stone-200"
+                        <span
+                          className={`flex-1 text-lg font-semibold ${
+                            product.done ? "line-through text-stone-400" : "text-stone-900"
                           }`}
                         >
-                          <button
-                            onClick={() => toggleDone(item.id)}
-                            className="shrink-0"
-                          >
-                            {item.done ? (
-                              <CheckCircle2 className="w-6 h-6 text-green-600" />
-                            ) : (
-                              <div className="w-6 h-6 border-2 border-stone-300 rounded-full" />
-                            )}
-                          </button>
-                          <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div>
-                              <p className="text-sm text-stone-600">Commande</p>
-                              <p className="font-medium">{item.orderNumber}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-stone-600">Quantité</p>
-                              <p className="font-medium">{item.quantity}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-stone-600">Client</p>
-                              <p className="font-medium">{item.customerName}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-stone-600">Livraison</p>
-                              <p className="font-medium">
-                                {item.deliveryDate} - {item.deliveryTimeSlot}
-                              </p>
-                            </div>
-                          </div>
-                          {item.notes && (
-                            <div className="shrink-0 max-w-xs">
-                              <p className="text-sm text-stone-600">Notes:</p>
-                              <p className="text-sm">{item.notes}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
+                          {product.productName}
+                        </span>
+
+                        <span
+                          className={`shrink-0 text-2xl font-bold min-w-[3rem] text-right ${
+                            product.done ? "text-green-400" : "text-[#C5A065]"
+                          }`}
+                        >
+                          {product.totalQuantity}
+                          <span className="text-sm font-normal text-stone-400 ml-1">u.</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
           ) : (
+            /* ── VUE COMMANDES ── */
             <div className="space-y-4">
-              {productionItems.length === 0 ? (
+              {filteredItems.length === 0 ? (
                 <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm p-8 text-center border border-stone-200/50">
                   <Package className="w-12 h-12 text-stone-400 mx-auto mb-4" />
-                  <p className="text-stone-600">
-                    Aucune commande pour cette date
-                  </p>
+                  <p className="text-stone-600">Aucune commande pour cette date</p>
                 </div>
               ) : (
-                productionItems.map((item) => (
+                filteredItems.map((item) => (
                   <div
                     key={item.id}
                     className={`bg-white/80 backdrop-blur-md rounded-lg shadow-sm p-6 border border-stone-200/50 ${
@@ -603,10 +526,7 @@ const CuisinierDashboard: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-start gap-4">
-                      <button
-                        onClick={() => toggleDone(item.id)}
-                        className="shrink-0 mt-1"
-                      >
+                      <button onClick={() => toggleItemDone(item.id)} className="shrink-0 mt-1">
                         {item.done ? (
                           <CheckCircle2 className="w-6 h-6 text-green-600" />
                         ) : (
@@ -616,17 +536,11 @@ const CuisinierDashboard: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-4">
                           <div>
-                            <h3 className="text-lg font-semibold text-stone-900">
-                              {item.productName}
-                            </h3>
-                            <p className="text-sm text-stone-600">
-                              Commande #{item.orderNumber}
-                            </p>
+                            <h3 className="text-lg font-semibold text-stone-900">{item.productName}</h3>
+                            <p className="text-sm text-stone-600">Commande #{item.orderNumber}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-bold text-[#C5A065]">
-                              {item.quantity}
-                            </p>
+                            <p className="text-2xl font-bold text-[#C5A065]">{item.quantity}</p>
                             <p className="text-sm text-stone-600">unités</p>
                           </div>
                         </div>
@@ -636,9 +550,7 @@ const CuisinierDashboard: React.FC = () => {
                             <div>
                               <p className="text-sm text-stone-600">Client</p>
                               <p className="font-medium">{item.customerName}</p>
-                              <p className="text-sm text-stone-500">
-                                {item.customerPhone}
-                              </p>
+                              <p className="text-sm text-stone-500">{item.customerPhone}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -646,9 +558,7 @@ const CuisinierDashboard: React.FC = () => {
                             <div>
                               <p className="text-sm text-stone-600">Livraison</p>
                               <p className="font-medium">
-                                {item.deliveryType === "pickup"
-                                  ? "Ramassage"
-                                  : "Livraison"}
+                                {item.deliveryType === "pickup" ? "Ramassage" : "Livraison"}
                               </p>
                               <p className="text-sm text-stone-500">
                                 {item.deliveryDate} - {item.deliveryTimeSlot}
@@ -658,9 +568,7 @@ const CuisinierDashboard: React.FC = () => {
                         </div>
                         {item.notes && (
                           <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                            <p className="text-sm font-medium text-stone-900 mb-1">
-                              Notes:
-                            </p>
+                            <p className="text-sm font-medium text-stone-900 mb-1">Notes :</p>
                             <p className="text-sm text-stone-700">{item.notes}</p>
                           </div>
                         )}

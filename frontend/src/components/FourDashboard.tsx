@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  ChefHat, 
+  Flame, 
   Package, 
   CheckCircle2, 
   AlertCircle,
@@ -85,9 +85,8 @@ function NavItem({ icon, label, active = false, onClick }: NavItemProps) {
   );
 }
 
-const PatissierDashboard: React.FC = () => {
+const FourDashboard: React.FC = () => {
   const [productionItems, setProductionItems] = useState<ProductionItem[]>([]);
-  // done state per productId for the "Produits" view
   const [productDoneMap, setProductDoneMap] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +100,7 @@ const PatissierDashboard: React.FC = () => {
 
   const loadSavedStatuses = (): { items: Record<string, boolean>; products: Record<number, boolean> } => {
     try {
-      const saved = localStorage.getItem(`patissier-done-${selectedDate}`);
+      const saved = localStorage.getItem(`four-done-${selectedDate}`);
       return saved ? JSON.parse(saved) : { items: {}, products: {} };
     } catch { return { items: {}, products: {} }; }
   };
@@ -115,7 +114,7 @@ const PatissierDashboard: React.FC = () => {
       if (item.done) itemStatuses[item.id] = true;
     });
     localStorage.setItem(
-      `patissier-done-${selectedDate}`,
+      `four-done-${selectedDate}`,
       JSON.stringify({ items: itemStatuses, products })
     );
   };
@@ -144,14 +143,14 @@ const PatissierDashboard: React.FC = () => {
       const data = await response.json();
       const saved = loadSavedStatuses();
 
-      const patissierItems = (data.data?.items || [])
-        .filter((item: ProductionItem) => item.productionType === "patisserie")
+      const fourItems = (data.data?.items || [])
+        .filter((item: ProductionItem) => item.productionType === "four")
         .map((item: ProductionItem) => ({
           ...item,
           done: saved.items[item.id] || false,
         }));
 
-      setProductionItems(patissierItems);
+      setProductionItems(fourItems);
       setProductDoneMap(saved.products || {});
     } catch (err: any) {
       console.error("Error loading production data:", err);
@@ -161,7 +160,6 @@ const PatissierDashboard: React.FC = () => {
     }
   };
 
-  // Toggle done for a whole product (Produits view)
   const toggleProductDone = (productId: number) => {
     setProductDoneMap((prev) => {
       const updated = { ...prev, [productId]: !prev[productId] };
@@ -170,7 +168,6 @@ const PatissierDashboard: React.FC = () => {
     });
   };
 
-  // Toggle done for a single order item (Commandes view)
   const toggleItemDone = (itemId: string) => {
     setProductionItems((prev) => {
       const updated = prev.map((item) =>
@@ -190,7 +187,6 @@ const PatissierDashboard: React.FC = () => {
     }
   };
 
-  // Group products — one entry per productId with total quantity
   const groupedProducts: GroupedProduct[] = Object.values(
     productionItems.reduce((acc, item) => {
       if (!acc[item.productId]) {
@@ -237,7 +233,7 @@ const PatissierDashboard: React.FC = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `production-patissier-${selectedDate}.csv`;
+    a.download = `production-four-${selectedDate}.csv`;
     a.click();
   };
 
@@ -276,7 +272,6 @@ const PatissierDashboard: React.FC = () => {
         <GoldenBackground />
       </div>
 
-      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
@@ -293,18 +288,16 @@ const PatissierDashboard: React.FC = () => {
       `}
       >
         <div className="p-6 border-b border-stone-200/50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1
-                className="text-2xl mb-1"
-                style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}
-              >
-                Marius & Fanny
-              </h1>
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-stone-500">
-                Pâtissier
-              </p>
-            </div>
+          <div>
+            <h1
+              className="text-2xl mb-1"
+              style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}
+            >
+              Marius & Fanny
+            </h1>
+            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-stone-500">
+              Four
+            </p>
           </div>
           <button
             onClick={() => setIsMobileMenuOpen(false)}
@@ -320,11 +313,7 @@ const PatissierDashboard: React.FC = () => {
               Production
             </p>
             <div className="space-y-2">
-              <NavItem
-                icon={<ChefHat size={20} />}
-                label="Liste de production"
-                active={true}
-              />
+              <NavItem icon={<Flame size={20} />} label="Liste de production" active={true} />
             </div>
           </div>
         </nav>
@@ -342,18 +331,11 @@ const PatissierDashboard: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto relative z-10">
-        {/* Mobile Header */}
         <div className="md:hidden bg-white/80 backdrop-blur-md border-b border-stone-200 p-4 flex items-center justify-between sticky top-0 z-30">
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="text-stone-600 hover:text-[#C5A065]"
-          >
+          <button onClick={() => setIsMobileMenuOpen(true)} className="text-stone-600 hover:text-[#C5A065]">
             <Menu size={24} />
           </button>
-          <h1
-            className="text-xl"
-            style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}
-          >
+          <h1 className="text-xl" style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}>
             Marius & Fanny
           </h1>
           <div className="w-6" />
@@ -364,15 +346,15 @@ const PatissierDashboard: React.FC = () => {
           <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm p-6 mb-6 border border-stone-200/50">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <ChefHat className="w-8 h-8 text-[#C5A065]" />
+                <Flame className="w-8 h-8 text-[#C5A065]" />
                 <div>
                   <h2
                     className="text-3xl md:text-4xl mb-1"
                     style={{ fontFamily: '"Great Vibes", cursive', color: "#C5A065" }}
                   >
-                    Liste de Production - Pâtisserie
+                    Liste de Production - Four
                   </h2>
-                  <p className="text-stone-600">Gestion des pâtisseries</p>
+                  <p className="text-stone-600">Gestion des produits à cuire au four</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 print:hidden">
@@ -388,11 +370,11 @@ const PatissierDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Stats — 3 cards (Quantité Totale removed) */}
+            {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-amber-50 rounded-lg p-4 border border-amber-200/50">
+              <div className="bg-orange-50 rounded-lg p-4 border border-orange-200/50">
                 <div className="flex items-center gap-3">
-                  <Package className="w-6 h-6 text-amber-600" />
+                  <Package className="w-6 h-6 text-orange-600" />
                   <div>
                     <p className="text-sm text-stone-600">Total Produits</p>
                     <p className="text-2xl font-bold text-stone-900">{totalProducts}</p>
@@ -410,9 +392,9 @@ const PatissierDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div className="bg-purple-50 rounded-lg p-4 border border-purple-200/50">
+              <div className="bg-red-50 rounded-lg p-4 border border-red-200/50">
                 <div className="flex items-center gap-3">
-                  <AlertCircle className="w-6 h-6 text-purple-600" />
+                  <Flame className="w-6 h-6 text-red-600" />
                   <div>
                     <p className="text-sm text-stone-600">Progression</p>
                     <p className="text-2xl font-bold text-stone-900">{completionPercentage}%</p>
@@ -467,7 +449,7 @@ const PatissierDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* ── VUE PRODUITS ── simple list: product + quantity + single checkbox */}
+          {/* ── VUE PRODUITS ── */}
           {viewMode === "list" ? (
             <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm border border-stone-200/50 overflow-hidden">
               {filteredProducts.length === 0 ? (
@@ -477,7 +459,6 @@ const PatissierDashboard: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  {/* Column headers */}
                   <div className="flex items-center gap-4 px-6 py-3 bg-stone-50 border-b border-stone-200">
                     <div className="w-7 shrink-0" />
                     <span className="flex-1 text-xs font-black uppercase tracking-widest text-stone-400">
@@ -488,52 +469,49 @@ const PatissierDashboard: React.FC = () => {
                     </span>
                   </div>
                   <ul className="divide-y divide-stone-100">
-                  {filteredProducts.map((product) => (
-                    <li
-                      key={product.productId}
-                      className={`flex items-center gap-4 px-6 py-4 transition-colors ${
-                        product.done ? "bg-green-50" : "hover:bg-stone-50"
-                      }`}
-                    >
-                      {/* Checkbox */}
-                      <button
-                        onClick={() => toggleProductDone(product.productId)}
-                        className="shrink-0"
-                        title="Marquer comme fait"
-                      >
-                        {product.done ? (
-                          <CheckCircle2 className="w-7 h-7 text-green-500" />
-                        ) : (
-                          <div className="w-7 h-7 border-2 border-stone-300 rounded-full hover:border-[#C5A065] transition-colors" />
-                        )}
-                      </button>
-
-                      {/* Product name */}
-                      <span
-                        className={`flex-1 text-lg font-semibold ${
-                          product.done ? "line-through text-stone-400" : "text-stone-900"
+                    {filteredProducts.map((product) => (
+                      <li
+                        key={product.productId}
+                        className={`flex items-center gap-4 px-6 py-4 transition-colors ${
+                          product.done ? "bg-green-50" : "hover:bg-stone-50"
                         }`}
                       >
-                        {product.productName}
-                      </span>
+                        <button
+                          onClick={() => toggleProductDone(product.productId)}
+                          className="shrink-0"
+                          title="Marquer comme fait"
+                        >
+                          {product.done ? (
+                            <CheckCircle2 className="w-7 h-7 text-green-500" />
+                          ) : (
+                            <div className="w-7 h-7 border-2 border-stone-300 rounded-full hover:border-[#C5A065] transition-colors" />
+                          )}
+                        </button>
 
-                      {/* Quantity badge */}
-                      <span
-                        className={`shrink-0 text-2xl font-bold min-w-[3rem] text-right ${
-                          product.done ? "text-green-400" : "text-[#C5A065]"
-                        }`}
-                      >
-                        {product.totalQuantity}
-                        <span className="text-sm font-normal text-stone-400 ml-1">u.</span>
-                      </span>
-                    </li>
-                  ))}
+                        <span
+                          className={`flex-1 text-lg font-semibold ${
+                            product.done ? "line-through text-stone-400" : "text-stone-900"
+                          }`}
+                        >
+                          {product.productName}
+                        </span>
+
+                        <span
+                          className={`shrink-0 text-2xl font-bold min-w-[3rem] text-right ${
+                            product.done ? "text-green-400" : "text-[#C5A065]"
+                          }`}
+                        >
+                          {product.totalQuantity}
+                          <span className="text-sm font-normal text-stone-400 ml-1">u.</span>
+                        </span>
+                      </li>
+                    ))}
                   </ul>
                 </>
               )}
             </div>
           ) : (
-            /* ── VUE COMMANDES ── detail per order item */
+            /* ── VUE COMMANDES ── */
             <div className="space-y-4">
               {filteredItems.length === 0 ? (
                 <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm p-8 text-center border border-stone-200/50">
@@ -608,4 +586,4 @@ const PatissierDashboard: React.FC = () => {
   );
 };
 
-export default PatissierDashboard;
+export default FourDashboard;

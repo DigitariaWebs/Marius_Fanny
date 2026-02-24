@@ -45,6 +45,13 @@ export function RoleBasedRedirect({ children }: RoleBasedRedirectProps) {
             navigate("/staff/patissier", { replace: true });
             return;
           }
+
+          // If user is a four and NOT on their designated route
+          if (userRole === "four" && location.pathname !== "/staff/four") {
+            console.log("🔥 Redirecting four to their dashboard");
+            navigate("/staff/four", { replace: true });
+            return;
+          }
         }
 
         // Allow rendering for all other cases
