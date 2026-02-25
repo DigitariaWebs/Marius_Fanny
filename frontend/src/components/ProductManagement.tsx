@@ -27,6 +27,79 @@ import type { Product, Category } from "../types";
 import { productAPI } from "../lib/ProductAPI";
 import { categoryAPI } from "../lib/CategoryAPI";
 import { getImageUrl } from "../utils/api";
+import {
+  formatChoiceDisplay,
+  formatChoiceForSaving,
+  parseChoiceInput,
+} from "../utils/customOptions";
+
+type CustomOptionChoice = {
+  label: string;
+  price: string;
+};
+
+type CustomOptionField = {
+  name: string;
+  choices: CustomOptionChoice[];
+};
+
+type ProductFormState = {
+  name: string;
+  category: string;
+  price: string;
+  description: string;
+  image: string;
+  available: boolean;
+  minOrderQuantity: string;
+  maxOrderQuantity: string;
+  preparationTimeHours: string;
+  hasTaxes: boolean;
+  allergens: string;
+  productionType: "patisserie" | "cuisinier" | "four";
+  targetAudience: "clients" | "pro";
+  customOptions: CustomOptionField[];
+};
+
+const buildPayloadOptions = (options: CustomOptionField[]) =>
+  options
+    .map((opt) => ({
+      name: opt.name.trim(),
+      choices: opt.choices
+        .map((choice) =>
+          formatChoiceForSaving(choice.label, choice.price || undefined),
+        )
+        .filter((choice) => choice.length > 0),
+    }))
+    .filter((opt) => opt.name && opt.choices.length > 0);
+
+const createDefaultProductForm = (category = ""): ProductFormState => ({
+  name: "",
+  category,
+  price: "",
+  description: "",
+  image: "",
+  available: true,
+  minOrderQuantity: "1",
+  maxOrderQuantity: "10",
+  preparationTimeHours: "",
+  hasTaxes: true,
+  allergens: "",
+  productionType: "patisserie",
+  targetAudience: "clients",
+  customOptions: [],
+});
+
+const mapStoredOptionsToForm = (options?: Product["customOptions"]): CustomOptionField[] =>
+  options?.map((opt) => ({
+    name: opt.name,
+    choices: opt.choices.map((choice) => {
+      const parsed = parseChoiceInput(choice);
+      return {
+        label: parsed.label,
+        price: parsed.price !== null ? parsed.price.toFixed(2) : "",
+      };
+    }),
+  })) || [];
 
 export function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -42,22 +115,9 @@ export function ProductManagement() {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [productForm, setProductForm] = useState({
-    name: "",
-    category: "",
-    price: "",
-    description: "",
-    image: "",
-    available: true,
-    minOrderQuantity: "1",
-    maxOrderQuantity: "10",
-    preparationTimeHours: "",
-    hasTaxes: true,
-    allergens: "",
-    productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
-    targetAudience: "clients" as "clients" | "pro",
-    customOptions: [] as Array<{ name: string; choices: string[] }>,
-  });
+  const [productForm, setProductForm] = useState<ProductFormState>(
+    createDefaultProductForm(),
+  );
 
   useEffect(() => {
     fetchData();
@@ -186,7 +246,7 @@ export function ProductManagement() {
       allergens: product.allergens || "",
       productionType: product.productionType,
       targetAudience: product.targetAudience,
-      customOptions: product.customOptions || [],
+      customOptions: mapStoredOptionsToForm(product.customOptions),
     });
     setIsEditModalOpen(true);
   };
@@ -230,33 +290,17 @@ export function ProductManagement() {
         allergens: productForm.allergens || undefined,
         productionType: productForm.productionType,
         targetAudience: productForm.targetAudience,
-        customOptions: productForm.customOptions
-          .filter(opt => opt.name.trim() !== "")
-          .map(opt => ({
-            name: opt.name.trim(),
-            choices: opt.choices.filter(c => c.trim() !== "")
-          })),
+        customOptions: buildPayloadOptions(productForm.customOptions),
       };
 
       const response = await productAPI.createProduct(productData);
       setProducts([...products, response.data!]);
       setIsCreateModalOpen(false);
-      setProductForm({
-        name: "",
-        category: categories.length > 0 ? categories[0].name : "",
-        price: "",
-        description: "",
-        image: "",
-        available: true,
-        minOrderQuantity: "1",
-        maxOrderQuantity: "10",
-        preparationTimeHours: "",
-        hasTaxes: true,
-        allergens: "",
-        productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
-        targetAudience: "clients" as "clients" | "pro",
-        customOptions: [],
-      });
+      setProductForm(
+        createDefaultProductForm(
+          categories.length > 0 ? categories[0].name : "",
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create product');
     } finally {
@@ -284,12 +328,7 @@ export function ProductManagement() {
         allergens: productForm.allergens || undefined,
         productionType: productForm.productionType,
         targetAudience: productForm.targetAudience,
-        customOptions: productForm.customOptions
-          .filter(opt => opt.name.trim() !== "")
-          .map(opt => ({
-            name: opt.name.trim(),
-            choices: opt.choices.filter(c => c.trim() !== "")
-          })),
+        customOptions: buildPayloadOptions(productForm.customOptions),
       };
 
       const response = await productAPI.updateProduct(selectedProduct.id, productData);
@@ -300,22 +339,11 @@ export function ProductManagement() {
       );
       setIsEditModalOpen(false);
       setSelectedProduct(null);
-      setProductForm({
-        name: "",
-        category: categories.length > 0 ? categories[0].name : "",
-        price: "",
-        description: "",
-        image: "",
-        available: true,
-        minOrderQuantity: "1",
-        maxOrderQuantity: "10",
-        preparationTimeHours: "",
-        hasTaxes: true,
-        allergens: "",
-        productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
-        targetAudience: "clients" as "clients" | "pro",
-        customOptions: [],
-      });
+      setProductForm(
+        createDefaultProductForm(
+          categories.length > 0 ? categories[0].name : "",
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update product');
     } finally {
@@ -530,22 +558,11 @@ export function ProductManagement() {
             label: "Annuler",
             onClick: () => {
               setIsCreateModalOpen(false);
-              setProductForm({
-                name: "",
-                category: categories.length > 0 ? categories[0].name : "",
-                price: "",
-                description: "",
-                image: "",
-                available: true,
-                minOrderQuantity: "1",
-                maxOrderQuantity: "10",
-                preparationTimeHours: "",
-                hasTaxes: true,
-                allergens: "",
-                productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
-                targetAudience: "clients" as "clients" | "pro",
-                customOptions: [],
-              });
+              setProductForm(
+                createDefaultProductForm(
+                  categories.length > 0 ? categories[0].name : "",
+                ),
+              );
             },
             disabled: isSubmitting,
           },
@@ -786,7 +803,10 @@ export function ProductManagement() {
                   <button
                     type="button"
                     onClick={() => {
-                      const newOpts = [...productForm.customOptions, { name: "", choices: [""] }];
+                      const newOpts = [
+                        ...productForm.customOptions,
+                        { name: "", choices: [{ label: "", price: "" }] },
+                      ];
                       setProductForm({ ...productForm, customOptions: newOpts });
                     }}
                     className="text-sm text-[#C5A065] hover:underline flex items-center gap-1"
@@ -798,7 +818,7 @@ export function ProductManagement() {
                 {productForm.customOptions.map((opt, idx) => (
                   <div key={idx} className="p-4 bg-gray-50 rounded-lg space-y-3 border border-gray-200">
                     <div className="flex gap-2">
-                       <input
+                      <input
                         type="text"
                         placeholder="Nom de l'option (ex: Taille)"
                         value={opt.name}
@@ -823,19 +843,32 @@ export function ProductManagement() {
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-gray-500 uppercase">Choix possibles</p>
                       {opt.choices.map((choice, cidx) => (
-                        <div key={cidx} className="flex gap-2">
+                        <div key={cidx} className="flex flex-wrap gap-2 items-center">
                           <input
                             type="text"
                             placeholder="Choix (ex: 12 personnes)"
-                            value={choice}
+                            value={choice.label}
                             onChange={(e) => {
                               const newOpts = [...productForm.customOptions];
                               const newChoices = [...newOpts[idx].choices];
-                              newChoices[cidx] = e.target.value;
+                              newChoices[cidx] = { ...newChoices[cidx], label: e.target.value };
                               newOpts[idx] = { ...newOpts[idx], choices: newChoices };
                               setProductForm({ ...productForm, customOptions: newOpts });
                             }}
                             className="flex-1 p-2 border border-gray-200 rounded outline-none text-sm"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Prix (ex: 45.00)"
+                            value={choice.price}
+                            onChange={(e) => {
+                              const newOpts = [...productForm.customOptions];
+                              const newChoices = [...newOpts[idx].choices];
+                              newChoices[cidx] = { ...newChoices[cidx], price: e.target.value };
+                              newOpts[idx] = { ...newOpts[idx], choices: newChoices };
+                              setProductForm({ ...productForm, customOptions: newOpts });
+                            }}
+                            className="w-24 sm:w-32 p-2 border border-gray-200 rounded outline-none text-sm"
                           />
                           <button
                             type="button"
@@ -855,7 +888,10 @@ export function ProductManagement() {
                         type="button"
                         onClick={() => {
                           const newOpts = [...productForm.customOptions];
-                          const newChoices = [...newOpts[idx].choices, ""];
+                          const newChoices = [
+                            ...newOpts[idx].choices,
+                            { label: "", price: "" },
+                          ];
                           newOpts[idx] = { ...newOpts[idx], choices: newChoices };
                           setProductForm({ ...productForm, customOptions: newOpts });
                         }}
@@ -892,22 +928,11 @@ export function ProductManagement() {
             onClick: () => {
               setIsEditModalOpen(false);
               setSelectedProduct(null);
-              setProductForm({
-                name: "",
-                category: categories.length > 0 ? categories[0].name : "",
-                price: "",
-                description: "",
-                image: "",
-                available: true,
-                minOrderQuantity: "1",
-                maxOrderQuantity: "10",
-                preparationTimeHours: "",
-                hasTaxes: true,
-                allergens: "",
-                productionType: "patisserie" as "patisserie" | "cuisinier" | "four",
-                targetAudience: "clients" as "clients" | "pro",
-                customOptions: [],
-              });
+              setProductForm(
+                createDefaultProductForm(
+                  categories.length > 0 ? categories[0].name : "",
+                ),
+              );
             },
             disabled: isSubmitting,
           },
@@ -1148,7 +1173,10 @@ export function ProductManagement() {
                   <button
                     type="button"
                     onClick={() => {
-                      const newOpts = [...productForm.customOptions, { name: "", choices: [""] }];
+                      const newOpts = [
+                        ...productForm.customOptions,
+                        { name: "", choices: [{ label: "", price: "" }] },
+                      ];
                       setProductForm({ ...productForm, customOptions: newOpts });
                     }}
                     className="text-sm text-[#C5A065] hover:underline flex items-center gap-1"
@@ -1160,7 +1188,7 @@ export function ProductManagement() {
                 {productForm.customOptions.map((opt, idx) => (
                   <div key={idx} className="p-4 bg-gray-50 rounded-lg space-y-3 border border-gray-200">
                     <div className="flex gap-2">
-                       <input
+                      <input
                         type="text"
                         placeholder="Nom de l'option (ex: Taille)"
                         value={opt.name}
@@ -1185,19 +1213,32 @@ export function ProductManagement() {
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-gray-500 uppercase">Choix possibles</p>
                       {opt.choices.map((choice, cidx) => (
-                        <div key={cidx} className="flex gap-2">
+                        <div key={cidx} className="flex flex-wrap gap-2 items-center">
                           <input
                             type="text"
                             placeholder="Choix (ex: 12 personnes)"
-                            value={choice}
+                            value={choice.label}
                             onChange={(e) => {
                               const newOpts = [...productForm.customOptions];
                               const newChoices = [...newOpts[idx].choices];
-                              newChoices[cidx] = e.target.value;
+                              newChoices[cidx] = { ...newChoices[cidx], label: e.target.value };
                               newOpts[idx] = { ...newOpts[idx], choices: newChoices };
                               setProductForm({ ...productForm, customOptions: newOpts });
                             }}
                             className="flex-1 p-2 border border-gray-200 rounded outline-none text-sm"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Prix (ex: 45.00)"
+                            value={choice.price}
+                            onChange={(e) => {
+                              const newOpts = [...productForm.customOptions];
+                              const newChoices = [...newOpts[idx].choices];
+                              newChoices[cidx] = { ...newChoices[cidx], price: e.target.value };
+                              newOpts[idx] = { ...newOpts[idx], choices: newChoices };
+                              setProductForm({ ...productForm, customOptions: newOpts });
+                            }}
+                            className="w-24 sm:w-32 p-2 border border-gray-200 rounded outline-none text-sm"
                           />
                           <button
                             type="button"
@@ -1217,7 +1258,10 @@ export function ProductManagement() {
                         type="button"
                         onClick={() => {
                           const newOpts = [...productForm.customOptions];
-                          const newChoices = [...newOpts[idx].choices, ""];
+                          const newChoices = [
+                            ...newOpts[idx].choices,
+                            { label: "", price: "" },
+                          ];
                           newOpts[idx] = { ...newOpts[idx], choices: newChoices };
                           setProductForm({ ...productForm, customOptions: newOpts });
                         }}
@@ -1369,8 +1413,12 @@ export function ProductManagement() {
                   <div className="mt-2 space-y-2">
                     {selectedProduct.customOptions.map((opt, idx) => (
                       <div key={idx} className="p-2 bg-gray-50 rounded border border-gray-100">
-                        <span className="font-semibold text-sm">{opt.name} : </span>
-                        <span className="text-sm">{opt.choices.join(", ")}</span>
+                        <p className="font-semibold text-sm">{opt.name}</p>
+                        <div className="text-sm text-stone-600 space-y-1">
+                          {opt.choices.map((choice, choiceIdx) => (
+                            <p key={choiceIdx}>{formatChoiceDisplay(choice)}</p>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>

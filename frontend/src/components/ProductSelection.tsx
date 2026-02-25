@@ -4,6 +4,7 @@ import { productAPI } from '../lib/ProductAPI';
 import { categoryAPI } from '../lib/CategoryAPI';
 import type { Product, Category as CategoryType } from '../types';
 import { getImageUrl } from '../utils/api';
+import { formatChoiceDisplay, getChoicePrice } from '../utils/customOptions';
 
 const styles = {
   gold: '#C5A065',
@@ -233,21 +234,33 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const getCurrentPrice = () => {
     if (!selectedProduct) return 0;
     let price = selectedProduct.price;
-    // For cakes, add size pricing (this logic might need to be updated based on your actual products)
-    if (selectedProduct.category === "Gâteaux" && cakeSize === "12") {
-      price += 21.5; // This is a placeholder - adjust based on your pricing logic
+    const cakeSizeDelta =
+      selectedProduct.category === "Gâteaux" && cakeSize === "12" ? 21.5 : 0;
+    price += cakeSizeDelta;
+
+    const optionPrices = Object.values(selectedOptions)
+      .map((choice) => getChoicePrice(choice))
+      .filter((price): price is number => price !== null);
+
+    if (!optionPrices.length) {
+      return price;
     }
-    return price;
+
+    if ((selectedProduct.customOptions?.length ?? 0) === 1) {
+      return optionPrices[0];
+    }
+
+    return price + optionPrices.reduce((sum, value) => sum + value, 0);
   };
 
   const handleAddToCart = () => {
     if (selectedProduct) {
       const productToAdd: any = { ...selectedProduct };
+      productToAdd.price = getCurrentPrice();
 
       // Handle cake sizing
       if (selectedProduct.category === "Gâteaux") {
         if (cakeSize === "12") {
-          productToAdd.price += 21.5;
           productToAdd.name = `${productToAdd.name} (12 pers.)`;
           productToAdd.selectedSize = "12 personnes";
         } else {
@@ -432,6 +445,25 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                     <span className="text-lg font-bold text-[#C5A065]">
                       {product.price.toFixed(2)} $
                     </span>
+                    {product.customOptions && product.customOptions.length > 0 && (
+                      <div className="mt-3 text-[11px] text-stone-500 space-y-1">
+                        {product.customOptions.slice(0, 2).map((opt) => {
+                          const choices = opt.choices
+                            .slice(0, 2)
+                            .map((choice) => formatChoiceDisplay(choice))
+                            .filter(Boolean);
+
+                          if (!choices.length) return null;
+
+                          return (
+                            <p key={opt.name}>
+                              <span className="font-semibold">{opt.name}:</span>{" "}
+                              {choices.join(" · ")}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -512,20 +544,28 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                           {option.name}
                         </h4>
                         <div className="flex gap-2 flex-wrap">
-                          {option.choices.map((choice) => (
-                            <button
-                              key={choice}
-                              type="button"
-                              onClick={() => setSelectedOptions(prev => ({ ...prev, [option.name]: choice }))}
-                              className={`flex-1 py-3 px-2 rounded text-sm font-medium transition-all min-w-[100px] ${
-                                selectedOptions[option.name] === choice
-                                  ? "bg-[#C5A065] text-white shadow-md"
-                                  : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
-                              }`}
-                            >
-                              {choice}
-                            </button>
-                          ))}
+                          {option.choices.map((choice) => {
+                            const displayText = formatChoiceDisplay(choice) || choice;
+                            return (
+                              <button
+                                key={`${option.name}-${displayText}`}
+                                type="button"
+                                onClick={() =>
+                                  setSelectedOptions((prev) => ({
+                                    ...prev,
+                                    [option.name]: choice,
+                                  }))
+                                }
+                                className={`flex-1 py-3 px-2 rounded text-sm font-medium transition-all min-w-[100px] ${
+                                  selectedOptions[option.name] === choice
+                                    ? "bg-[#C5A065] text-white shadow-md"
+                                    : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
+                                }`}
+                              >
+                                {displayText}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}
