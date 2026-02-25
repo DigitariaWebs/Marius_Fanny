@@ -157,9 +157,6 @@ export default function OrderForm({
     fetchProducts();
   }, []);
 
-  const allProductsPacked = formData.items.length > 0 && 
-    formData.items.every(item => item.isPacked);
-
   useEffect(() => {
     if (formData.deliveryType === "pickup") {
       setFormData((prev) => ({
@@ -286,7 +283,7 @@ export default function OrderForm({
     setFormData((prev) => ({
       ...prev,
       items: prev.items.map((item) =>
-        item.id === id ? { ...item, isPacked: true } : item
+        item.id === id ? { ...item, isPacked: true } : item,
       ),
     }));
   };
@@ -1230,7 +1227,7 @@ export default function OrderForm({
         )}
       </div>
 
-      {/* SECTION 6: Articles avec boutons d'emballage */}
+      {/* SECTION 6: Articles */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <Label className="text-xs text-gray-600">ARTICLES:</Label>
@@ -1247,14 +1244,6 @@ export default function OrderForm({
         </div>
 
         {/* Indicateur de commande prête */}
-        {allProductsPacked && (
-          <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg text-center">
-            <span className="text-green-800 font-semibold text-sm">
-              ✅ COMMANDE PRÊTE - Tous les produits sont emballés
-            </span>
-          </div>
-        )}
-
         {errors.items && (
           <p className="text-xs text-red-500 mb-2">{errors.items}</p>
         )}
@@ -1267,7 +1256,7 @@ export default function OrderForm({
                 <TableHead className="w-24 text-xs">QTÉ</TableHead>
                 <TableHead className="w-28 text-xs">PRIX</TableHead>
                 <TableHead className="w-28 text-xs">MONTANT</TableHead>
-                <TableHead className="w-24 text-xs">EMBALLAGE</TableHead>
+                <TableHead className="w-24"></TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -1340,7 +1329,7 @@ export default function OrderForm({
                       </TableCell>
                       <TableCell>
                         {/* Bouton Emballer */}
-                        {item.productId && !item.isPacked && (
+                        {false && item.productId && !item.isPacked && (
                           <Button
                             type="button"
                             onClick={() => handlePackItem(item.id)}
@@ -1350,7 +1339,7 @@ export default function OrderForm({
                             Emballer
                           </Button>
                         )}
-                        {item.isPacked && (
+                        {false && item.isPacked && (
                           <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">
                             <Check className="w-3 h-3 mr-1" />
                             Emballé

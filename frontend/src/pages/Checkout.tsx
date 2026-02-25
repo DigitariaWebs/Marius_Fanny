@@ -389,6 +389,11 @@ const Checkout: React.FC = () => {
       }
 
       const result = await response.json();
+      const rawOrderNumber = result?.data?.orderNumber || "";
+      const orderDigitsMatch = String(rawOrderNumber).trim().match(/-(\d{1,4})$/);
+      const displayOrderNumber = orderDigitsMatch
+        ? orderDigitsMatch[1].padStart(4, "0")
+        : String(rawOrderNumber);
       console.log("✅ [CHECKOUT] Order saved successfully:", result);
 
       // Clear cart from localStorage and notify UI
@@ -411,7 +416,7 @@ const Checkout: React.FC = () => {
             <div className="space-y-2 text-stone-600 bg-stone-50 p-4 rounded-lg">
               <p>
                 <span className="font-medium">Numéro de commande:</span>{" "}
-                {result.data.orderNumber}
+                {displayOrderNumber}
               </p>
               <p>
                 <span className="font-medium">Montant:</span> {amount}$ CAD

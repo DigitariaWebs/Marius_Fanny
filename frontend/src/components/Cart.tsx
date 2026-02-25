@@ -68,6 +68,12 @@ const CartDrawer: React.FC<CartProps> = ({
   // État pour le modal de choix de connexion
   const [showLoginChoiceModal, setShowLoginChoiceModal] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
+  const [inStoreConfirmation, setInStoreConfirmation] = useState<{
+    orderId: string;
+    timestamp: string;
+    total: number;
+    itemsCount: number;
+  } | null>(null);
 
   // Log cart open/close events
   useEffect(() => {
@@ -158,6 +164,69 @@ const CartDrawer: React.FC<CartProps> = ({
     // Stocker dans l'état et ouvrir le modal
     setOrderData(newOrderData);
     setShowLoginChoiceModal(true);
+  };
+
+  const handleInStorePayment = () => {
+    if (!items.length) return;
+
+    const timestamp = new Date();
+    const orderId = `MAG-${timestamp.getFullYear()}${(timestamp.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}${timestamp
+      .getDate()
+      .toString()
+      .padStart(2, "0")}-${timestamp
+      .getTime()
+      .toString()
+      .slice(-5)}`;
+
+    const slip = {
+      orderId,
+      timestamp: timestamp.toISOString(),
+      items,
+      deliveryType,
+      pickupLocation:
+        deliveryType === "pickup" ? pickupLocation : undefined,
+      deliveryFee: delivery,
+      subtotal,
+      taxes,
+      total,
+    };
+
+    const stored = JSON.parse(
+      localStorage.getItem("in_store_orders") || "[]",
+    );
+    stored.push(slip);
+    localStorage.setItem("in_store_orders", JSON.stringify(stored));
+
+    setInStoreConfirmation({
+      orderId,
+      timestamp: slip.timestamp,
+      total,
+      itemsCount: items.length,
+    });
+  };
+
+  const handleDownloadOrderSlip = () => {
+    if (!inStoreConfirmation) return;
+
+    const slipLines = [
+      "Bon de commande - Paiement en magasin",
+      `N° de commande : ${inStoreConfirmation.orderId}`,
+      `Date : ${new Date(inStoreConfirmation.timestamp).toLocaleString()}`,
+      `Articles : ${inStoreConfirmation.itemsCount}`,
+      `Montant total : ${inStoreConfirmation.total.toFixed(2)} $`,
+    ];
+
+    const blob = new Blob([slipLines.join("\n")], {
+      type: "text/plain",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bon-de-commande-${inStoreConfirmation.orderId}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleLoginChoice = (wantsToLogin: boolean) => {
@@ -545,35 +614,74 @@ const CartDrawer: React.FC<CartProps> = ({
 
             {/* Payment Section */}
             {items.length > 0 && (
-              <button
-                onClick={handleProceedToPayment}
-                disabled={
-                  deliveryType === "delivery" &&
-                  (!deliveryZoneInfo?.isValid ||
-                    (minimumOrderValidation !== null &&
-                      !minimumOrderValidation.isValid))
-                }
-                className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all shadow-lg mt-4 group ${
-                  deliveryType === "delivery" &&
-                  (!deliveryZoneInfo?.isValid ||
-                    (minimumOrderValidation !== null &&
-                      !minimumOrderValidation.isValid))
-                    ? "bg-stone-400 text-stone-600 cursor-not-allowed"
-                    : "bg-[#2D2A26] text-white hover:bg-[#C5A065]"
-                }`}
-                title={
-                  deliveryType === "delivery" && !deliveryZoneInfo?.isValid
-                    ? "Veuillez entrer un code postal valide"
-                    : deliveryType === "delivery" &&
-                        minimumOrderValidation &&
-                        !minimumOrderValidation.isValid
-                      ? "Montant minimum non atteint"
-                      : ""
-                }
-              >
-                <CreditCard size={18} />
-                Passer au paiement
-              </button>
+              <>
+                <button
+                  onClick={handleProceedToPayment}
+                  disabled={
+                    deliveryType === "delivery" &&
+                    (!deliveryZoneInfo?.isValid ||
+                      (minimumOrderValidation !== null &&
+                        !minimumOrderValidation.isValid))
+                  }
+                  className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all shadow-lg mt-4 group ${
+                    deliveryType === "delivery" &&
+                    (!deliveryZoneInfo?.isValid ||
+                      (minimumOrderValidation !== null &&
+                        !minimumOrderValidation.isValid))
+                      ? "bg-stone-400 text-stone-600 cursor-not-allowed"
+                      : "bg-[#2D2A26] text-white hover:bg-[#C5A065]"
+                  }`}
+                  title={
+                    deliveryType === "delivery" && !deliveryZoneInfo?.isValid
+                      ? "Veuillez entrer un code postal valide"
+                      : deliveryType === "delivery" &&
+                          minimumOrderValidation &&
+                          !minimumOrderValidation.isValid
+                        ? "Montant minimum non atteint"
+                        : ""
+                  }
+                >
+                  <CreditCard size={18} />
+                  Passer au paiement
+                </button>
+
+                <button
+                  onClick={handleInStorePayment}
+                  className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition-all shadow mt-3 border border-dashed border-[#C5A065] text-[#2D2A26] bg-white hover:bg-[#C5A065] hover:text-white"
+                >
+                  <CreditCard size={16} />
+                  Payer en magasin
+                </button>
+              </>
+            )}
+
+            {inStoreConfirmation && (
+              <div className="mt-4 rounded-2xl border border-dashed border-[#C5A065] bg-[#FFF9F3] p-4 text-sm space-y-2">
+                <p className="text-[#2D2A26] font-semibold">
+                  Bon de commande enregistré{" "}
+                  <span className="text-[#C5A065]">
+                    #{inStoreConfirmation.orderId}
+                  </span>
+                </p>
+                <p className="text-stone-500">
+                  {inStoreConfirmation.itemsCount} article(s) • Total{" "}
+                  <strong>{inStoreConfirmation.total.toFixed(2)} $</strong>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleDownloadOrderSlip}
+                    className="flex-1 py-2 rounded-lg bg-[#C5A065] text-white text-xs font-semibold uppercase tracking-widest"
+                  >
+                    Télécharger le bon de commande
+                  </button>
+                  <button
+                    onClick={() => setInStoreConfirmation(null)}
+                    className="flex-1 py-2 rounded-lg border border-stone-300 text-[#2D2A26] text-xs font-semibold uppercase tracking-widest"
+                  >
+                    Refermer
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Footer */}
