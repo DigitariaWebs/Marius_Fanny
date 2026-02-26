@@ -1,18 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Phone, Instagram, Send, MapPin, Mail, Clock } from 'lucide-react';
+import { ArrowLeft, Phone, Instagram, Send, MapPin, Mail, Paperclip, X } from 'lucide-react';
 import GoldenBackground from './GoldenBackground';
 
 const Contact: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const [submitted, setSubmitted] = useState(false);
   const [subject, setSubject] = useState("Renseignement général");
-  const [cvFileName, setCvFileName] = useState("");
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 5000);
+    setTimeout(() => {
+      setSubmitted(false);
+      setCvFile(null);
+    }, 5000);
   };
 
   return (
@@ -162,17 +166,36 @@ const Contact: React.FC = () => {
                         CV (PDF, DOC, DOCX)
                       </label>
                       <input
+                        ref={fileInputRef}
                         type="file"
                         accept=".pdf,.doc,.docx"
-                        onChange={(e) =>
-                          setCvFileName(e.target.files?.[0]?.name || "")
-                        }
-                        className="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-lg focus:outline-none focus:border-[#C5A065] transition-colors"
+                        className="hidden"
+                        onChange={(e) => setCvFile(e.target.files?.[0] || null)}
                       />
-                      {cvFileName && (
-                        <p className="text-xs text-stone-500">
-                          Fichier sélectionné: {cvFileName}
-                        </p>
+                      {cvFile ? (
+                        <div className="flex items-center justify-between w-full bg-[#C5A065]/10 border border-[#C5A065]/40 px-4 py-3 rounded-lg">
+                          <div className="flex items-center gap-2 text-[#2D2A26]">
+                            <Paperclip className="w-4 h-4 text-[#C5A065]" />
+                            <span className="text-sm font-medium truncate max-w-xs">{cvFile.name}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setCvFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                            className="text-stone-400 hover:text-red-500 transition-colors ml-3"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full flex items-center justify-center gap-3 bg-stone-50 border-2 border-dashed border-[#C5A065]/40 hover:border-[#C5A065] hover:bg-[#C5A065]/5 px-4 py-5 rounded-lg transition-all text-[#C5A065] font-semibold text-sm"
+                        >
+                          <Paperclip className="w-5 h-5" />
+                          Joindre mon CV
+                          <span className="text-stone-400 font-normal">(PDF, DOC, DOCX)</span>
+                        </button>
                       )}
                     </div>
                   )}
@@ -182,7 +205,7 @@ const Contact: React.FC = () => {
                     <textarea 
                       required rows={5}
                       className="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-lg focus:outline-none focus:border-[#C5A065] transition-colors resize-none"
-                      placeholder="Comment pouvons-nous vous aider ?"
+                      placeholder={subject === "Carrière" ? "Parlez-nous de vous : poste souhaité, expériences, disponibilités…" : "Comment pouvons-nous vous aider ?"}
                     ></textarea>
                   </div>
 
