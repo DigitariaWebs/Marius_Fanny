@@ -47,6 +47,8 @@ type ProductFormState = {
   name: string;
   category: string;
   price: string;
+  discountPercentage: string;
+  availableDays: number[];
   description: string;
   image: string;
   available: boolean;
@@ -76,6 +78,8 @@ const createDefaultProductForm = (category = ""): ProductFormState => ({
   name: "",
   category,
   price: "",
+  discountPercentage: "0",
+  availableDays: [],
   description: "",
   image: "",
   available: true,
@@ -88,6 +92,16 @@ const createDefaultProductForm = (category = ""): ProductFormState => ({
   targetAudience: "clients",
   customOptions: [],
 });
+
+const DAY_OPTIONS = [
+  { value: 0, label: "Dim" },
+  { value: 1, label: "Lun" },
+  { value: 2, label: "Mar" },
+  { value: 3, label: "Mer" },
+  { value: 4, label: "Jeu" },
+  { value: 5, label: "Ven" },
+  { value: 6, label: "Sam" },
+];
 
 const mapStoredOptionsToForm = (options?: Product["customOptions"]): CustomOptionField[] =>
   options?.map((opt) => ({
@@ -196,6 +210,12 @@ export function ProductManagement() {
     });
   };
 
+  const getDiscountedPrice = (price: number, discountPercentage?: number) => {
+    const discount = discountPercentage ?? 0;
+    if (discount <= 0) return price;
+    return price * (1 - discount / 100);
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("fr-CA", {
@@ -236,6 +256,8 @@ export function ProductManagement() {
       name: product.name,
       category: product.category,
       price: product.price.toString(),
+      discountPercentage: (product.discountPercentage ?? 0).toString(),
+      availableDays: product.availableDays || [],
       description: product.description || "",
       image: product.image || "",
       available: product.available,
@@ -278,6 +300,8 @@ export function ProductManagement() {
         name: productForm.name,
         category: productForm.category,
         price: parseFloat(productForm.price),
+        discountPercentage: parseFloat(productForm.discountPercentage) || 0,
+        availableDays: productForm.availableDays.length > 0 ? productForm.availableDays : undefined,
         description: productForm.description || undefined,
         image: productForm.image || undefined,
         available: productForm.available,
@@ -316,6 +340,8 @@ export function ProductManagement() {
         name: productForm.name,
         category: productForm.category,
         price: parseFloat(productForm.price),
+        discountPercentage: parseFloat(productForm.discountPercentage) || 0,
+        availableDays: productForm.availableDays.length > 0 ? productForm.availableDays : undefined,
         description: productForm.description || undefined,
         image: productForm.image || undefined,
         available: productForm.available,
@@ -402,7 +428,21 @@ export function ProductManagement() {
       label: "Prix",
       sortable: true,
       render: (product: Product) => (
-        <div className="font-medium">{formatCurrency(product.price)}</div>
+        <div className="font-medium">
+          {product.discountPercentage && product.discountPercentage > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 line-through">
+                {formatCurrency(product.price)}
+              </span>
+              <span>{formatCurrency(getDiscountedPrice(product.price, product.discountPercentage))}</span>
+              <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                -{product.discountPercentage}%
+              </span>
+            </div>
+          ) : (
+            <span>{formatCurrency(product.price)}</span>
+          )}
+        </div>
       ),
     },
     {
@@ -626,6 +666,62 @@ export function ProductManagement() {
                 placeholder="0.00"
               />
             </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Discount (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={productForm.discountPercentage}
+                onChange={(e) =>
+                  setProductForm({ ...productForm, discountPercentage: e.target.value })
+                }
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
+                placeholder="0"
+              />
+              <p className="text-xs text-gray-500">
+                Ex: 25 pour afficher un produit a -25%
+              </p>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-gray-700">
+                Jours disponibles (laisser vide = tous les jours)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {DAY_OPTIONS.map((day) => {
+                  const checked = productForm.availableDays.includes(day.value);
+                  return (
+                    <label
+                      key={`create-day-${day.value}`}
+                      className={`px-3 py-1 rounded-full text-xs border cursor-pointer transition-colors ${
+                        checked
+                          ? "bg-[#C5A065] text-white border-[#C5A065]"
+                          : "bg-white text-stone-600 border-stone-300 hover:border-[#C5A065]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={checked}
+                        onChange={() => {
+                          const next = checked
+                            ? productForm.availableDays.filter((d) => d !== day.value)
+                            : [...productForm.availableDays, day.value].sort((a, b) => a - b);
+                          setProductForm({ ...productForm, availableDays: next });
+                        }}
+                      />
+                      {day.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
@@ -999,6 +1095,61 @@ export function ProductManagement() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
+                Discount (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={productForm.discountPercentage}
+                onChange={(e) =>
+                  setProductForm({ ...productForm, discountPercentage: e.target.value })
+                }
+                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C5A065]/50 outline-none"
+                placeholder="0"
+              />
+              <p className="text-xs text-gray-500">
+                Ex: 25 pour afficher un produit a -25%
+              </p>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-gray-700">
+                Jours disponibles (laisser vide = tous les jours)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {DAY_OPTIONS.map((day) => {
+                  const checked = productForm.availableDays.includes(day.value);
+                  return (
+                    <label
+                      key={`edit-day-${day.value}`}
+                      className={`px-3 py-1 rounded-full text-xs border cursor-pointer transition-colors ${
+                        checked
+                          ? "bg-[#C5A065] text-white border-[#C5A065]"
+                          : "bg-white text-stone-600 border-stone-300 hover:border-[#C5A065]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={checked}
+                        onChange={() => {
+                          const next = checked
+                            ? productForm.availableDays.filter((d) => d !== day.value)
+                            : [...productForm.availableDays, day.value].sort((a, b) => a - b);
+                          setProductForm({ ...productForm, availableDays: next });
+                        }}
+                      />
+                      {day.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
                 Temps de préparation
               </label>
               <select
@@ -1333,9 +1484,23 @@ export function ProductManagement() {
                 <label className="text-sm font-medium text-gray-500">
                   Prix
                 </label>
-                <p className="text-base text-[#2D2A26] mt-1 font-medium">
-                  {formatCurrency(selectedProduct.price)}
-                </p>
+                {selectedProduct.discountPercentage && selectedProduct.discountPercentage > 0 ? (
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-sm text-gray-400 line-through">
+                      {formatCurrency(selectedProduct.price)}
+                    </span>
+                    <span className="text-base text-[#2D2A26] font-medium">
+                      {formatCurrency(getDiscountedPrice(selectedProduct.price, selectedProduct.discountPercentage))}
+                    </span>
+                    <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                      -{selectedProduct.discountPercentage}%
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-base text-[#2D2A26] mt-1 font-medium">
+                    {formatCurrency(selectedProduct.price)}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">
@@ -1393,6 +1558,19 @@ export function ProductManagement() {
                 </label>
                 <p className="text-base text-[#2D2A26] mt-1">
                   {selectedProduct.hasTaxes ? "Taxes applicables" : "Sans taxes"}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">
+                  Jours disponibles
+                </label>
+                <p className="text-base text-[#2D2A26] mt-1">
+                  {selectedProduct.availableDays && selectedProduct.availableDays.length > 0
+                    ? selectedProduct.availableDays
+                        .sort((a, b) => a - b)
+                        .map((day) => DAY_OPTIONS.find((d) => d.value === day)?.label || day)
+                        .join(", ")
+                    : "Tous les jours"}
                 </p>
               </div>
               {selectedProduct.allergens && (

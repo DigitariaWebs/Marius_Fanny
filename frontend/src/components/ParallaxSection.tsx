@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import GoldenBackground from './GoldenBackground'; // Assurez-vous que le chemin est bon
 
 import {
@@ -23,6 +24,7 @@ interface FormData {
 }
 
 const WholesaleSection = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>({
     companyName: '',
     contactName: '',
@@ -76,20 +78,8 @@ const WholesaleSection = () => {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    console.log('Formulaire envoyé:', formData);
-    setIsSubmitted(true);
-
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setFormData({
-        companyName: '',
-        contactName: '',
-        email: '',
-        phone: '',
-        businessType: '',
-        message: ''
-      });
-    }, 5000);
+    // Redirect to the dedicated partner page so users always use the same pro form.
+    navigate('/devenir-partenaire');
   };
 
   return (
@@ -326,7 +316,7 @@ const WholesaleSection = () => {
                       type="submit"
                       className="w-full bg-[#C5A065] text-white py-5 rounded-xl font-black uppercase text-sm tracking-widest hover:bg-[#2D2A26] transition-all duration-300 shadow-lg hover:shadow-xl mt-4"
                     >
-                      Envoyer ma demande
+                      Continuer vers le formulaire partenaire
                     </button>
                   </form>
                 )}

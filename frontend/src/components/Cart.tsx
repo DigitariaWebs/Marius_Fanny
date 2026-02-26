@@ -33,6 +33,7 @@ interface CartItem {
   image: string;
   quantity: number;
   hasTaxes?: boolean;
+  category?: string;
 }
 
 interface CartProps {
@@ -90,8 +91,19 @@ const CartDrawer: React.FC<CartProps> = ({
     0,
   );
 
+  const viennoiseriesCount = items.reduce((sum, item) => {
+    const category = (item.category || "").toLowerCase();
+    return category.includes("viennoiser") ? sum + item.quantity : sum;
+  }, 0);
+
   const taxes = items.reduce((sum, item) => {
-    if (item.hasTaxes) {
+    const category = (item.category || "").toLowerCase();
+    const isViennoiserie = category.includes("viennoiser");
+    const itemIsTaxable = isViennoiserie
+      ? viennoiseriesCount < 6
+      : !!item.hasTaxes;
+
+    if (itemIsTaxable) {
       return sum + item.price * item.quantity * TAX_RATE;
     }
     return sum;

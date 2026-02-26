@@ -58,6 +58,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const [selectedBread, setSelectedBread] = useState<string>("Baguette");
   const [isSliced, setIsSliced] = useState<boolean>(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const currentWeekDay = new Date().getDay();
 
   const isLunchCategory = (category: string) => {
     return [
@@ -216,10 +217,13 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
     const filtered = products.filter((p) => {
       if (!p.available) return false;
+      if (p.availableDays && p.availableDays.length > 0 && !p.availableDays.includes(currentWeekDay)) {
+        return false;
+      }
       return lowerNames.includes(p.category.toLowerCase());
     });
     setFilteredProducts(filtered);
-  }, [currentCategory, subCategory, childCategories, products, categoryTree]);
+  }, [currentCategory, subCategory, childCategories, products, categoryTree, currentWeekDay]);
 
   const handleBack = () => {
     if (subCategory) {
@@ -253,10 +257,31 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
     return price + optionPrices.reduce((sum, value) => sum + value, 0);
   };
 
+  const getDiscountedPrice = (price: number, discountPercentage?: number) => {
+    const discount = discountPercentage ?? 0;
+    if (discount <= 0) return price;
+    return price * (1 - discount / 100);
+  };
+
+  const getRelatedProducts = (product: Product): Product[] => {
+    if (!isLunchCategory(product.category)) return [];
+
+    return products
+      .filter((p) => {
+        if (p.id === product.id || !p.available) return false;
+        const haystack = `${p.category} ${p.name}`.toLowerCase();
+        return haystack.includes("boisson");
+      })
+      .slice(0, 4);
+  };
+
   const handleAddToCart = () => {
     if (selectedProduct) {
       const productToAdd: any = { ...selectedProduct };
-      productToAdd.price = getCurrentPrice();
+      productToAdd.price = getDiscountedPrice(
+        getCurrentPrice(),
+        selectedProduct.discountPercentage,
+      );
 
       // Handle cake sizing
       if (selectedProduct.category === "Gâteaux") {
@@ -442,9 +467,23 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                     {product.description}
                   </p>
                   <div className="mt-auto pt-4 border-t border-stone-100">
-                    <span className="text-lg font-bold text-[#C5A065]">
-                      {product.price.toFixed(2)} $
-                    </span>
+                    {product.discountPercentage && product.discountPercentage > 0 ? (
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        <span className="text-sm text-stone-400 line-through">
+                          {product.price.toFixed(2)} $
+                        </span>
+                        <span className="text-lg font-bold text-[#C5A065]">
+                          {getDiscountedPrice(product.price, product.discountPercentage).toFixed(2)} $
+                        </span>
+                        <span className="text-[11px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                          -{product.discountPercentage}%
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-lg font-bold text-[#C5A065]">
+                        {product.price.toFixed(2)} $
+                      </span>
+                    )}
                     {product.customOptions && product.customOptions.length > 0 && (
                       <div className="mt-3 text-[11px] text-stone-500 space-y-1">
                         {product.customOptions.slice(0, 2).map((opt) => {
@@ -518,7 +557,21 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                 </h2>
                 
                 <div className="text-2xl font-medium text-[#C5A065] mb-6">
-                  {getCurrentPrice().toFixed(2)} $
+                  {selectedProduct.discountPercentage && selectedProduct.discountPercentage > 0 ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-base text-stone-400 line-through">
+                        {getCurrentPrice().toFixed(2)} $
+                      </span>
+                      <span>
+                        {getDiscountedPrice(getCurrentPrice(), selectedProduct.discountPercentage).toFixed(2)} $
+                      </span>
+                      <span className="text-[11px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                        -{selectedProduct.discountPercentage}%
+                      </span>
+                    </div>
+                  ) : (
+                    <span>{getCurrentPrice().toFixed(2)} $</span>
+                  )}
                   {selectedProduct.hasTaxes && (
                     <span className="text-xs text-stone-400 ml-2 font-normal">
                       + taxes
@@ -738,6 +791,43 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                       />
                     </div>
                   </>
+                )}
+
+
+                {isLunchCategory(selectedProduct.category) && getRelatedProducts(selectedProduct).length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
+                      <span className="w-1 h-4 bg-[#C5A065] rounded-full"></span>
+                      Produits lies (boissons)
+                    </h4>
+                    <div className="space-y-2">
+                      {getRelatedProducts(selectedProduct).map((related) => (
+                        <div key={related.id} className="flex items-center justify-between border border-stone-200 rounded-lg p-2">
+                          <div>
+                            <p className="text-sm font-medium text-stone-700">{related.name}</p>
+                            <p className="text-xs text-stone-500">
+                              {getDiscountedPrice(related.price, related.discountPercentage).toFixed(2)} $
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onAddToCart({
+                                ...related,
+                                price: getDiscountedPrice(
+                                  related.price,
+                                  related.discountPercentage,
+                                ),
+                              })
+                            }
+                            className="px-3 py-1 text-xs font-bold rounded bg-[#2D2A26] text-white hover:bg-[#C5A065] transition-colors"
+                          >
+                            Ajouter
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
 
                 {/* ESPACE SUPPLÉMENTAIRE POUR LE SCROLL */}

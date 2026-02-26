@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { authClient, forgotPassword } from "../lib/AuthClient"; 
 import GoldenBackground from "./GoldenBackground";
-import { Mail, ArrowLeft, Check, Lock, User } from "lucide-react";
+import { Mail, ArrowLeft, Check, Lock, User, Eye, EyeOff } from "lucide-react";
 import { getRedirectPath } from "../utils/loginMultipleusers"; 
 import { UserWithRole } from "../types";
 
@@ -23,6 +23,7 @@ const AuthPage: React.FC = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -31,7 +32,6 @@ const AuthPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const location = useLocation();
 
   // --- LOGIQUE DE REDIRECTION CENTRALISÉE ---
   const handleRoleBasedRedirect = async () => {
@@ -254,6 +254,12 @@ const AuthPage: React.FC = () => {
         <div className="absolute inset-0 z-0">
           <GoldenBackground />
         </div>
+        <button
+          onClick={() => navigate("/")}
+          className="absolute top-6 left-6 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-white/95 border border-[#C5A065]/40 shadow-md text-xs font-bold uppercase tracking-widest text-[#2D2A26] hover:text-[#C5A065] transition-colors"
+        >
+          <ArrowLeft size={18} className="text-[#C5A065]" /> Retour au site
+        </button>
         <div className="relative z-10 w-full max-w-md px-6 text-center">
           <div className="bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/40">
             <div className="w-20 h-20 bg-[#C5A065]/10 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -334,6 +340,12 @@ const AuthPage: React.FC = () => {
       <div className="absolute inset-0 z-0">
         <GoldenBackground />
       </div>
+      <button
+        onClick={() => navigate("/")}
+        className="absolute top-6 left-6 z-20 flex items-center gap-2 px-3 py-2 rounded-full bg-white/95 border border-[#C5A065]/40 shadow-md text-xs font-bold uppercase tracking-widest text-[#2D2A26] hover:text-[#C5A065] transition-colors"
+      >
+        <ArrowLeft size={18} className="text-[#C5A065]" /> Retour au site
+      </button>
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-white/40">
           <div className="text-center mb-8">
@@ -402,14 +414,24 @@ const AuthPage: React.FC = () => {
                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-50 group-focus-within:opacity-100 group-focus-within:text-[#C5A065] transition-all">
                   <Lock size={12} /> Mot de passe
                 </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-0 py-3 bg-transparent border-b border-black/10 focus:border-[#C5A065] outline-none transition-all placeholder:text-black/10 text-sm"
-                  placeholder="••••••••"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-0 py-3 pr-9 bg-transparent border-b border-black/10 focus:border-[#C5A065] outline-none transition-all placeholder:text-black/10 text-sm"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-stone-500 hover:text-[#C5A065] transition-colors"
+                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
             )}
 

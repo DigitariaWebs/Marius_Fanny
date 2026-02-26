@@ -144,7 +144,7 @@ const FourDashboard: React.FC = () => {
       const saved = loadSavedStatuses();
 
       const fourItems = (data.data?.items || [])
-        .filter((item: ProductionItem) => item.productionType === "four")
+        .filter((item: ProductionItem) => (item.productionType || "").toString().trim().toLowerCase() === "four")
         .map((item: ProductionItem) => ({
           ...item,
           done: saved.items[item.id] || false,

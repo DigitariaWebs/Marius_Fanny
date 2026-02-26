@@ -23,6 +23,7 @@ export interface Product {
   name: string;
   category: string;
   price: number;
+  discountPercentage?: number;
   available: boolean;
   minOrderQuantity: number;
   maxOrderQuantity: number;
@@ -33,6 +34,7 @@ export interface Product {
   sales?: number;
   revenue?: number;
   preparationTimeHours?: number; // Hours required to prepare the product
+  availableDays?: number[]; // 0-6 (Sunday-Saturday)
   hasTaxes?: boolean;
   allergens?: string;
   productionType: "patisserie" | "cuisinier" | "four";

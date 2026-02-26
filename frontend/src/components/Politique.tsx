@@ -170,7 +170,7 @@ const Politique: React.FC = () => {
                   <li className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-[#C5A065]" />
                     <span className="text-[#2D2A26]">
-                      Par téléphone : (123) 456-7890
+                      Par téléphone : 450-689-0655
                     </span>
                   </li>
                   <li className="flex items-center gap-3">
