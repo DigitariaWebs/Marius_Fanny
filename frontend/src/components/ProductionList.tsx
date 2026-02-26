@@ -129,6 +129,20 @@ const ProductionList: React.FC = () => {
     });
   };
 
+  // Align order number display with the Commandes page formatting
+  const formatOrderNumber = (orderNumber: string) => {
+    const trimmed = orderNumber.trim();
+    const mfMatch = trimmed.match(/^(MF-\d{8}-)(\d{1,4})$/i);
+    if (mfMatch) {
+      return mfMatch[2].padStart(4, "0");
+    }
+
+    if (!/^\d+$/.test(trimmed)) return orderNumber;
+    const numeric = Number(trimmed);
+    if (Number.isNaN(numeric) || numeric < 0 || numeric > 1000) return orderNumber;
+    return String(numeric).padStart(4, "0");
+  };
+
   // Grouper les produits pour la vue liste
   const groupedProducts: GroupedProduct[] = React.useMemo(() => {
     const groups = new Map<number, GroupedProduct>();
@@ -169,6 +183,7 @@ const ProductionList: React.FC = () => {
       return (
         item.productName.toLowerCase().includes(term) ||
         item.orderNumber.toLowerCase().includes(term) ||
+        formatOrderNumber(item.orderNumber).toLowerCase().includes(term) ||
         item.customerName.toLowerCase().includes(term)
       );
     }
@@ -185,6 +200,29 @@ const ProductionList: React.FC = () => {
 
   const doneItems = filteredItems.filter(item => item.done);
   const notDoneItems = filteredItems.filter(item => !item.done);
+  const availableToday = productionItems.filter(item => item.done);
+  const availableTodayByProduct = React.useMemo(() => {
+    const grouped = new Map<string, { productName: string; totalQuantity: number; orderCount: number }>();
+
+    availableToday.forEach((item) => {
+      const key = `${item.productId}-${item.productName}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          productName: item.productName,
+          totalQuantity: 0,
+          orderCount: 0,
+        });
+      }
+
+      const current = grouped.get(key)!;
+      current.totalQuantity += item.quantity;
+      current.orderCount += 1;
+    });
+
+    return Array.from(grouped.values()).sort((a, b) =>
+      b.totalQuantity - a.totalQuantity || a.productName.localeCompare(b.productName),
+    );
+  }, [availableToday]);
 
   // Vue par commandes (comme avant mais avec checkbox)
   const OrdersView = () => (
@@ -298,7 +336,7 @@ const ProductionList: React.FC = () => {
                             className="w-4 h-4 rounded border-stone-300 text-[#C5A065] focus:ring-[#C5A065]"
                           />
                           <span className={item.done ? "line-through text-stone-400" : "text-stone-700 font-medium"}>
-                            {item.orderNumber} - {item.customerName}
+                            {formatOrderNumber(item.orderNumber)} - {item.customerName}
                           </span>
                           {item.allergies && (
                             <span className="text-red-500 text-xs" title={item.allergies}>⚠️</span>
@@ -355,7 +393,7 @@ const ProductionList: React.FC = () => {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-                  {item.orderNumber}
+                  {formatOrderNumber(item.orderNumber)}
                 </span>
                 {item.done ? (
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200">
@@ -572,6 +610,27 @@ const ProductionList: React.FC = () => {
             {productionItems.filter(i => i.done).length}
           </p>
         </div>
+      </div>
+
+      <div className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200">
+        <h3 className="text-lg font-bold text-blue-700 mb-3">
+          Produits disponibles aujourd'hui (consultation du jour)
+        </h3>
+
+        {availableTodayByProduct.length === 0 ? (
+          <p className="text-sm text-blue-600">Aucun produit disponible actuellement</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {availableTodayByProduct.map((item) => (
+              <div key={item.productName} className="bg-white p-3 rounded-lg border border-blue-100">
+                <p className="font-semibold text-stone-700">{item.productName}</p>
+                <p className="text-sm text-stone-500">Qte totale: {item.totalQuantity}</p>
+                <p className="text-xs text-stone-400">Commandes: {item.orderCount}</p>
+                <p className="text-xs text-green-600 font-medium">Disponible</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Affichage selon la vue */}

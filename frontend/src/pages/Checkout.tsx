@@ -59,13 +59,34 @@ const Checkout: React.FC = () => {
     onClose: () => {},
   });
 
+  const formatDisplayDate = (dateString: string) =>
+    new Date(`${dateString}T00:00:00`).toLocaleDateString("fr-CA", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
   // Delivery time slots configuration - MODIFIÉ POUR RAMASSAGE
   const getAvailableTimeSlots = (selectedDate: string) => {
     if (!selectedDate) return [];
 
-    // Si c'est du ramassage, pas de créneaux fixes
+    // Pour le ramassage, proposer des heures fixes
     if (state?.deliveryType === "pickup") {
-      return []; // Retourne un tableau vide pour indiquer qu'il n'y a pas de créneaux prédéfinis
+      return [
+        "07:00",
+        "08:00",
+        "09:00",
+        "10:00",
+        "11:00",
+        "12:00",
+        "13:00",
+        "14:00",
+        "15:00",
+        "16:00",
+        "17:00",
+        "18:00",
+      ];
     }
 
     const date = new Date(selectedDate + "T00:00:00");
@@ -299,9 +320,10 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    // Pour le ramassage, pas besoin de créneau horaire
-    if (state.deliveryType === "delivery" && !deliveryTime) {
-      alert("Veuillez sélectionner un créneau horaire.");
+    if (!deliveryTime) {
+      alert(
+        `Veuillez sélectionner ${state.deliveryType === "delivery" ? "un créneau horaire" : "une heure de ramassage"}.`,
+      );
       return;
     }
 
@@ -681,12 +703,7 @@ const Checkout: React.FC = () => {
                       </p>
                       <p className="text-xs mt-2 text-stone-600">
                         📅 {state.deliveryType === "delivery" ? "Livraison" : "Ramassage"} disponible à partir du{" "}
-                        {new Date(minDeliveryDate).toLocaleDateString("fr-CA", {
-                          weekday: "long",
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
+                        {formatDisplayDate(minDeliveryDate)}
                       </p>
                       {maxPreparationTime === 24 && state.deliveryType === "delivery" && (
                         <p className="text-xs mt-2 text-stone-600 font-medium">
@@ -725,12 +742,7 @@ const Checkout: React.FC = () => {
                       {deliveryDate && !dateValidationError && (
                         <p className="mt-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
                           ✅ Date valide! {state.deliveryType === "delivery" ? "Livraison" : "Ramassage"} prévu le{" "}
-                          {new Date(deliveryDate).toLocaleDateString("fr-CA", {
-                            weekday: "long",
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
+                          {formatDisplayDate(deliveryDate)}
                         </p>
                       )}
                     </div>
@@ -764,24 +776,30 @@ const Checkout: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Pour le ramassage: champ de texte libre */}
+                    {/* Pour le ramassage: heure obligatoire */}
                     {state.deliveryType === "pickup" && (
                       <div>
                         <label className="flex text-sm text-stone-600 mb-2 items-center gap-2">
                           <Clock size={16} />
-                          Heure approximative (optionnel)
+                          Heure de ramassage *
                         </label>
-                        <input
-                          type="text"
+                        <select
                           value={deliveryTime}
                           onChange={handleTimeSlotChange}
-                          placeholder="Ex: Vers 14h, Après 17h, etc."
-                          className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065]"
+                          className="w-full px-4 py-3 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065] bg-white"
                           disabled={!deliveryDate || !!dateValidationError}
-                        />
+                          required
+                        >
+                          <option value="">Sélectionnez une heure</option>
+                          {availableTimeSlots.map((slot, index) => (
+                            <option key={index} value={slot}>
+                              {slot}
+                            </option>
+                          ))}
+                        </select>
                         {deliveryTime && (
-                          <p className="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                            ℹ️ Vous avez indiqué: {deliveryTime}
+                          <p className="mt-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                            ✅ Heure sélectionnée: {deliveryTime}
                           </p>
                         )}
                       </div>
@@ -802,9 +820,9 @@ const Checkout: React.FC = () => {
                       </button>
                       <button
                         type="submit"
-                        disabled={!!dateValidationError || (state.deliveryType === "delivery" && !deliveryTime)}
+                        disabled={!!dateValidationError || !deliveryTime}
                         className={`flex-1 py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all shadow-lg ${
-                          (!!dateValidationError || (state.deliveryType === "delivery" && !deliveryTime))
+                          (!!dateValidationError || !deliveryTime)
                             ? "bg-stone-400 text-stone-600 cursor-not-allowed"
                             : "bg-[#2D2A26] text-white hover:bg-[#C5A065]"
                         }`}
@@ -846,7 +864,7 @@ const Checkout: React.FC = () => {
                     </p>
                     <p className="text-sm text-stone-600">
                       <strong>{state.deliveryType === "delivery" ? "Livraison" : "Ramassage"}:</strong>{" "}
-                      {new Date(deliveryDate).toLocaleDateString("fr-CA")}
+                      {formatDisplayDate(deliveryDate)}
                       {deliveryTime && ` - ${deliveryTime}`}
                     </p>
                   </div>

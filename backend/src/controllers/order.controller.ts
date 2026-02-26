@@ -194,15 +194,38 @@ export const getProductionList = async (
     const productIds = [...new Set(orders.flatMap(order => 
       order.items.map(item => item.productId)
     ))];
+    const productNames = [...new Set(orders.flatMap(order =>
+      order.items.map(item => item.productName).filter(Boolean)
+    ))];
 
-    // Fetch product data for all products
-    const products = await Product.find({ id: { $in: productIds } });
+    // Fetch product data for all products (ID first, name fallback for legacy/mismatch cases)
+    const products = await Product.find({
+      $or: [
+        { id: { $in: productIds } },
+        { name: { $in: productNames } },
+      ],
+    });
     const productMap = new Map(products.map(p => [p.id, p]));
+    const productNameMap = new Map(products.map(p => [p.name.toLowerCase(), p]));
+
+    const normalizeProductionType = (value: unknown): "patisserie" | "cuisinier" | "four" | null => {
+      if (typeof value !== "string") return null;
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "patisserie" || normalized === "cuisinier" || normalized === "four") {
+        return normalized;
+      }
+      return null;
+    };
 
     // Flatten orders into production items (one per product per order)
     const productionItems = orders.flatMap((order) =>
       order.items.map((item, idx) => {
-        const product = productMap.get(item.productId);
+        const productById = productMap.get(item.productId);
+        const productByName = productNameMap.get(item.productName.toLowerCase());
+        const resolvedProductionType =
+          normalizeProductionType(productById?.productionType) ??
+          normalizeProductionType(productByName?.productionType);
+
         return {
           id: `${order._id}-${idx}`,
           orderId: order._id,
@@ -211,7 +234,7 @@ export const getProductionList = async (
           productName: item.productName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          productionType: product?.productionType || null,
+          productionType: resolvedProductionType,
           customerName: `${order.clientInfo.firstName} ${order.clientInfo.lastName}`,
           customerPhone: order.clientInfo.phone,
           deliveryDate: order.deliveryDate || (order.pickupDate ? order.pickupDate.toISOString().split('T')[0] : order.orderDate.toISOString().split('T')[0]),

@@ -6,6 +6,8 @@ import GoldenBackground from './GoldenBackground';
 const Contact: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const [submitted, setSubmitted] = useState(false);
+  const [subject, setSubject] = useState("Renseignement général");
+  const [cvFileName, setCvFileName] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,8 +82,9 @@ const Contact: React.FC = () => {
                     <MapPin className="w-5 h-5 text-[#C5A065]" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-[#C5A065] uppercase">Boutique Principale</p>
+                    <p className="text-xs font-bold text-[#C5A065] uppercase">Boutiques</p>
                     <p className="text-[#2D2A26] font-medium">239-E Boulevard Samson, Laval</p>
+                    <p className="text-[#2D2A26] font-medium">2006 rue St-Hubert, Montréal</p>
                   </div>
                 </div>
               </div>
@@ -90,7 +93,7 @@ const Contact: React.FC = () => {
                 <p className="text-sm italic text-stone-500 mb-4">Suivez nos créations :</p>
                 <a href="https://www.instagram.com/patisseriemariusetfanny/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 px-4 py-2 bg-[#C5A065] text-white rounded-full hover:bg-[#B59055] transition-all">
                   <Instagram className="w-5 h-5" />
-                  <span className="font-bold text-sm">@mariusetfanny</span>
+                  <span className="font-bold text-sm">@patisseriemariusetfanny</span>
                 </a>
               </div>
             </div>
@@ -139,14 +142,40 @@ const Contact: React.FC = () => {
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-stone-500">Sujet</label>
-                    <select className="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-lg focus:outline-none focus:border-[#C5A065] transition-colors">
+                    <select
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-lg focus:outline-none focus:border-[#C5A065] transition-colors"
+                    >
                       <option>Renseignement général</option>
                       <option>Commande spéciale </option>
                       <option>Service traiteur</option>
                       <option>Réclamation / Qualité</option>
+                      <option>Carrière</option>
                       <option>Autre</option>
                     </select>
                   </div>
+
+                  {subject === "Carrière" && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-stone-500">
+                        CV (PDF, DOC, DOCX)
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) =>
+                          setCvFileName(e.target.files?.[0]?.name || "")
+                        }
+                        className="w-full bg-stone-50 border border-stone-200 px-4 py-3 rounded-lg focus:outline-none focus:border-[#C5A065] transition-colors"
+                      />
+                      {cvFileName && (
+                        <p className="text-xs text-stone-500">
+                          Fichier sélectionné: {cvFileName}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-stone-500">Votre Message</label>
