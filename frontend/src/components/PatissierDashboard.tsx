@@ -23,6 +23,14 @@ import GoldenBackground from "./GoldenBackground";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+const getLocalDateYYYYMMDD = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 interface ProductionItem {
   id: string;
   orderId: string;
@@ -93,7 +101,7 @@ const PatissierDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    getLocalDateYYYYMMDD()
   );
   const [viewMode, setViewMode] = useState<"list" | "orders">("list");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

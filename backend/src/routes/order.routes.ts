@@ -4,6 +4,7 @@ import {
   getOrders,
   getOrderById,
   getProductionList,
+  setProductionItemStatus,
   updateOrder,
   deleteOrder,
   validateDelivery,
@@ -18,6 +19,7 @@ import {
   validateDeliverySchema,
   orderQuerySchema,
 } from "../schemas/order.schema.js";
+import { productionStatusSchema } from "../schemas/inventory.schema.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
@@ -46,6 +48,14 @@ router.post("/", requireAuth, validateBody(createOrderSchema), createOrder);
 
 // Get production list for kitchen (requires authentication)
 router.get("/production", requireAuth, getProductionList);
+
+// Persist "done" and keep store inventory in sync
+router.patch(
+  "/production/status",
+  requireAuth,
+  validateBody(productionStatusSchema),
+  setProductionItemStatus,
+);
 
 // Get all orders with pagination and filters (requires authentication)
 router.get("/", requireAuth, validateQuery(orderQuerySchema), getOrders);

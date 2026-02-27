@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Order from "../models/Order.js";
 import { Product } from "../models/Product.js";
+import { ProductionItemStatus } from "../models/ProductionItemStatus.js";
 import type { ApiResponse, PaginatedResponse } from "../types.js";
 import type {
   CreateOrderInput,
@@ -243,9 +244,22 @@ export const getProductionList = async (
           pickupLocation: order.pickupLocation,
           orderStatus: order.status,
           notes: item.notes || order.notes || "",
+          done: false,
         };
       })
     );
+
+    if (date && productionItems.length > 0) {
+      const ids = productionItems.map((i) => i.id);
+      const statuses = await ProductionItemStatus.find({
+        date,
+        productionItemId: { $in: ids },
+      });
+      const statusMap = new Map(statuses.map((s) => [s.productionItemId, s]));
+      productionItems.forEach((i) => {
+        i.done = statusMap.get(i.id)?.done ?? false;
+      });
+    }
 
     res.json({
       success: true,
@@ -260,6 +274,67 @@ export const getProductionList = async (
     res.status(500).json({
       success: false,
       error: "Erreur lors de la récupération de la liste de production",
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Update a production item status (done/undone).
+ * PATCH /api/orders/production/status
+ */
+export const setProductionItemStatus = async (
+  req: Request,
+  res: Response<ApiResponse>,
+) => {
+  try {
+    const {
+      productionItemId,
+      date,
+      done,
+      productId,
+      productName,
+      quantity,
+      location,
+    } = req.body as {
+      productionItemId: string;
+      date: string;
+      done: boolean;
+      productId: number;
+      productName: string;
+      quantity: number;
+      location: "Montreal" | "Laval";
+    };
+
+    const existing = await ProductionItemStatus.findOne({
+      productionItemId,
+      date,
+    });
+    void existing;
+
+    const status = await ProductionItemStatus.findOneAndUpdate(
+      { productionItemId, date },
+      {
+        $set: {
+          done,
+          productId,
+          productName,
+          quantity,
+          location,
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+
+    res.json({
+      success: true,
+      data: { status },
+    });
+  } catch (error: any) {
+    console.error("Error updating production item status:", error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur lors de la mise Ã  jour du statut de production",
       message: error.message,
     });
   }
