@@ -72,12 +72,13 @@ router.patch("/:id/delivery-status", requireAuth, updateDeliveryStatus);
 // Update an order (admin only)
 router.patch(
   "/:id",
+  requireAuth,
   requireAdmin,
   validateBody(updateOrderSchema),
   updateOrder,
 );
 
 // Delete an order (admin only)
-router.delete("/:id", requireAdmin, deleteOrder);
+router.delete("/:id", requireAuth, requireAdmin, deleteOrder);
 
 export default router;

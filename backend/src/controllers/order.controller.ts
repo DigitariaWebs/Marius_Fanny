@@ -475,13 +475,7 @@ export const updateOrder = async (
       });
     }
 
-    // Check permissions - only admin can update orders
-    if (req.user && req.user.role !== "admin") {
-      return res.status(403).json({
-        success: false,
-        error: "Vous n'avez pas la permission de modifier cette commande",
-      });
-    }
+    // Permission already verified by requireAdmin middleware
 
     const updateData = req.body;
     const changes: any[] = [];

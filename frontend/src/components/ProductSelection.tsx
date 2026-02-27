@@ -34,6 +34,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const navigate = useNavigate();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,15 +61,13 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const currentWeekDay = new Date().getDay();
 
+  // Normalise: minuscules + retire les accents pour comparaisons souples
+  const normalizeStr = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   const isLunchCategory = (category: string) => {
-    return [
-      "Boîtes à lunch",
-      "Boite à lunch",
-      "Boîte à lunch",
-      "Salade repas",
-      "Plateau repas",
-      "Option végétarienne"
-    ].includes(category);
+    const n = normalizeStr(category);
+    return n.includes("lunch") || n.includes("salade repas") || n.includes("plateau repas") || n.includes("vegetarien");
   };
 
   // Flatten API tree to get all nodes, then rebuild from parentId
@@ -109,9 +108,10 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const [catRes, prodRes] = await Promise.all([
+      const [catRes, prodRes, allProdRes] = await Promise.all([
         categoryAPI.getAllCategories(),
         productAPI.getAllProducts(1, 100, "clients"),
+        productAPI.getAllProducts(1, 100), // Tous produits (boissons pro inclus) pour recommendations
       ]);
 
       // Rebuild tree from parentId to handle any shape from API
@@ -133,6 +133,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
       );
       setCategoryTree(roots);
       setProducts(prodRes.data.products);
+      setAllProducts(allProdRes.data.products);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
@@ -266,10 +267,10 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const getRelatedProducts = (product: Product): Product[] => {
     if (!isLunchCategory(product.category)) return [];
 
-    return products
+    return allProducts
       .filter((p) => {
         if (p.id === product.id || !p.available) return false;
-        const haystack = `${p.category} ${p.name}`.toLowerCase();
+        const haystack = normalizeStr(`${p.category} ${p.name}`);
         return haystack.includes("boisson");
       })
       .slice(0, 4);
@@ -798,7 +799,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                   <div className="mb-6">
                     <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
                       <span className="w-1 h-4 bg-[#C5A065] rounded-full"></span>
-                      Produits lies (boissons)
+                       Recommandations
                     </h4>
                     <div className="space-y-2">
                       {getRelatedProducts(selectedProduct).map((related) => (
