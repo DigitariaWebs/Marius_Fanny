@@ -501,31 +501,42 @@ export function OrderManagement() {
   };
 
   // Fonction pour emballer un produit
-  const handlePackItem = (orderId: string, itemId: number) => {
-    let updatedSelectedOrder: OrderWithPacking | null = null;
+  const handlePackItem = async (orderId: string, itemId: number) => {
+    // Compute new state synchronously before calling setOrders
+    const currentOrder = orders.find((o) => o.id === orderId);
+    if (!currentOrder) return;
 
+    const updatedItems = currentOrder.items.map((item) =>
+      item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item,
+    );
+    const allPacked = updatedItems.every((item) => item.productionStatus === "ready");
+    const newStatus = (allPacked ? "ready" : currentOrder.status) as OrderWithPacking["status"];
+
+    const updatedOrder: OrderWithPacking = {
+      ...currentOrder,
+      items: updatedItems,
+      status: newStatus,
+    };
+
+    // Update local state
     setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id !== orderId) return order;
-
-        const updatedItems = order.items.map((item) =>
-          item.id === itemId ? { ...item, isPacked: true, productionStatus: "ready" } : item,
-        );
-        const allPacked = updatedItems.every((item) => item.productionStatus === "ready");
-        const updatedOrder = {
-          ...order,
-          items: updatedItems,
-          status: allPacked ? "ready" : order.status,
-        };
-
-        updatedSelectedOrder = updatedOrder;
-        return updatedOrder;
-      }),
+      prevOrders.map((order) => (order.id === orderId ? updatedOrder : order)),
     );
 
     // Keep modal state in sync with the source of truth to prevent visual rollback.
-    if (selectedOrderForProducts?.id === orderId && updatedSelectedOrder) {
-      setSelectedOrderForProducts(updatedSelectedOrder);
+    if (selectedOrderForProducts?.id === orderId) {
+      setSelectedOrderForProducts(updatedOrder);
+    }
+
+    // Persist the status change to the backend so it survives navigation
+    if (allPacked && currentOrder.status !== "ready") {
+      try {
+        const result = await orderAPI.updateOrder(orderId, { status: "ready" });
+        console.log("✅ Statut sauvegardé:", result);
+      } catch (err: any) {
+        console.error("❌ Failed to persist order status:", err);
+        alert(`Erreur lors de la sauvegarde du statut: ${err.message || err}`);
+      }
     }
   };
 
@@ -544,18 +555,23 @@ export function OrderManagement() {
     setIsDeleteModalOpen(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!orderToDelete) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      await orderAPI.deleteOrder(orderToDelete.id);
       const newOrders = orders.filter((o) => o.id !== orderToDelete.id);
       setOrders(newOrders);
       setFilteredOrders(newOrders);
       setIsDeleteModalOpen(false);
       setOrderToDelete(null);
+    } catch (err: any) {
+      console.error("❌ Failed to delete order:", err);
+      alert(`Erreur lors de la suppression: ${err.message || err}`);
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
 
   const handleCancelClick = (order: OrderWithPacking) => {
@@ -563,11 +579,12 @@ export function OrderManagement() {
     setIsCancelModalOpen(true);
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!orderToCancel) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      await orderAPI.updateOrder(orderToCancel.id, { status: "cancelled" });
       const updatedOrders: OrderWithPacking[] = orders.map((o) =>
         o.id === orderToCancel.id ? { ...o, status: "cancelled" } : o,
       );
@@ -575,16 +592,28 @@ export function OrderManagement() {
       setFilteredOrders(updatedOrders);
       setIsCancelModalOpen(false);
       setOrderToCancel(null);
+    } catch (err: any) {
+      console.error("❌ Failed to cancel order:", err);
+      alert(`Erreur lors de l'annulation: ${err.message || err}`);
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
 
-  const handleUpdateStatus = (orderId: string, newStatus: OrderWithPacking["status"]) => {
+  const handleUpdateStatus = async (orderId: string, newStatus: OrderWithPacking["status"]) => {
     const updatedOrders: OrderWithPacking[] = orders.map((o) =>
       o.id === orderId ? { ...o, status: newStatus } : o,
     );
     setOrders(updatedOrders);
     setFilteredOrders(updatedOrders);
+
+    // Persist status change to the backend
+    try {
+      await orderAPI.updateOrder(orderId, { status: newStatus });
+    } catch (err: any) {
+      console.error("❌ Failed to persist order status:", err);
+      alert(`Erreur lors de la sauvegarde du statut: ${err.message || err}`);
+    }
   };
 
   const handlePrintOrders = () => {
