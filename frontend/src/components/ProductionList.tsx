@@ -20,6 +20,14 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+const getLocalDateYYYYMMDD = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 interface ProductionItem {
   id: string;
   orderId: string;
@@ -49,38 +57,65 @@ interface GroupedProduct {
   allergies: string[]; // Liste des allergies uniques pour ce produit
 }
 
+interface InventoryItem {
+  _id: string;
+  productId: number;
+  productName: string;
+  location: "Montreal" | "Laval";
+  quantity: number;
+}
+
+interface GroupedInventory {
+  productId: number;
+  productName: string;
+  locations: {
+    Montreal: number;
+    Laval: number;
+  };
+  total: number;
+}
+
 const ProductionList: React.FC = () => {
   const [productionItems, setProductionItems] = useState<ProductionItem[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    getLocalDateYYYYMMDD()
   );
   const [viewMode, setViewMode] = useState<"list" | "orders">("list"); // Deux vues
-
-  // Load saved "done" statuses from localStorage
-  const loadSavedStatuses = (): Record<string, boolean> => {
-    try {
-      const saved = localStorage.getItem(`production-done-${selectedDate}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch { return {}; }
-  };
-
-  const saveStatuses = (items: ProductionItem[]) => {
-    const statuses: Record<string, boolean> = {};
-    items.forEach((item) => {
-      if (item.done) {
-        statuses[item.id] = item.done;
-      }
-    });
-    localStorage.setItem(`production-done-${selectedDate}`, JSON.stringify(statuses));
-  };
 
   // Fetch production data from API
   useEffect(() => {
     fetchProductionData();
   }, [selectedDate]);
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  const fetchInventory = async () => {
+    setInventoryLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/inventory`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setInventoryItems(result.data?.items || []);
+    } catch (err: any) {
+      console.error("❌ Erreur chargement inventaire:", err);
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
 
   const fetchProductionData = async () => {
     setLoading(true);
@@ -101,13 +136,13 @@ const ProductionList: React.FC = () => {
 
       const result = await response.json();
       const apiItems = result.data?.items || [];
-      const savedStatuses = loadSavedStatuses();
+
 
       const items: ProductionItem[] = apiItems.map((item: any) => ({
         ...item,
         // Extraire les allergies si présentes dans les notes ou un champ dédié
         allergies: item.allergies || item.notes?.match(/allergie?[^.]*/i)?.[0] || null,
-        done: savedStatuses[item.id] || false,
+        done: !!item.done,
       }));
 
       setProductionItems(items);
@@ -119,14 +154,44 @@ const ProductionList: React.FC = () => {
     }
   };
 
-  const toggleDone = (itemId: string) => {
-    setProductionItems(prev => {
-      const updated = prev.map(item =>
-        item.id === itemId ? { ...item, done: !item.done } : item
+  const toggleDone = async (itemId: string) => {
+    const item = productionItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    const nextDone = !item.done;
+
+    setProductionItems((prev) =>
+      prev.map((i) => (i.id === itemId ? { ...i, done: nextDone } : i)),
+    );
+
+    try {
+      const response = await fetch(`${API_URL}/api/orders/production/status`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productionItemId: item.id,
+          date: selectedDate,
+          done: nextDone,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          location: item.pickupLocation,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      await fetchInventory();
+    } catch (err: any) {
+      console.error("❌ Erreur mise à jour statut:", err);
+      setProductionItems((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, done: !nextDone } : i)),
       );
-      saveStatuses(updated);
-      return updated;
-    });
+      setError(err.message || "Impossible de mettre à jour le statut");
+    }
   };
 
   // Align order number display with the Commandes page formatting
@@ -176,6 +241,36 @@ const ProductionList: React.FC = () => {
     return Array.from(groups.values());
   }, [productionItems]);
 
+  // Grouper l'inventaire par produit
+  const groupedInventory: GroupedInventory[] = React.useMemo(() => {
+    const groups = new Map<number, GroupedInventory>();
+    
+    inventoryItems.forEach(item => {
+      if (!groups.has(item.productId)) {
+        groups.set(item.productId, {
+          productId: item.productId,
+          productName: item.productName,
+          locations: {
+            Montreal: 0,
+            Laval: 0
+          },
+          total: 0
+        });
+      }
+      
+      const group = groups.get(item.productId)!;
+      group.locations[item.location] = item.quantity;
+      group.total += item.quantity;
+    });
+    
+    return Array.from(groups.values());
+  }, [inventoryItems]);
+
+  // Fonction pour obtenir l'inventaire d'un produit
+  const getInventoryForProduct = (productId: number) => {
+    return groupedInventory.find(g => g.productId === productId) || null;
+  };
+
   // Filtrer les articles
   const filteredItems = productionItems.filter(item => {
     if (searchTerm) {
@@ -200,36 +295,22 @@ const ProductionList: React.FC = () => {
 
   const doneItems = filteredItems.filter(item => item.done);
   const notDoneItems = filteredItems.filter(item => !item.done);
-  const availableToday = productionItems.filter(item => item.done);
-  const availableTodayByProduct = React.useMemo(() => {
-    const grouped = new Map<string, { productName: string; totalQuantity: number; orderCount: number }>();
-
-    availableToday.forEach((item) => {
-      const key = `${item.productId}-${item.productName}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          productName: item.productName,
-          totalQuantity: 0,
-          orderCount: 0,
-        });
-      }
-
-      const current = grouped.get(key)!;
-      current.totalQuantity += item.quantity;
-      current.orderCount += 1;
-    });
-
-    return Array.from(grouped.values()).sort((a, b) =>
-      b.totalQuantity - a.totalQuantity || a.productName.localeCompare(b.productName),
+  const inventoryAvailable = inventoryItems
+    .filter((i) => i.quantity > 0)
+    .sort(
+      (a, b) =>
+        a.location.localeCompare(b.location) ||
+        a.productName.localeCompare(b.productName),
     );
-  }, [availableToday]);
+
+  // Inventory adjustments are handled elsewhere (not from the production list).
 
   // Vue par commandes (comme avant mais avec checkbox)
   const OrdersView = () => (
     <div className="space-y-4">
       {notDoneItems.length > 0 && (
         <div>
-          <h3 className="text-lg font-bold text-amber-700 mb-3">À faire ({notDoneItems.length})</h3>
+          <h3 className="text-lg font-bold text-amber-700 mb-3">Non Fait ({notDoneItems.length})</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {notDoneItems.map(item => (
               <ProductionCard key={item.id} item={item} onToggle={toggleDone} />
@@ -265,7 +346,6 @@ const ProductionList: React.FC = () => {
     </div>
   );
 
-  // Vue par liste (produits groupés) - MODIFIÉE AVEC LABELS AU-DESSUS DES CHECKBOXES
   const ListView = () => (
     <div className="space-y-6">
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
@@ -275,12 +355,14 @@ const ProductionList: React.FC = () => {
               <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Produit</th>
               <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Quantité totale</th>
               <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Allergies</th>
-              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">À faire / Fait</th>
+              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Stock disponible</th>
+              <th className="text-left py-3 px-4 text-xs font-bold text-stone-400 uppercase tracking-wider">Non fait / fait</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
             {filteredGroups.map(group => {
               const totalCount = group.items.length;
+              const inventory = getInventoryForProduct(group.productId);
               
               return (
                 <tr key={group.productId} className="hover:bg-stone-50/50 transition-colors">
@@ -313,11 +395,30 @@ const ProductionList: React.FC = () => {
                     )}
                   </td>
                   <td className="py-3 px-4">
-                    {/* En-tête avec les labels À faire / Fait */}
+                    {inventory ? (
+                      <div className="text-sm">
+                        <div className="font-medium text-blue-600">{inventory.total} unités</div>
+                        <div className="text-xs text-stone-400 mt-1">
+                          <span className="inline-block mr-2"> MTL: {inventory.locations.Montreal}</span>
+                          <span> Laval: {inventory.locations.Laval}</span>
+                        </div>
+                        {inventory.total < group.totalQuantity && (
+                          <div className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                            <AlertCircle size={12} />
+                            Manque {group.totalQuantity - inventory.total}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-stone-400">-</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4">
+                    {/* En-tête avec les labels Non remis / Remis */}
                     <div className="flex items-center gap-4 mb-2 text-xs font-medium">
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 bg-amber-500 rounded"></div>
-                        <span>À faire</span>
+                        <span>Non fait</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 bg-green-500 rounded"></div>
@@ -343,7 +444,7 @@ const ProductionList: React.FC = () => {
                           )}
                           {/* Petit indicateur de statut */}
                           <span className={`text-xs px-1.5 py-0.5 rounded-full ${item.done ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {item.done ? 'Fait' : 'À faire'}
+                            {item.done ? 'Remis' : 'Non remis'}
                           </span>
                         </div>
                       ))}
@@ -399,14 +500,14 @@ const ProductionList: React.FC = () => {
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200">
                     <span className="flex items-center gap-1">
                       <CheckCircle2 size={16} />
-                      Fait
+                      Remis
                     </span>
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-amber-100 text-amber-700 border-amber-200">
                     <span className="flex items-center gap-1">
                       <Clock size={16} />
-                      À faire
+                      Non remis
                     </span>
                   </span>
                 )}
@@ -588,8 +689,8 @@ const ProductionList: React.FC = () => {
                 className="w-full px-4 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C5A065]"
               >
                 <option value="all">Tous</option>
-                <option value="notdone">À faire</option>
-                <option value="done">Fait</option>
+                <option value="notdone">Non remis</option>
+                <option value="done">Remis</option>
               </select>
             </div>
           )}
@@ -599,7 +700,7 @@ const ProductionList: React.FC = () => {
       {/* Statistiques simplifiées */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
-          <p className="text-xs text-amber-600 font-bold">À faire</p>
+          <p className="text-xs text-amber-600 font-bold">Non Fait</p>
           <p className="text-2xl font-bold text-amber-700">
             {productionItems.filter(i => !i.done).length}
           </p>
@@ -612,21 +713,47 @@ const ProductionList: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200">
-        <h3 className="text-lg font-bold text-blue-700 mb-3">
-          Produits disponibles aujourd'hui (consultation du jour)
+
+
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 mb-6 border border-blue-200">
+        <h3 className="text-lg font-bold text-blue-700 mb-3 flex items-center gap-2">
+          <Package size={20} />
+          Stock disponible en boutique
         </h3>
 
-        {availableTodayByProduct.length === 0 ? (
-          <p className="text-sm text-blue-600">Aucun produit disponible actuellement</p>
+        {inventoryLoading ? (
+          <p className="text-sm text-blue-600">Chargement...</p>
+        ) : groupedInventory.length === 0 ? (
+          <p className="text-sm text-blue-600">Aucun produit en boutique actuellement</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {availableTodayByProduct.map((item) => (
-              <div key={item.productName} className="bg-white p-3 rounded-lg border border-blue-100">
-                <p className="font-semibold text-stone-700">{item.productName}</p>
-                <p className="text-sm text-stone-500">Qte totale: {item.totalQuantity}</p>
-                <p className="text-xs text-stone-400">Commandes: {item.orderCount}</p>
-                <p className="text-xs text-green-600 font-medium">Disponible</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {groupedInventory.map((inv) => (
+              <div key={inv.productId} className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="font-semibold text-stone-700">{inv.productName}</p>
+                  <span className="text-xl font-bold text-[#C5A065]">{inv.total}</span>
+                </div>
+                
+                {/* Détail par boutique */}
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span className="text-stone-500">MTL:</span>
+                    <span className="font-medium">{inv.locations.Montreal}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                    <span className="text-stone-500">Laval:</span>
+                    <span className="font-medium">{inv.locations.Laval}</span>
+                  </div>
+                </div>
+
+                {/* Alerte si stock faible */}
+                {inv.total < 5 && (
+                  <div className="mt-2 text-xs text-amber-600 bg-amber-50 p-1 rounded">
+                    ⚠️ Stock faible
+                  </div>
+                )}
               </div>
             ))}
           </div>
