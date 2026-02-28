@@ -4,7 +4,6 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 // Components
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
-import BestSellers from "./components/BestSellers";
 import ParallaxSection from "./components/ParallaxSection";
 import Time from "./components/Timeline";
 import Footer from "./components/Footer";
@@ -64,9 +63,7 @@ const HomePage: React.FC<HomePageProps> = ({
         <Shop onAddToCart={onAddToCart} />
       </section>
 
-      <section id="best-sellers">
-        <BestSellers onAddToCart={onAddToCart} />
-      </section>
+ 
       <Video />
       <section id="timeline">
         <Time />

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { categoryAPI } from '../lib/CategoryAPI';
 import type { Category as CategoryType } from '../types';
 import { getImageUrl } from '../utils/api';
+import ProductSelection from './ProductSelection'; 
 
 const styles = {
   cream: '#F9F7F2',
@@ -26,14 +27,19 @@ interface ApiCategoryNode extends CategoryType {
 
 interface CategoryShowcaseProps {
   onCategoryClick?: (categoryId: number, categoryTitle: string) => void;
-  onAddToCart?: (product: any) => void;
+  onAddToCart: (product: any) => void; // Changé en obligatoire pour ProductSelection
 }
 
-const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) => {
-  const navigate = useNavigate();
+const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // ÉTAT : Pour savoir quelle catégorie est sélectionnée
+  const [selectedCat, setSelectedCat] = useState<{id: number, title: string} | null>(null);
+  
+  // RÉFÉRENCE : Pour le scroll automatique
+  const productsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -43,40 +49,26 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) => {
     try {
       setLoading(true);
       const response = await categoryAPI.getAllCategories();
-
       const flattenCategories = (nodes: ApiCategoryNode[] = []): ApiCategoryNode[] => {
         const result: ApiCategoryNode[] = [];
-
         const walk = (items: ApiCategoryNode[]) => {
           items.forEach((item) => {
             result.push(item);
-            if (Array.isArray(item.children) && item.children.length > 0) {
-              walk(item.children);
-            }
+            if (Array.isArray(item.children) && item.children.length > 0) walk(item.children);
           });
         };
-
         walk(nodes);
         return result;
       };
 
       const allNodes = flattenCategories((response.data.categories || []) as ApiCategoryNode[]);
       const byId = new Map<number, ApiCategoryNode & { children: ApiCategoryNode[] }>();
-
       allNodes.forEach((node) => {
         if (typeof node.id !== 'number') return;
-        if (!byId.has(node.id)) {
-          byId.set(node.id, {
-            ...node,
-            children: [],
-          });
-        }
+        if (!byId.has(node.id)) byId.set(node.id, { ...node, children: [] });
       });
-
       byId.forEach((node) => {
-        if (node.parentId && byId.has(node.parentId)) {
-          byId.get(node.parentId)!.children.push(node);
-        }
+        if (node.parentId && byId.has(node.parentId)) byId.get(node.parentId)!.children.push(node);
       });
 
       const rootCategories = Array.from(byId.values())
@@ -88,26 +80,22 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) => {
         const walk = (nodes: ApiCategoryNode[]) => {
           nodes.forEach((node) => {
             titles.push(node.name);
-            if (Array.isArray(node.children) && node.children.length > 0) {
-              walk(node.children);
-            }
+            if (Array.isArray(node.children) && node.children.length > 0) walk(node.children);
           });
         };
         walk(children);
         return titles;
       };
       
-      // Convert root categories to display format; children stay inside parent card
       const displayCategories: Category[] = rootCategories.map((cat, index) => ({
         id: cat.id,
         title: cat.name,
         image: cat.image || './gateau.jpg',
-        size: (index === 4) ? 'large' : 'small', // Make the 5th item large
+        size: 'small', // On force 'small' pour que tout soit uniforme et compact
         childTitles: getAllChildTitles(cat.children || []),
       }));
       setCategories(displayCategories);
     } catch (error: any) {
-      console.error('Failed to fetch categories:', error);
       setError(error?.message || 'Erreur de chargement');
     } finally {
       setLoading(false);
@@ -115,123 +103,73 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick }) => {
   };
 
   const handleCategoryClick = (categoryId: number, categoryTitle: string) => {
-    if (onCategoryClick) {
-      onCategoryClick(categoryId, categoryTitle);
-    }
-    navigate(`/products?category=${categoryId}&title=${encodeURIComponent(categoryTitle)}`);
+    setSelectedCat({ id: categoryId, title: categoryTitle });
+    if (onCategoryClick) onCategoryClick(categoryId, categoryTitle);
+    
+    // Scroll vers les produits après un court délai
+    setTimeout(() => {
+      productsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
-  if (loading) {
-    return (
-      <section
-        className="relative py-20 px-6"
-        style={{
-          fontFamily: styles.fontSans,
-          backgroundColor: 'rgba(249, 247, 242, 0.85)',
-        }}
-      >
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C5A065] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Chargement des catégories...</p>
-        </div>
-      </section>
-    );
-  }
-
-  if (error) {
-    return (
-      <section
-        className="relative py-20 px-6"
-        style={{
-          fontFamily: styles.fontSans,
-          backgroundColor: 'rgba(249, 247, 242, 0.85)',
-        }}
-      >
-        <div className="max-w-7xl mx-auto text-center">
-          <p className="text-red-500 text-lg mb-4">Erreur: {error}</p>
-          <button
-            onClick={() => { setError(null); fetchCategories(); }}
-            className="px-6 py-2 rounded-lg text-white transition-colors"
-            style={{ backgroundColor: styles.gold }}
-          >
-            Réessayer
-          </button>
-        </div>
-      </section>
-    );
-  }
+  if (loading) return <div className="py-20 text-center">Chargement...</div>;
 
   return (
-    <section
-      className="relative py-20 px-6"
-      style={{
-        fontFamily: styles.fontSans,
-        backgroundColor: 'rgba(249, 247, 242, 0.85)', 
-      }}
-    >
-      <div className="max-w-7xl mx-auto" style={{ position: 'relative', zIndex: 1 }}>
-
-        <div className="text-center mb-16 space-y-4">
-          <h2 className="text-5xl md:text-6xl" style={{ fontFamily: styles.fontScript, color: styles.gold }}>
-            Bienvenue sur notre boutique en ligne
-          </h2>
-          <div className="flex flex-col items-center gap-2">
-            <p className="uppercase tracking-[0.2em] text-xs font-bold" style={{ color: styles.text }}>
-              Collecte gratuite dans nos 2 boutiques
-            </p>
-            <div className="h-px w-24" style={{ backgroundColor: styles.gold }}></div>
+    <div className="flex flex-col bg-[#F9F7F2]">
+      <section className="relative py-12 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-10 space-y-4">
+            <h2 className="text-4xl md:text-5xl" style={{ fontFamily: styles.fontScript, color: styles.gold }}>
+              Notre Boutique
+            </h2>
+            <p className="uppercase tracking-widest text-xs font-bold">Sélectionnez une catégorie</p>
           </div>
-          <p className="text-sm font-medium opacity-70" style={{ color: styles.text }}>
-            DÉLAI DE 48H POUR TRAITER VOTRE COMMANDE
-          </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]">
-          {categories.map((cat, index) => (
-            <div
-              key={`category-${cat.id}-${index}`}
-              onClick={() => handleCategoryClick(cat.id, cat.title)}
-              className={`group overflow-hidden rounded-2xl shadow-sm transition-all duration-500 hover:shadow-xl cursor-pointer
-                ${cat.size === 'large' ? 'md:col-span-2' : 'md:col-span-1'}`}
-              style={{ position: 'relative', isolation: 'isolate' }}
-            >
-              <img
-                src={getImageUrl(cat.image)}
-                alt={cat.title}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                style={{ zIndex: 1 }}
-              />
-
-              <div
-                className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition-opacity"
-                style={{ zIndex: 2 }}
-              />
-
-              <div
-                className="absolute inset-0 p-8 flex flex-col justify-end"
-                style={{ zIndex: 3 }}
-              >
-                <h3 className="text-white text-2xl font-semibold tracking-wide uppercase transition-transform duration-500 group-hover:-translate-y-2">
-                  {cat.title}
-                </h3>
-                {cat.childTitles.length > 0 && (
-                  <p className="text-white/80 text-xs tracking-wide mt-2 line-clamp-2">
-                    {cat.childTitles.join(' • ')}
-                  </p>
-                )}
+          {/* GRILLE COMPACTE */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {categories.map((cat) => {
+              const isSelected = selectedCat?.id === cat.id;
+              return (
                 <div
-                  className="h-1 w-0 group-hover:w-16 transition-all duration-500"
-                  style={{ backgroundColor: styles.gold }}
-                />
-                <span className="text-white/0 group-hover:text-white text-xs uppercase tracking-[0.2em] mt-4 transition-all duration-500">
-                  Voir la sélection →
-                </span>
-              </div>
-            </div>
-          ))}
+                  key={cat.id}
+                  onClick={() => handleCategoryClick(cat.id, cat.title)}
+                  className={`group relative h-32 md:h-40 overflow-hidden rounded-xl cursor-pointer transition-all duration-300
+                    ${isSelected ? 'ring-4 ring-[#C5A065] shadow-inner' : 'hover:shadow-md'}`}
+                >
+                  <img
+                    src={getImageUrl(cat.image)}
+                    alt={cat.title}
+                    className={`absolute inset-0 w-full h-full object-cover transition-all duration-500
+                      ${isSelected ? 'grayscale opacity-40 scale-100' : 'group-hover:scale-105'}`}
+                  />
+                  <div className={`absolute inset-0 flex items-center justify-center p-2 bg-black/30 group-hover:bg-black/20`}>
+                    <h3 className="text-white text-sm md:text-base font-bold uppercase text-center drop-shadow-md">
+                      {cat.title}
+                    </h3>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
+      </section>
+
+      {/* ZONE D'AFFICHAGE DES PRODUITS */}
+      <div ref={productsRef} className="min-h-screen">
+        {selectedCat ? (
+          <ProductSelection 
+            categoryId={selectedCat.id} 
+            categoryTitle={selectedCat.title}
+            onAddToCart={onAddToCart}
+            onBack={() => setSelectedCat(null)} // Optionnel: pour fermer la vue
+          />
+        ) : (
+          <div className="py-20 text-center text-stone-400 italic font-light">
+            Cliquez sur une catégorie pour découvrir nos délices...
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 };
 
