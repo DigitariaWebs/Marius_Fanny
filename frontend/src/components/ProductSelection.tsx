@@ -16,15 +16,15 @@ interface ApiCategoryNode extends CategoryType {
 }
 
 interface ProductSelectionProps {
-  categoryId: number;
-  categoryTitle: string;
+  categoryId?: number;
+  categoryTitle?: string;
   onBack?: () => void;
   onAddToCart: (product: any) => void;
 }
 
 const ProductSelection: React.FC<ProductSelectionProps> = ({
   categoryId,
-  categoryTitle,
+  categoryTitle = '',
   onBack,
   onAddToCart,
 }) => {
@@ -102,7 +102,9 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   useEffect(() => {
     if (products.length === 0) return;
     const targetCategoryName = subCategory ? subCategory.title : categoryTitle;
-    const filtered = products.filter(p => p.available && p.category.toLowerCase() === targetCategoryName.toLowerCase());
+    const filtered = targetCategoryName
+      ? products.filter(p => p.available && p.category.toLowerCase() === targetCategoryName.toLowerCase())
+      : products.filter(p => p.available);
     setFilteredProducts(filtered);
 
     const currentNode = flattenTree(categoryTree).find(c => c.id === (subCategory?.id || categoryId));
@@ -149,7 +151,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
     return price * (1 - discount / 100);
   };
 
-  const getRelatedProducts = (product: Product) => {
+  const getRelatedProducts = (product: Product): Product[] => {
     return [];
   };
 
