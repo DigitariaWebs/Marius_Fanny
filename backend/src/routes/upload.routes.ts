@@ -35,8 +35,9 @@ const getUploadStorage = () => {
   // Only use Cloudinary if properly configured
   if (hasValidConfig) {
     try {
+      const cloudinaryStorage = createCloudinaryStorage('products');
       console.log('📤 Using Cloudinary storage for uploads');
-      return createCloudinaryStorage('products');
+      return cloudinaryStorage;
     } catch (error) {
       console.warn('⚠️  Cloudinary error, falling back to local storage:', (error as any).message);
       return localStorage;
@@ -81,15 +82,13 @@ const handleMulterError = (err: any, req: Request, res: Response, next: NextFunc
 
 // Upload single image
 router.post('/single', requireAuth, requireRole('admin'), (req, res, next) => {
-  upload.single('image')(req, res, (err) => {
+  upload.single('image')(req, res, (err: any) => {
     if (err) {
-      console.error('❌ Upload error:', err.message);
+      console.error('❌ Upload error:', err.message || err);
       
       // Check if it's a Cloudinary authentication error
-      if (err.http_code === 403 || err.message?.includes('403')) {
-        console.warn('⚠️  Cloudinary credentials invalid - using local storage fallback');
-        // Don't fail - the storage has already fallen back to local
-        // This is expected behavior
+      if (err.http_code === 403 || err.message?.includes('403') || err.message?.includes('Unauthorized')) {
+        console.warn('⚠️  Cloudinary credentials invalid - check your API keys');
       }
       
       return res.status(400).json({ error: err.message || 'Upload failed' });
@@ -102,21 +101,23 @@ router.post('/single', requireAuth, requireRole('admin'), (req, res, next) => {
       }
 
       // Determine the URL based on storage type
-      const isCloudinary = (req.file as any).path && (req.file as any).path.includes('cloudinary');
+      // Cloudinary returns the full URL in the 'path' property
+      const file = req.file as any;
+      const isCloudinary = file.path && (file.path.includes('res.cloudinary.com') || file.path.includes('cloudinary'));
       let url: string;
       
       if (isCloudinary) {
-        url = (req.file as any).path;  // Cloudinary URL (already absolute)
+        url = file.path;  // Cloudinary URL (already absolute)
       } else {
         // For local storage, build a full absolute URL so it works from any frontend origin
-        const relativePath = `/uploads/${(req.file as any).filename}`;
+        const relativePath = `/uploads/${file.filename}`;
         const backendUrl = process.env.BETTER_AUTH_URL || `${req.protocol}://${req.get('host')}`;
         url = `${backendUrl}${relativePath}`;
       }
 
       const storageType = isCloudinary ? 'Cloudinary' : 'Local Storage';
       console.log(`✅ Image uploaded successfully using ${storageType}:`, {
-        filename: (req.file as any).filename,
+        filename: file.filename,
         url: url,
       });
 
@@ -124,7 +125,7 @@ router.post('/single', requireAuth, requireRole('admin'), (req, res, next) => {
       res.json({
         success: true,
         url: url,
-        public_id: (req.file as any).filename,
+        public_id: file.filename,
         storage: storageType,
       });
     } catch (error) {

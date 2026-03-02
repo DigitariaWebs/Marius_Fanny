@@ -4,8 +4,7 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 // Configure Cloudinary
 const hasValidConfig = process.env.CLOUDINARY_CLOUD_NAME && 
                       process.env.CLOUDINARY_API_KEY && 
-                      process.env.CLOUDINARY_API_SECRET &&
-                      process.env.CLOUDINARY_API_SECRET.length > 30; // API secrets should be 40+ chars
+                      process.env.CLOUDINARY_API_SECRET;
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -16,9 +15,6 @@ cloudinary.config({
 // Verify configuration
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
   console.warn('⚠️  Cloudinary configuration missing - using local file storage for uploads');
-} else if (!hasValidConfig) {
-  console.warn('⚠️  Cloudinary API secret appears incomplete - using local file storage for uploads');
-  console.warn('   (API secrets should be 40+ characters)');
 } else {
   console.log('✅ Cloudinary configured with cloud_name:', process.env.CLOUDINARY_CLOUD_NAME);
   console.log('✅ Cloudinary API key set:', process.env.CLOUDINARY_API_KEY ? '***' : 'missing');
