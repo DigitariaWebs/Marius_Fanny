@@ -102,23 +102,8 @@ async function initializeAuth() {
     });
   } catch (error) {
     console.error("❌ Failed to initialize auth:", error);
-    const isProduction = process.env.NODE_ENV === "production";
-    // Return a minimal auth instance that will fail gracefully
-    return betterAuth({
-      baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-      advanced: {
-        useSecureCookies: isProduction,
-        defaultCookieAttributes: {
-          sameSite: isProduction ? "none" : "lax",
-          secure: isProduction,
-          partitioned: isProduction,
-        },
-      },
-      secret: process.env.BETTER_AUTH_SECRET || "your-secret-key-change-in-production",
-      trustedOrigins: [
-        process.env.FRONTEND_URL || "http://localhost:5173",
-      ],
-    });
+    // Re-throw so the failed init is NOT cached and the next request retries
+    throw error;
   }
 }
 
@@ -132,10 +117,10 @@ export const auth = new Proxy({} as ReturnType<typeof betterAuth>, {
   },
 });
 
-// Initialize and cache
+// Initialize and cache (only cache on success)
 export async function getAuth() {
   if (!authInstance) {
-    authInstance = await initializeAuth();
+    authInstance = await initializeAuth(); // throws on failure → not cached
   }
   return authInstance;
 }
