@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { productAPI } from '../lib/ProductAPI';
 import { categoryAPI } from '../lib/CategoryAPI';
 import type { Product, Category as CategoryType } from '../types';
@@ -37,6 +38,9 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const [childCategories, setChildCategories] = useState<ApiCategoryNode[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [recommendationNotif, setRecommendationNotif] = useState<Product[]>([]);
+  const [showRecommendationNotif, setShowRecommendationNotif] = useState(false);
+  const [modalMainImage, setModalMainImage] = useState('');
 
   // States pour les options
   const [quantity, setQuantity] = useState(1);
@@ -68,6 +72,10 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   useEffect(() => {
     fetchData();
   }, [categoryId]);
+
+  useEffect(() => {
+    if (selectedProduct) setModalMainImage(selectedProduct.image || '');
+  }, [selectedProduct]);
 
   const fetchData = async () => {
     try {
@@ -169,9 +177,16 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   };
 
   const getPreparationBadge = (hours: number) => {
-    if (hours >= 48) {
+    if (hours >= 168) {
       return {
-        text: '48h',
+        text: '7j',
+        bgColor: 'bg-amber-100',
+        textColor: 'text-amber-800',
+        borderColor: 'border-amber-300',
+      };
+    } else if (hours >= 48) {
+      return {
+        text: `${hours}h`,
         bgColor: 'bg-amber-100',
         textColor: 'text-amber-800',
         borderColor: 'border-amber-300',
@@ -207,6 +222,15 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
         selectedOptions: selectedOptions 
       };
       for (let i = 0; i < quantity; i++) onAddToCart(p);
+
+      // Afficher les recommandations comme notification
+      const related = getRelatedProducts(selectedProduct);
+      if (related.length > 0) {
+        setRecommendationNotif(related);
+        setShowRecommendationNotif(true);
+        setTimeout(() => setShowRecommendationNotif(false), 1000000);
+      }
+
       setSelectedProduct(null);
     }
   };
@@ -215,6 +239,52 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
   return (
     <div className="py-8 px-4 md:px-8 bg-white/50 backdrop-blur-sm animate-in fade-in duration-500" style={{ fontFamily: '"Century Gothic", sans-serif' }}>
+
+      {/* NOTIFICATION RECOMMANDATIONS */}
+      {showRecommendationNotif && recommendationNotif.length > 0 && (
+        <div className="fixed top-6 left-6 z-[99999] w-80 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className="bg-[#2D2A26] px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">✨</span>
+              <p className="text-white text-xs font-bold uppercase tracking-widest">Vous aimerez aussi</p>
+            </div>
+            <button
+              onClick={() => setShowRecommendationNotif(false)}
+              className="text-white/60 hover:text-white transition-colors text-lg leading-none"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="p-3 space-y-2 max-h-72 overflow-y-auto">
+            {recommendationNotif.map((rec) => {
+              const recPrice = getDiscountedPrice(rec.price, rec.discountPercentage);
+              return (
+                <div key={rec.id} className="flex items-center gap-3 bg-stone-50 rounded-xl p-2 hover:bg-stone-100 transition-colors">
+                  <img
+                    src={getImageUrl(rec.image)}
+                    alt={rec.name}
+                    className="w-14 h-14 rounded-lg object-cover shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#2D2A26] truncate">{rec.name}</p>
+                    <p className="text-sm font-bold text-[#337957]">{recPrice.toFixed(2)} $</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddToCart({ ...rec, price: recPrice });
+                      setShowRecommendationNotif(false);
+                    }}
+                    className="shrink-0 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-[#337957] text-white hover:bg-[#2D2A26] transition-colors"
+                  >
+                    + Panier
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto">
         
         {/* Navigation interne */}
@@ -322,7 +392,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
       {/* MODAL PRODUIT - SANS FOND NOIR */}
 
-      {selectedProduct && (
+      {selectedProduct && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           {/* Fond transparent au lieu de noir */}
           <div
@@ -339,21 +409,54 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
               ✕
             </button>
 
-            <div className="w-full md:w-1/2 h-64 md:h-auto shrink-0 relative">
-              <img
-                src={getImageUrl(selectedProduct.image)}
-                alt={selectedProduct.name}
-                className="w-full h-full object-cover"
-              />
-              
-              {/* Étiquette sur l'image de la modal */}
-              {selectedProduct.preparationTimeHours && selectedProduct.preparationTimeHours >= 24 && (
-                <div className="absolute top-4 left-4 bg-amber-100 text-amber-800 text-sm font-bold px-4 py-2 rounded-sm border border-amber-300 shadow-md uppercase tracking-wider">
-                  {selectedProduct.preparationTimeHours >= 48 ? '48h' : '24h'}
+            <div className="w-full md:w-1/2 shrink-0 flex flex-col">
+              <div className="relative flex-1 h-56 md:h-auto min-h-0">
+                <img
+                  src={getImageUrl(modalMainImage || selectedProduct.image)}
+                  alt={selectedProduct.name}
+                  className="w-full h-full object-cover"
+                />
+                
+                {/* Étiquette sur l'image de la modal */}
+                {selectedProduct.preparationTimeHours && selectedProduct.preparationTimeHours >= 24 && (
+                  <div className="absolute top-4 left-4 bg-amber-100 text-amber-800 text-sm font-bold px-4 py-2 rounded-sm border border-amber-300 shadow-md uppercase tracking-wider">
+                    {selectedProduct.preparationTimeHours >= 168 ? '7j' : selectedProduct.preparationTimeHours >= 48 ? `${selectedProduct.preparationTimeHours}h` : '24h'}
+                  </div>
+                )}
+                
+                <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent md:hidden"></div>
+              </div>
+
+              {/* Galerie de photos supplémentaires */}
+              {selectedProduct.images && selectedProduct.images.length > 0 && (
+                <div className="flex gap-2 p-2 bg-gray-50 overflow-x-auto shrink-0">
+                  {/* Miniature de la photo principale */}
+                  <button
+                    type="button"
+                    onClick={() => setModalMainImage(selectedProduct.image || '')}
+                    className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
+                      (modalMainImage === selectedProduct.image || (!modalMainImage && true))
+                        ? 'border-[#337957]'
+                        : 'border-gray-200'
+                    }`}
+                  >
+                    <img src={getImageUrl(selectedProduct.image)} alt="" className="w-full h-full object-cover" />
+                  </button>
+                  {/* Miniatures des photos supplémentaires */}
+                  {selectedProduct.images.map((img, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setModalMainImage(img)}
+                      className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-all shrink-0 ${
+                        modalMainImage === img ? 'border-[#337957]' : 'border-gray-200'
+                      }`}
+                    >
+                      <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
                 </div>
               )}
-              
-              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent md:hidden"></div>
             </div>
 
             <div className="w-full md:w-1/2 flex flex-col h-[60vh] md:h-[80vh] overflow-hidden">
@@ -508,7 +611,9 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                     className="mb-6 p-4 rounded-lg border"
                     style={{
                       backgroundColor:
-                        selectedProduct.preparationTimeHours >= 48
+                        selectedProduct.preparationTimeHours >= 168
+                          ? "#fffbeb"
+                          : selectedProduct.preparationTimeHours >= 48
                           ? "#fffbeb"
                           : selectedProduct.preparationTimeHours >= 24
                           ? "#fefce8"
@@ -516,7 +621,9 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                           ? "#fffbeb"
                           : "#f0fdf4",
                       borderColor:
-                        selectedProduct.preparationTimeHours >= 48
+                        selectedProduct.preparationTimeHours >= 168
+                          ? "#fcd34d"
+                          : selectedProduct.preparationTimeHours >= 48
                           ? "#fcd34d"
                           : selectedProduct.preparationTimeHours >= 24
                           ? "#fde047"
@@ -530,7 +637,9 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                         className="text-xs font-bold uppercase tracking-widest"
                         style={{
                           color:
-                            selectedProduct.preparationTimeHours >= 48
+                            selectedProduct.preparationTimeHours >= 168
+                              ? "#b45309"
+                              : selectedProduct.preparationTimeHours >= 48
                               ? "#b45309"
                               : selectedProduct.preparationTimeHours >= 24
                               ? "#a16207"
@@ -546,7 +655,9 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                       className="text-sm font-medium"
                       style={{
                         color:
-                          selectedProduct.preparationTimeHours >= 48
+                          selectedProduct.preparationTimeHours >= 168
+                            ? "#b45309"
+                            : selectedProduct.preparationTimeHours >= 48
                             ? "#b45309"
                             : selectedProduct.preparationTimeHours >= 24
                             ? "#a16207"
@@ -608,41 +719,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                   </>
                 )}
 
-                {getRelatedProducts(selectedProduct).length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-xs font-bold uppercase mb-2 text-stone-500 flex items-center gap-2">
-                      <span className="w-1 h-4 bg-[#337957] rounded-full"></span>
-                       Recommandations
-                    </h4>
-                    <div className="space-y-2">
-                      {getRelatedProducts(selectedProduct).map((related) => (
-                        <div key={related.id} className="flex items-center justify-between border border-stone-200 rounded-lg p-2">
-                          <div>
-                            <p className="text-sm font-medium text-stone-700">{related.name}</p>
-                            <p className="text-xs text-stone-500">
-                              {getDiscountedPrice(related.price, related.discountPercentage).toFixed(2)} $
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onAddToCart({
-                                ...related,
-                                price: getDiscountedPrice(
-                                  related.price,
-                                  related.discountPercentage,
-                                ),
-                              })
-                            }
-                            className="px-3 py-1 text-xs font-bold rounded bg-[#2D2A26] text-white hover:bg-[#337957] transition-colors"
-                          >
-                            Ajouter
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
 
                 {/* ESPACE SUPPLÉMENTAIRE POUR LE SCROLL */}
                 <div className="h-12 md:h-8"></div>
@@ -683,7 +760,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 };

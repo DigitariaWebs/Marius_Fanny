@@ -11,6 +11,7 @@ export interface IProduct {
   maxOrderQuantity: number;
   description?: string;
   image?: string;
+  images?: string[];
   createdAt: Date;
   updatedAt: Date;
   sales?: number;
@@ -39,6 +40,7 @@ const productSchema = new Schema<IProduct>({
   maxOrderQuantity: { type: Number, required: true, default: 10 },
   description: { type: String },
   image: { type: String },
+  images: [{ type: String }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   sales: { type: Number, default: 0 },

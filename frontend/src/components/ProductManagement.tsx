@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Plus,
   Search,
@@ -26,7 +26,7 @@ import { ImageUpload } from "./ImageUpload";
 import type { Product, Category } from "../types";
 import { productAPI } from "../lib/ProductAPI";
 import { categoryAPI } from "../lib/CategoryAPI";
-import { getImageUrl } from "../utils/api";
+import { getImageUrl, API_URL } from "../utils/api";
 import {
   formatChoiceDisplay,
   formatChoiceForSaving,
@@ -51,6 +51,7 @@ type ProductFormState = {
   availableDays: number[];
   description: string;
   image: string;
+  images: string[];
   available: boolean;
   minOrderQuantity: string;
   maxOrderQuantity: string;
@@ -83,6 +84,7 @@ const createDefaultProductForm = (category = ""): ProductFormState => ({
   availableDays: [],
   description: "",
   image: "",
+  images: [],
   available: true,
   minOrderQuantity: "1",
   maxOrderQuantity: "10",
@@ -130,6 +132,28 @@ export function ProductManagement() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingExtra, setUploadingExtra] = useState(false);
+  const extraImageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExtraImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 5 * 1024 * 1024) return;
+    setUploadingExtra(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch(`${API_URL}/api/upload/single`, { method: 'POST', body: formData, credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setProductForm(f => ({ ...f, images: [...f.images, getImageUrl(data.url)] }));
+      }
+    } finally {
+      setUploadingExtra(false);
+      if (extraImageInputRef.current) extraImageInputRef.current.value = '';
+    }
+  };
 
   const [productForm, setProductForm] = useState<ProductFormState>(
     createDefaultProductForm(),
@@ -262,6 +286,7 @@ export function ProductManagement() {
       availableDays: product.availableDays || [],
       description: product.description || "",
       image: product.image || "",
+      images: product.images || [],
       available: product.available,
       minOrderQuantity: product.minOrderQuantity.toString(),
       maxOrderQuantity: product.maxOrderQuantity.toString(),
@@ -307,6 +332,7 @@ export function ProductManagement() {
         availableDays: productForm.availableDays.length > 0 ? productForm.availableDays : undefined,
         description: productForm.description || undefined,
         image: productForm.image || undefined,
+        images: productForm.images.length > 0 ? productForm.images : undefined,
         available: productForm.available,
         minOrderQuantity: parseInt(productForm.minOrderQuantity),
         maxOrderQuantity: parseInt(productForm.maxOrderQuantity),
@@ -322,7 +348,7 @@ export function ProductManagement() {
       };
 
       const response = await productAPI.createProduct(productData);
-      setProducts([...products, response.data!]);
+      await fetchData();
       setIsCreateModalOpen(false);
       setProductForm(
         createDefaultProductForm(
@@ -348,6 +374,7 @@ export function ProductManagement() {
         availableDays: productForm.availableDays.length > 0 ? productForm.availableDays : undefined,
         description: productForm.description || undefined,
         image: productForm.image || undefined,
+        images: productForm.images.length > 0 ? productForm.images : undefined,
         available: productForm.available,
         minOrderQuantity: parseInt(productForm.minOrderQuantity),
         maxOrderQuantity: parseInt(productForm.maxOrderQuantity),
@@ -363,11 +390,7 @@ export function ProductManagement() {
       };
 
       const response = await productAPI.updateProduct(selectedProduct.id, productData);
-      setProducts(
-        products.map((p) =>
-          p.id === selectedProduct.id ? response.data! : p,
-        ),
-      );
+      await fetchData();
       setIsEditModalOpen(false);
       setSelectedProduct(null);
       setProductForm(
@@ -637,6 +660,24 @@ export function ProductManagement() {
               />
             </div>
 
+            {/* PHOTOS SUPPLÉMENTAIRES */}
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-gray-700">Photos supplémentaires</label>
+              <input ref={extraImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleExtraImageUpload} />
+              <div className="flex flex-wrap gap-2 mt-2">
+                {productForm.images.map((img, idx) => (
+                  <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => setProductForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }))} className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"><X size={10} /></button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => extraImageInputRef.current?.click()} disabled={uploadingExtra} className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-[#C5A065] transition-colors text-gray-400 hover:text-[#C5A065] disabled:opacity-50">
+                  {uploadingExtra ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#C5A065]" /> : <><Plus size={18} /><span className="text-[10px] mt-1">Ajouter</span></>}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">Ajoutez jusqu'à 5 photos supplémentaires</p>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 Catégorie *
@@ -746,6 +787,7 @@ export function ProductManagement() {
                 <option value="24">24 heures (1 jour)</option>
                 <option value="48">48 heures (2 jours)</option>
                 <option value="72">72 heures (3 jours)</option>
+                <option value="168">7 jours</option>
               </select>
               <p className="text-xs text-gray-500">
                 Délai nécessaire pour préparer ce produit
@@ -1137,6 +1179,24 @@ export function ProductManagement() {
               />
             </div>
 
+            {/* PHOTOS SUPPLÉMENTAIRES */}
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-gray-700">Photos supplémentaires</label>
+              <input ref={extraImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleExtraImageUpload} />
+              <div className="flex flex-wrap gap-2 mt-2">
+                {productForm.images.map((img, idx) => (
+                  <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => setProductForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }))} className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600"><X size={10} /></button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => extraImageInputRef.current?.click()} disabled={uploadingExtra} className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-[#C5A065] transition-colors text-gray-400 hover:text-[#C5A065] disabled:opacity-50">
+                  {uploadingExtra ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#C5A065]" /> : <><Plus size={18} /><span className="text-[10px] mt-1">Ajouter</span></>}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">Ajoutez jusqu'à 5 photos supplémentaires</p>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 Catégorie *
@@ -1245,6 +1305,7 @@ export function ProductManagement() {
                 <option value="24">24 heures (1 jour)</option>
                 <option value="48">48 heures (2 jours)</option>
                 <option value="72">72 heures (3 jours)</option>
+                <option value="168">7 jours</option>
               </select>
               <p className="text-xs text-gray-500">
                 Délai nécessaire pour préparer ce produit

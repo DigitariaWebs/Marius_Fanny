@@ -15,6 +15,7 @@ export interface CreateProductData {
   maxOrderQuantity?: number;
   description?: string;
   image?: string;
+  images?: string[];
   preparationTimeHours?: number;
   availableDays?: number[];
   hasTaxes?: boolean;
@@ -25,6 +26,7 @@ export interface CreateProductData {
     name: string;
     choices: string[];
   }>;
+  recommendations?: number[];
 }
 
 export interface UpdateProductData {
@@ -37,6 +39,7 @@ export interface UpdateProductData {
   maxOrderQuantity?: number;
   description?: string;
   image?: string;
+  images?: string[];
   preparationTimeHours?: number;
   availableDays?: number[];
   hasTaxes?: boolean;
@@ -47,6 +50,7 @@ export interface UpdateProductData {
     name: string;
     choices: string[];
   }>;
+  recommendations?: number[];
 }
 
 export interface ApiResponse<T> {

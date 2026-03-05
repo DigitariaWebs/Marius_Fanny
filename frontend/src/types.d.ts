@@ -29,6 +29,7 @@ export interface Product {
   maxOrderQuantity: number;
   description?: string;
   image?: string;
+  images?: string[];
   createdAt: string;
   updatedAt: string;
   sales?: number;
