@@ -39,7 +39,7 @@ const Hero = () => {
       </video>
 
       {/* OVERLAY SOMBRE pour lisibilité */}
-      <div className="absolute inset-0 bg-black/50 z-[1]" />
+      <div className="absolute inset-0 bg-black/30 z-[1]" />
 
       {/* CONTENU CENTRAL */}
       <div className="relative z-[10] flex flex-col items-center text-center px-6 max-w-full py-10 md:py-20">
@@ -47,7 +47,7 @@ const Hero = () => {
           ref={logoRef}
           src="/logo.avif"
           alt="Marius & Fanny Logo"
-          className="w-56 sm:w-72 md:w-96 lg:w-[480px] h-auto object-contain drop-shadow-xl mx-auto mb-8 md:mb-12"
+          className="w-40 sm:w-52 md:w-64 lg:w-80 h-auto object-contain drop-shadow-xl mx-auto mb-8 md:mb-12 mt-16 md:mt-20"
         />
 
         <div ref={contentRef} className="flex flex-col items-center">
@@ -66,7 +66,7 @@ const Hero = () => {
                 navigate("/products");
               }
             }}
-            className="bg-[#337957] text-bakery-dark px-8 py-3 md:px-10 md:py-4 rounded-sm font-bold uppercase tracking-widest text-xs md:text-sm hover:bg-white hover:scale-105 transition-all duration-300 shadow-[0_10px_30px_rgba(197,160,101,0.3)] hover:shadow-[0_15px_40px_rgba(197,160,101,0.4)]"
+            className="bg-white text-[#2D2A26] px-8 py-3 md:px-10 md:py-4 rounded-sm font-bold uppercase tracking-widest text-xs md:text-sm hover:bg-[#337957] hover:text-white hover:scale-105 transition-all duration-300 shadow-[0_10px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_15px_40px_rgba(0,0,0,0.3)]"
           >
             Commander maintenant
           </button>

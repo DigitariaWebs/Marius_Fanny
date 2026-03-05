@@ -303,7 +303,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                           {product.price.toFixed(2)}$
                         </span>
                       )}
-                      <span className="text-[#337957] font-bold text-xs">
+                      <span className="text-white font-bold text-xs drop-shadow">
                         {discountedPrice.toFixed(2)} $
                       </span>
                     </div>

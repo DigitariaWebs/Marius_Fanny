@@ -52,7 +52,7 @@ export function CategoryManagement() {
     try {
       setLoading(true);
       setError(null);
-      const response = await categoryAPI.getAllCategoriesAdmin();
+      const response = await categoryAPI.getAllCategoriesAdmin(1, 1000);
       setCategories(response.data.categories);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch categories');

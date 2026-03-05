@@ -126,7 +126,7 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart })
           </div>
 
           {/* GRILLE COMPACTE */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {categories.map((cat) => {
               const isSelected = selectedCat?.id === cat.id;
               return (
@@ -155,19 +155,15 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart })
       </section>
 
       {/* ZONE D'AFFICHAGE DES PRODUITS */}
-      <div ref={productsRef} className="min-h-screen">
+      <div ref={productsRef}>
         {selectedCat ? (
           <ProductSelection 
             categoryId={selectedCat.id} 
             categoryTitle={selectedCat.title}
             onAddToCart={onAddToCart}
-            onBack={() => setSelectedCat(null)} // Optionnel: pour fermer la vue
+            onBack={() => setSelectedCat(null)}
           />
-        ) : (
-          <div className="py-20 text-center text-stone-400 italic font-light">
-            Cliquez sur une catégorie pour découvrir nos délices...
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -31,6 +31,10 @@ interface CheckoutState {
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
   const state = location.state as CheckoutState;
 
   const [customerName, setCustomerName] = useState("");

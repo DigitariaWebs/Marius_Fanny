@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authClient } from "../lib/AuthClient";
 import GoldenBackground from "./GoldenBackground";
@@ -47,6 +47,10 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
   const [isVerificationSent, setIsVerificationSent] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
 
   // Form fields
   const [formData, setFormData] = useState({
