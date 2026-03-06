@@ -37,6 +37,11 @@ class DailyInventoryAPI {
       credentials: "include",
     });
 
+    if (response.status === 401) {
+      window.location.href = "/se-connecter";
+      throw new Error("Session expirée. Veuillez vous reconnecter.");
+    }
+
     if (!response.ok) {
       const errorData = await response
         .json()

@@ -145,6 +145,11 @@ const PatissierDashboard: React.FC = () => {
         }
       );
 
+      if (response.status === 401) {
+        navigate("/se-connecter");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`Erreur ${response.status}: ${response.statusText}`);
       }
