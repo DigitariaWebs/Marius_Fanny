@@ -1,7 +1,32 @@
 import * as nodemailer from "nodemailer";
+import { Resend } from "resend";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// Resend client — used for transactional emails (better deliverability)
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+const FROM_EMAIL = process.env.EMAIL_USER || "noreply@marius-fanny.com";
+
+/**
+ * Send an email via Resend if API key is set, else fall back to Nodemailer.
+ */
+async function sendEmail(opts: {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  if (resend) {
+    const { error } = await resend.emails.send(opts);
+    if (error) throw new Error(`Resend error: ${error.message}`);
+  } else {
+    await transporter.sendMail({ ...opts, replyTo: opts.from });
+  }
+}
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -151,6 +176,323 @@ export async function sendPasswordResetEmail(
 }
 
 export default transporter;
+
+/**
+ * Send partner request notification email to admin
+ */
+export async function sendPartnerRequestEmail(
+  adminEmail: string,
+  applicant: {
+    businessName: string;
+    contactName: string;
+    email: string;
+    phone: string;
+    address: string;
+  },
+  approvalLink: string,
+): Promise<void> {
+  try {
+    const mailOptions = {
+      from: FROM_EMAIL,
+      to: adminEmail,
+      subject: `🤝 Nouvelle demande partenaire Pro - ${applicant.businessName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #F9F7F2; border-radius: 10px;">
+
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #337957; font-size: 32px; margin: 0;">
+              Marius &amp; Fanny
+            </h1>
+            <p style="color: #888; font-size: 13px; margin-top: 4px;">Panneau d'administration</p>
+          </div>
+
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #2D2A26; margin-bottom: 20px; border-bottom: 2px solid #337957; padding-bottom: 10px;">
+              📋 Nouvelle demande de compte Pro
+            </h2>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+              <tr>
+                <td style="padding: 8px 12px; background: #F9F7F2; border-radius: 4px; color: #888; font-size: 12px; font-weight: bold; width: 40%;">ENTREPRISE</td>
+                <td style="padding: 8px 12px; color: #2D2A26; font-size: 15px; font-weight: bold;">${applicant.businessName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; color: #888; font-size: 12px; font-weight: bold;">CONTACT</td>
+                <td style="padding: 8px 12px; color: #2D2A26; font-size: 15px;">${applicant.contactName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; background: #F9F7F2; border-radius: 4px; color: #888; font-size: 12px; font-weight: bold;">EMAIL</td>
+                <td style="padding: 8px 12px; background: #F9F7F2; color: #337957; font-size: 15px;">${applicant.email}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; color: #888; font-size: 12px; font-weight: bold;">TÉLÉPHONE</td>
+                <td style="padding: 8px 12px; color: #2D2A26; font-size: 15px;">${applicant.phone}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; background: #F9F7F2; border-radius: 4px; color: #888; font-size: 12px; font-weight: bold;">ADRESSE</td>
+                <td style="padding: 8px 12px; background: #F9F7F2; color: #2D2A26; font-size: 15px;">${applicant.address}</td>
+              </tr>
+            </table>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${approvalLink}"
+                 style="display: inline-block; padding: 15px 40px; background-color: #337957; color: white;
+                        text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                ✅ Approuver ce partenaire
+              </a>
+            </div>
+
+            <p style="color: #999; text-align: center; font-size: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+              Ce lien d'approbation est valide pendant <strong>48 heures</strong>.
+            </p>
+            <p style="color: #bbb; text-align: center; font-size: 11px;">
+              Si vous ne reconnaissez pas cette demande, ignorez simplement cet email.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>© 2024 Marius &amp; Fanny. Tous droits réservés.</p>
+          </div>
+
+        </div>
+      `,
+    };
+
+    await sendEmail(mailOptions);
+    console.log("✅ Email demande partenaire envoyé à l'admin");
+  } catch (error) {
+    console.error("❌ Erreur lors de l'envoi de l'email admin:", error);
+    throw error;
+  }
+}
+
+/**
+ * Send approval confirmation email to the new partner
+ */
+export async function sendPartnerApprovedEmail(
+  email: string,
+  contactName: string,
+  businessName: string,
+  loginUrl: string,
+): Promise<void> {
+  try {
+    const mailOptions = {
+      from: FROM_EMAIL,
+      to: email,
+      subject: `🎉 Votre compte Pro a été approuvé - Marius & Fanny`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #F9F7F2; border-radius: 10px;">
+
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #337957; font-size: 32px; margin: 0;">Marius &amp; Fanny</h1>
+          </div>
+
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <div style="display: inline-block; background-color: #337957; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 14px;">
+                ✅ COMPTE PRO APPROUVÉ
+              </div>
+            </div>
+
+            <h2 style="color: #2D2A26; text-align: center; margin-bottom: 20px;">
+              Félicitations ${contactName} ! 🎉
+            </h2>
+
+            <p style="color: #555; line-height: 1.6; text-align: center; margin-bottom: 25px;">
+              Votre demande de compte professionnel pour <strong>${businessName}</strong> a été approuvée.
+              Vous pouvez maintenant vous connecter et accéder à tous les avantages partenaires.
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${loginUrl}"
+                 style="display: inline-block; padding: 15px 40px; background-color: #337957; color: white;
+                        text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                🚀 Accéder à mon espace Pro
+              </a>
+            </div>
+
+            <p style="color: #999; text-align: center; font-size: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+              Connectez-vous avec l'email <strong>${email}</strong> et le mot de passe que vous avez choisi lors de votre inscription.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>© 2024 Marius &amp; Fanny. Tous droits réservés.</p>
+          </div>
+
+        </div>
+      `,
+    };
+
+    await sendEmail(mailOptions);
+    console.log("✅ Email confirmation partenaire approuvé envoyé");
+  } catch (error) {
+    console.error("❌ Erreur envoi email approbation partenaire:", error);
+    // Don't throw - approval should not fail because of email
+  }
+}
+
+/**
+ * Send partner inquiry notification email to admin (from homepage wholesale form)
+ * This is a contact/inquiry — no account creation, just notification.
+ */
+export async function sendPartnerInquiryEmail(
+  adminEmail: string,
+  data: {
+    companyName: string;
+    contactName: string;
+    email: string;
+    phone: string;
+    businessType: string;
+    message: string;
+  },
+  inviteUrl: string,
+): Promise<void> {
+  try {
+    const mailOptions = {
+      from: `"Marius & Fanny - Espace Pro" <${FROM_EMAIL}>`,
+      to: adminEmail,
+      subject: `Nouvelle demande de renseignements Pro - ${data.companyName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #F9F7F2; border-radius: 10px;">
+
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #337957; font-size: 32px; margin: 0;">Marius &amp; Fanny</h1>
+            <p style="color: #888; font-size: 13px; margin-top: 4px;">Espace Professionnel</p>
+          </div>
+
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #2D2A26; margin-bottom: 20px; border-bottom: 2px solid #337957; padding-bottom: 10px;">
+              📋 Demande de renseignements Pro
+            </h2>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+              <tr>
+                <td style="padding: 8px 12px; background: #F9F7F2; border-radius: 4px; color: #888; font-size: 12px; font-weight: bold; width: 40%;">ENTREPRISE</td>
+                <td style="padding: 8px 12px; color: #2D2A26; font-size: 15px; font-weight: bold;">${data.companyName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; color: #888; font-size: 12px; font-weight: bold;">CONTACT</td>
+                <td style="padding: 8px 12px; color: #2D2A26; font-size: 15px;">${data.contactName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; background: #F9F7F2; color: #888; font-size: 12px; font-weight: bold;">EMAIL</td>
+                <td style="padding: 8px 12px; background: #F9F7F2; color: #337957; font-size: 15px;">${data.email}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; color: #888; font-size: 12px; font-weight: bold;">TÉLÉPHONE</td>
+                <td style="padding: 8px 12px; color: #2D2A26; font-size: 15px;">${data.phone}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; background: #F9F7F2; color: #888; font-size: 12px; font-weight: bold;">TYPE D'ACTIVITÉ</td>
+                <td style="padding: 8px 12px; background: #F9F7F2; color: #2D2A26; font-size: 15px;">${data.businessType}</td>
+              </tr>
+              ${data.message ? `
+              <tr>
+                <td style="padding: 8px 12px; color: #888; font-size: 12px; font-weight: bold; vertical-align: top;">MESSAGE</td>
+                <td style="padding: 8px 12px; color: #2D2A26; font-size: 15px;">${data.message}</td>
+              </tr>` : ""}
+            </table>
+
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="${inviteUrl}"
+                 style="display: inline-block; padding: 14px 36px; background-color: #337957; color: white;
+                        text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">
+                ✅ Approuver le partenaire &amp; envoyer l'invitation
+              </a>
+            </div>
+
+            <p style="color: #555; font-size: 13px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; text-align: center;">
+              En cliquant ce bouton, le prospect recevra automatiquement un email l'invitant à compléter son inscription sur votre plateforme.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>© 2024 Marius &amp; Fanny. Tous droits réservés.</p>
+          </div>
+
+        </div>
+      `,
+    };
+
+    await sendEmail(mailOptions);
+    console.log("✅ Email demande renseignements pro envoyé à l'admin");
+  } catch (error) {
+    console.error("❌ Erreur lors de l'envoi de l'email demande pro:", error);
+    throw error;
+  }
+}
+
+/**
+ * Send partner invitation email to the prospect (triggered by admin approval of an inquiry)
+ */
+export async function sendPartnerInvitationEmail(
+  prospectEmail: string,
+  contactName: string,
+  companyName: string,
+  registrationUrl: string,
+): Promise<void> {
+  try {
+    const mailOptions = {
+      from: `"Marius & Fanny" <${FROM_EMAIL}>`,
+      replyTo: "fanny.chiecchio@gmail.com",
+      to: prospectEmail,
+      subject: `Votre demande partenaire a été approuvée - Marius & Fanny`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #F9F7F2; border-radius: 10px;">
+
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #337957; font-size: 32px; margin: 0;">Marius &amp; Fanny</h1>
+            <p style="color: #888; font-size: 13px; margin-top: 4px;">Espace Professionnel</p>
+          </div>
+
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <div style="display: inline-block; background-color: #337957; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 14px;">
+                ✅ DEMANDE APPROUVÉE
+              </div>
+            </div>
+
+            <h2 style="color: #2D2A26; text-align: center; margin-bottom: 16px;">
+              Bonjour ${contactName} 👋
+            </h2>
+
+            <p style="color: #555; line-height: 1.7; text-align: center; margin-bottom: 25px;">
+              Nous avons examiné votre demande de partenariat pour <strong>${companyName}</strong> et nous sommes ravis de vous inviter à rejoindre notre réseau professionnel.
+            </p>
+
+            <p style="color: #555; line-height: 1.7; text-align: center; margin-bottom: 30px;">
+              Pour finaliser la création de votre compte Pro, cliquez sur le bouton ci-dessous et complétez le formulaire d'inscription :
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${registrationUrl}"
+                 style="display: inline-block; padding: 15px 40px; background-color: #337957; color: white;
+                        text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                🚀 Créer mon compte Pro
+              </a>
+            </div>
+
+            <p style="color: #999; text-align: center; font-size: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+              Si vous avez des questions, contactez-nous à <a href="mailto:fanny.chiecchio@gmail.com" style="color: #337957;">fanny.chiecchio@gmail.com</a>
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>© 2024 Marius &amp; Fanny. Tous droits réservés.</p>
+          </div>
+
+        </div>
+      `,
+    };
+
+    await sendEmail(mailOptions);
+    console.log("✅ Email invitation partenaire envoyé vers:", prospectEmail);
+  } catch (error) {
+    console.error("❌ Erreur envoi email invitation partenaire:", error);
+    throw error;
+  }
+}
 
 /**
  * Send full payment receipt email

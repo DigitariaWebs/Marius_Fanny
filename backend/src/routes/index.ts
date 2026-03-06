@@ -9,6 +9,7 @@ import uploadRoutes from "./upload.routes.js";
 import categoryRoutes from "./category.routes.js";
 import inventoryRoutes from "./inventory.routes.js";
 import dailyInventoryRoutes from "./dailyInventory.routes.js";
+import partnerRoutes from "./partner.routes.js";
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use("/categories", categoryRoutes);
 router.use("/upload", uploadRoutes);
 router.use("/inventory", inventoryRoutes);
 router.use("/daily-inventory", dailyInventoryRoutes);
+router.use("/partner-request", partnerRoutes);
 
 export default router;

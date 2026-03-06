@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { authClient } from "../lib/AuthClient";
+import { useNavigate, useLocation } from "react-router-dom";
+import { normalizedApiUrl } from "../lib/AuthClient";
 import GoldenBackground from "./GoldenBackground";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
@@ -10,7 +10,7 @@ import {
   TrendingUp,
   Shield,
   CheckCircle2,
-  ArrowRight,
+  Clock,
   Mail,
   Lock,
   User,
@@ -39,14 +39,29 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
   onCartClick,
   cartCount,
 }) => {
-  const [showRegistration, setShowRegistration] = useState(true);
+  const STORAGE_KEY = "partner_request_pending_email";
+
+  // Restore pending state from sessionStorage on mount
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [submitted, setSubmitted] = useState(() => !!sessionStorage.getItem(STORAGE_KEY));
+  const [pendingEmail, setPendingEmail] = useState(() => sessionStorage.getItem(STORAGE_KEY) || "");
   const [showPassword, setShowPassword] = useState(false);
-  const [isVerificationSent, setIsVerificationSent] = useState(false);
-  const [verificationCode, setVerificationCode] = useState("");
-  const [pendingEmail, setPendingEmail] = useState("");
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Detect admin approval redirect (?approved=1)
+  const searchParams = new URLSearchParams(location.search);
+  const justApproved = searchParams.get("approved") === "1";
+  const alreadyApproved = searchParams.get("already_approved") === "1";
+
+  // Clear sessionStorage when admin approves
+  useEffect(() => {
+    if (justApproved || alreadyApproved) {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+  }, [justApproved, alreadyApproved]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -63,8 +78,6 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
     confirmPassword: "",
   });
 
-  const navigate = useNavigate();
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError(null);
@@ -74,7 +87,6 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
     e.preventDefault();
     setError(null);
 
-    // Validation
     if (formData.password.length < 6) {
       setError("Le mot de passe doit contenir au moins 6 caractères.");
       return;
@@ -87,70 +99,42 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
     setLoading(true);
 
     try {
-      const { error: signUpError } = await authClient.signUp.email({
-        email: formData.email,
-        password: formData.password,
-        name: formData.email.split('@')[0],
-        role: "pro",
-      } as any);
+      const res = await fetch(`${normalizedApiUrl}/api/partner-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: formData.businessName,
+          contactName: formData.contactName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          password: formData.password,
+        }),
+      });
 
-      if (signUpError) {
-        throw new Error(signUpError.message || "Inscription échouée");
+      const data = await res.json();
+
+      if (!res.ok) {
+        // 409 = already has a pending request → treat as success screen
+        if (res.status === 409 && data.message?.includes("en attente")) {
+          sessionStorage.setItem(STORAGE_KEY, formData.email);
+          setPendingEmail(formData.email);
+          setSubmitted(true);
+          return;
+        }
+        throw new Error(data.message || "Une erreur est survenue.");
       }
 
-      // Show success
-      setSuccess(true);
+      // Persist so re-navigation still shows the pending screen
+      sessionStorage.setItem(STORAGE_KEY, formData.email);
+      setPendingEmail(formData.email);
+      setSubmitted(true);
     } catch (err: any) {
-      console.error("Pro signup error:", err);
       if (err.message === "Failed to fetch") {
         setError("Erreur réseau. Vérifiez votre connexion.");
       } else {
         setError(err.message || "Une erreur est survenue.");
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (verificationCode.length !== 6) {
-      setError("Le code doit contenir 6 chiffres.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await authClient.emailOtp.verifyEmail({
-        email: pendingEmail,
-        otp: verificationCode,
-      });
-
-      if (result.data) {
-        // Sign in after verification
-        const { error: signInError } = await authClient.signIn.email({
-          email: pendingEmail,
-          password: formData.password,
-        });
-
-        if (signInError) {
-          throw new Error(
-            signInError.message || "Erreur lors de la connexion"
-          );
-        }
-
-        setSuccess(true);
-        setTimeout(() => {
-          navigate("/pro");
-        }, 2000);
-      } else {
-        throw new Error("Code de vérification invalide");
-      }
-    } catch (err: any) {
-      setError(err.message || "Erreur de vérification.");
     } finally {
       setLoading(false);
     }
@@ -183,81 +167,8 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
     },
   ];
 
-  // ----------- OTP VERIFICATION VIEW -----------
-  if (isVerificationSent && !success) {
-    return (
-      <>
-        <Navbar onCartClick={onCartClick} cartCount={cartCount} />
-        <div className="relative min-h-screen pt-20">
-          <div className="fixed inset-0 z-0 opacity-30">
-            <GoldenBackground />
-          </div>
-          <div className="relative z-10 flex items-center justify-center min-h-[80vh] px-4">
-            <div className="bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl border border-white p-8 md:p-12 w-full max-w-md">
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#337957]/10 flex items-center justify-center">
-                  <Mail size={32} className="text-[#337957]" />
-                </div>
-                <h2
-                  className="text-3xl mb-2"
-                  style={{ fontFamily: styles.fontScript, color: styles.gold }}
-                >
-                  Vérification
-                </h2>
-                <p className="text-sm text-stone-500">
-                  Un code de vérification a été envoyé à{" "}
-                  <span className="font-semibold text-stone-700">
-                    {pendingEmail}
-                  </span>
-                </p>
-              </div>
-
-              <form onSubmit={handleVerifyCode} className="space-y-6">
-                <div>
-                  <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-stone-500 mb-2">
-                    Code de vérification
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={verificationCode}
-                    onChange={(e) =>
-                      setVerificationCode(e.target.value.replace(/\D/g, ""))
-                    }
-                    placeholder="000000"
-                    className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:border-[#337957] focus:ring-2 focus:ring-[#337957]/20 outline-none text-center text-2xl tracking-[0.5em] font-mono"
-                  />
-                </div>
-
-                {error && (
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading || verificationCode.length !== 6}
-                  className="w-full py-3 rounded-xl text-white font-bold text-sm uppercase tracking-widest transition-all disabled:opacity-50 hover:opacity-90"
-                  style={{ backgroundColor: styles.gold }}
-                >
-                  {loading ? (
-                    <Loader2 size={20} className="animate-spin mx-auto" />
-                  ) : (
-                    "Vérifier"
-                  )}
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-        <Footer />
-      </>
-    );
-  }
-
-  // ----------- SUCCESS VIEW -----------
-  if (success) {
+  // ----------- "JUST APPROVED" BANNER (admin clicked the approval link) -----------
+  if (justApproved || alreadyApproved) {
     return (
       <>
         <Navbar onCartClick={onCartClick} cartCount={cartCount} />
@@ -274,12 +185,66 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
                 className="text-4xl mb-3"
                 style={{ fontFamily: styles.fontScript, color: styles.gold }}
               >
-                Bienvenue !
+                {alreadyApproved ? "Déjà approuvé !" : "Partenaire approuvé !"}
               </h2>
               <p className="text-stone-600 mb-6">
-                Votre compte professionnel a été créé avec succès. Vous allez
-                être redirigé vers votre espace partenaire.
+                {alreadyApproved
+                  ? "Ce compte partenaire était déjà actif."
+                  : "Le compte professionnel a été créé avec succès. Le partenaire va recevoir un email de confirmation avec ses accès."}
               </p>
+              <button
+                onClick={() => navigate("/se-connecter")}
+                className="px-6 py-3 rounded-xl text-white font-bold text-sm uppercase tracking-widest hover:opacity-90 transition-all"
+                style={{ backgroundColor: styles.gold }}
+              >
+                Page de connexion
+              </button>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  // ----------- PENDING APPROVAL SUCCESS VIEW -----------
+  if (submitted) {
+    return (
+      <>
+        <Navbar onCartClick={onCartClick} cartCount={cartCount} />
+        <div className="relative min-h-screen pt-20">
+          <div className="fixed inset-0 z-0 opacity-30">
+            <GoldenBackground />
+          </div>
+          <div className="relative z-10 flex items-center justify-center min-h-[80vh] px-4">
+            <div className="bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl border border-white p-8 md:p-12 w-full max-w-md text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-50 flex items-center justify-center">
+                <Clock size={40} className="text-amber-500" />
+              </div>
+              <h2
+                className="text-4xl mb-3"
+                style={{ fontFamily: styles.fontScript, color: styles.gold }}
+              >
+                Demande envoyée !
+              </h2>
+              <p className="text-stone-600 mb-4">
+                Votre dossier de partenariat a bien été reçu et sera examiné
+                dans les plus brefs délais.
+              </p>
+              <p className="text-stone-500 text-sm mb-6">
+                Vous recevrez un email de confirmation à{" "}
+                <span className="font-semibold text-stone-700">
+                  {pendingEmail}
+                </span>{" "}
+                une fois votre compte approuvé.
+              </p>
+              <button
+                onClick={() => navigate("/")}
+                className="px-6 py-3 rounded-xl text-white font-bold text-sm uppercase tracking-widest hover:opacity-90 transition-all"
+                style={{ backgroundColor: styles.gold }}
+              >
+                Retour à l'accueil
+              </button>
             </div>
           </div>
         </div>
@@ -316,7 +281,7 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
                 artisanaux et bénéficiez d'avantages exclusifs.
               </p>
 
-              {/* FORMULAIRE COMPTE PRO - VISIBLE IMMÉDIATEMENT */}
+              {/* FORMULAIRE COMPTE PRO */}
               <div className="max-w-lg mx-auto mt-12">
                 <div className="bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl border border-white p-8 md:p-10">
                   <div className="text-center mb-8">
@@ -330,11 +295,55 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
                       Créer mon Compte Pro
                     </h2>
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-400">
-                      Finalisez votre inscription
+                      Votre demande sera examinée et approuvée
                     </p>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-5">
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Business Name */}
+                    <div>
+                      <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-stone-500 mb-2">
+                        Nom de l'entreprise *
+                      </label>
+                      <div className="relative">
+                        <Building2
+                          size={18}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                        />
+                        <input
+                          type="text"
+                          name="businessName"
+                          value={formData.businessName}
+                          onChange={handleChange}
+                          required
+                          placeholder="Restaurant Le Provençal"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[#337957] focus:ring-2 focus:ring-[#337957]/20 outline-none text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Contact Name */}
+                    <div>
+                      <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-stone-500 mb-2">
+                        Nom du contact *
+                      </label>
+                      <div className="relative">
+                        <User
+                          size={18}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                        />
+                        <input
+                          type="text"
+                          name="contactName"
+                          value={formData.contactName}
+                          onChange={handleChange}
+                          required
+                          placeholder="Jean Dupont"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[#337957] focus:ring-2 focus:ring-[#337957]/20 outline-none text-sm"
+                        />
+                      </div>
+                    </div>
+
                     {/* Email */}
                     <div>
                       <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-stone-500 mb-2">
@@ -352,6 +361,50 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
                           onChange={handleChange}
                           required
                           placeholder="contact@entreprise.com"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[#337957] focus:ring-2 focus:ring-[#337957]/20 outline-none text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Phone */}
+                    <div>
+                      <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-stone-500 mb-2">
+                        Téléphone *
+                      </label>
+                      <div className="relative">
+                        <Phone
+                          size={18}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                        />
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleChange}
+                          required
+                          placeholder="+33 6 12 34 56 78"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[#337957] focus:ring-2 focus:ring-[#337957]/20 outline-none text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    <div>
+                      <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-stone-500 mb-2">
+                        Adresse *
+                      </label>
+                      <div className="relative">
+                        <MapPin
+                          size={18}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                        />
+                        <input
+                          type="text"
+                          name="address"
+                          value={formData.address}
+                          onChange={handleChange}
+                          required
+                          placeholder="12 rue de la Paix, 75001 Paris"
                           className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[#337957] focus:ring-2 focus:ring-[#337957]/20 outline-none text-sm"
                         />
                       </div>
@@ -382,11 +435,7 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
                           onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
                         >
-                          {showPassword ? (
-                            <EyeOff size={18} />
-                          ) : (
-                            <Eye size={18} />
-                          )}
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
                     </div>
@@ -413,6 +462,12 @@ const DevenirPartenaire: React.FC<DevenirPartenaireProps> = ({
                         />
                       </div>
                     </div>
+
+                    {error && (
+                      <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">
+                        {error}
+                      </div>
+                    )}
 
                     {/* Submit */}
                     <button

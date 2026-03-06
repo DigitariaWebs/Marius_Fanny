@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import GoldenBackground from './GoldenBackground'; 
 
 import {
@@ -24,7 +23,6 @@ interface FormData {
 }
 
 const WholesaleSection = () => {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>({
     companyName: '',
     contactName: '',
@@ -35,6 +33,8 @@ const WholesaleSection = () => {
   });
 
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
   const businessTypes = [
     'Restaurant / Brasserie',
@@ -76,10 +76,28 @@ const WholesaleSection = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Redirect to the dedicated partner page so users always use the same pro form.
-    navigate('/devenir-partenaire');
+    setError('');
+    setIsLoading(true);
+    try {
+      const apiBase = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiBase}/api/partner-request/inquiry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data?.message || 'Une erreur est survenue. Veuillez réessayer.');
+        return;
+      }
+      setIsSubmitted(true);
+    } catch {
+      setError('Impossible de contacter le serveur. Vérifiez votre connexion.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -312,11 +330,18 @@ const WholesaleSection = () => {
                       />
                     </div>
 
+                    {error && (
+                      <p className="text-red-600 text-sm font-medium text-center bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                        {error}
+                      </p>
+                    )}
+
                     <button
                       type="submit"
-                      className="w-full bg-[#337957] text-white py-5 rounded-xl font-black uppercase text-sm tracking-widest hover:bg-[#2D2A26] transition-all duration-300 shadow-lg hover:shadow-xl mt-4"
+                      disabled={isLoading}
+                      className="w-full bg-[#337957] text-white py-5 rounded-xl font-black uppercase text-sm tracking-widest hover:bg-[#2D2A26] transition-all duration-300 shadow-lg hover:shadow-xl mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      Demander l'accès
+                      {isLoading ? 'Envoi en cours...' : 'Demander l\'accès'}
                     </button>
                   </form>
                 )}
