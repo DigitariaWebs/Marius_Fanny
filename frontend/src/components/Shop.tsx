@@ -140,9 +140,9 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart })
                     src={getImageUrl(cat.image)}
                     alt={cat.title}
                     className={`absolute inset-0 w-full h-full object-cover transition-all duration-500
-                      ${isSelected ? 'grayscale opacity-40 scale-100' : 'group-hover:scale-105'}`}
+                      ${isSelected ? 'scale-100' : 'group-hover:scale-105'}`}
                   />
-                  <div className={`absolute inset-0 flex items-center justify-center p-2 bg-black/30 group-hover:bg-black/20`}>
+                  <div className={`absolute inset-0 flex items-center justify-center p-2 transition-all duration-300 ${isSelected ? 'bg-[#337957]/60' : 'bg-black/30 group-hover:bg-black/20'}`}>
                     <h3 className="text-white text-sm md:text-base font-bold uppercase text-center drop-shadow-md">
                       {cat.title}
                     </h3>
