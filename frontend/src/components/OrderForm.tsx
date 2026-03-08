@@ -29,9 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { productAPI } from "../lib/ProductAPI";
 import type { Client, Address, Product } from "../types";
 import { TAX_RATE } from "../data";
-import { productAPI } from "../lib/ProductAPI";
 import {
   calculateDeliveryFee,
   validateMinimumOrder,
@@ -154,6 +154,8 @@ export default function OrderForm({
 
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [productSearch, setProductSearch] = useState<Record<string, string>>({}); // Search term per item
+  const [productDropdownOpen, setProductDropdownOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchProducts();
@@ -312,17 +314,34 @@ export default function OrderForm({
         return item;
       }),
     }));
+    // Clear search when product is selected
+    setProductSearch(prev => ({ ...prev, [itemId]: "" }));
   };
 
-  const getAvailableProducts = (currentItemId: string): Product[] => {
+  const handleProductSearchChange = (itemId: string, search: string) => {
+    setProductSearch(prev => ({ ...prev, [itemId]: search }));
+  };
+
+  const getAvailableProducts = (currentItemId: string, searchTerm: string = ""): Product[] => {
     const selectedProductIds = formData.items
       .filter((item) => item.id !== currentItemId && item.productId)
       .map((item) => item.productId);
 
-    return products.filter(
+    let filtered = products.filter(
       (product) =>
         product.available && !selectedProductIds.includes(product.id),
     );
+
+    // Filter by search term if provided
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(search) ||
+        p.category?.toLowerCase().includes(search)
+      );
+    }
+
+    return filtered;
   };
 
   const getProductById = (productId: number | null): Product | null => {
@@ -540,6 +559,8 @@ export default function OrderForm({
       }
     });
 
+    // Disabled preparation time validation for admin orders - admin knows the preparation time
+    /*
     formData.items.forEach((item, index) => {
       if (item.productId) {
         if (!validatePreparationTime(formData.date, item.productId)) {
@@ -549,6 +570,7 @@ export default function OrderForm({
         }
       }
     });
+    */
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -1267,30 +1289,48 @@ export default function OrderForm({
                 const product = item.productId
                   ? getProductById(item.productId)
                   : null;
-                const availableProducts = getAvailableProducts(item.id);
+                const availableProducts = getAvailableProducts(item.id, productSearch[item.id] || "");
                 const quantityError = errors[`item_${index}_quantity`];
 
                 return (
                   <React.Fragment key={item.id}>
                     <TableRow>
                       <TableCell>
-                        <Select
-                          value={item.productId?.toString() || ""}
-                          onValueChange={(value) =>
-                            handleProductSelect(item.id, parseInt(value))
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-sm">
-                            <SelectValue placeholder="Sélectionner un produit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableProducts.map((p) => (
-                              <SelectItem key={p.id} value={p.id.toString()}>
-                                {p.name} - ${p.price.toFixed(2)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-1">
+                          {/* Search input for products */}
+                          <Input
+                            type="text"
+                            placeholder="Rechercher un produit..."
+                            value={productSearch[item.id] || ""}
+                            onChange={(e) => handleProductSearchChange(item.id, e.target.value)}
+                            className="h-7 text-sm"
+                          />
+                          <Select
+                            value={item.productId?.toString() || ""}
+                            onValueChange={(value) =>
+                              handleProductSelect(item.id, parseInt(value))
+                            }
+                            open={productDropdownOpen[item.id]}
+                            onOpenChange={(open) => setProductDropdownOpen(prev => ({ ...prev, [item.id]: open }))}
+                          >
+                            <SelectTrigger className="h-8 text-sm">
+                              <SelectValue placeholder="Sélectionner un produit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableProducts.length === 0 ? (
+                                <div className="p-2 text-sm text-gray-500 text-center">
+                                  Aucun produit trouvé
+                                </div>
+                              ) : (
+                                availableProducts.map((p) => (
+                                  <SelectItem key={p.id} value={p.id.toString()}>
+                                    {p.name} - ${p.price.toFixed(2)}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input
@@ -1311,11 +1351,6 @@ export default function OrderForm({
                         {quantityError && (
                           <p className="text-xs text-red-500 mt-1">
                             {quantityError}
-                          </p>
-                        )}
-                        {errors[`item_${index}_preparation`] && (
-                          <p className="text-xs text-orange-600 mt-1 bg-orange-50 p-1 rounded">
-                            ⚠️ {errors[`item_${index}_preparation`]}
                           </p>
                         )}
                       </TableCell>

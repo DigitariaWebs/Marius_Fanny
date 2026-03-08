@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { categoryAPI } from '../lib/CategoryAPI';
 import type { Category as CategoryType } from '../types';
 import { getImageUrl } from '../utils/api';
-import ProductSelection from './ProductSelection'; 
+import ProductSelection from './ProductSelection';
 
 const styles = {
   cream: '#F9F7F2',
@@ -32,11 +32,12 @@ interface CategoryShowcaseProps {
 
 const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart }) => {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [banners, setBanners] = useState<CategoryType[]>([]); // Banner categories from admin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // ÉTAT : Pour savoir quelle catégorie est sélectionnée
-  const [selectedCat, setSelectedCat] = useState<{id: number, title: string} | null>(null);
+  const [selectedCat, setSelectedCat] = useState<{id: number | string, title: string} | null>(null);
   
   // RÉFÉRENCE : Pour le scroll automatique
   const productsRef = useRef<HTMLDivElement>(null);
@@ -75,6 +76,13 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart })
         .filter((node) => !node.parentId || !byId.has(node.parentId))
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0) || a.name.localeCompare(b.name));
 
+      // Filter banner categories (special occasions created by admin)
+      const bannerCategories = rootCategories.filter((cat) => cat.isBanner === true);
+      setBanners(bannerCategories);
+
+      // Regular categories (non-banner)
+      const regularCategories = rootCategories.filter((cat) => cat.isBanner !== true);
+
       const getAllChildTitles = (children: ApiCategoryNode[] = []): string[] => {
         const titles: string[] = [];
         const walk = (nodes: ApiCategoryNode[]) => {
@@ -87,7 +95,7 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart })
         return titles;
       };
       
-      const displayCategories: Category[] = rootCategories.map((cat, index) => ({
+      const displayCategories: Category[] = regularCategories.map((cat, index) => ({
         id: cat.id,
         title: cat.name,
         image: cat.image || './gateau.jpg',
@@ -102,9 +110,14 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart })
     }
   };
 
-  const handleCategoryClick = (categoryId: number, categoryTitle: string) => {
+  const handleCategoryClick = (categoryId: number | string, categoryTitle: string) => {
     setSelectedCat({ id: categoryId, title: categoryTitle });
-    if (onCategoryClick) onCategoryClick(categoryId, categoryTitle);
+    if (onCategoryClick) {
+      // Only pass number to external handler
+      if (typeof categoryId === 'number') {
+        onCategoryClick(categoryId, categoryTitle);
+      }
+    }
     
     // Scroll vers les produits après un court délai
     setTimeout(() => {
@@ -116,6 +129,73 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart })
 
   return (
     <div className="flex flex-col bg-[#F9F7F2]">
+      {/* SPECIAL OCCASION BANNERS */}
+      <section className="relative py-8 px-6 bg-gradient-to-r from-amber-50 to-rose-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-6">
+            <h2 className="text-3xl md:text-4xl" style={{ fontFamily: styles.fontScript, color: '#C5A065' }}>
+              Vos Événements Spéciaux
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {banners.length > 0 ? (
+              banners.map((banner) => (
+                <div
+                  key={banner.id}
+                  onClick={() => handleCategoryClick(banner.id, banner.name)}
+                  className="group relative h-48 md:h-56 overflow-hidden rounded-2xl cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
+                >
+                  {/* Background gradient or image */}
+                  {banner.image ? (
+                    <img 
+                      src={getImageUrl(banner.image)} 
+                      alt={banner.name}
+                      className="absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div 
+                      className="absolute inset-0 transition-all duration-500 group-hover:scale-110"
+                      style={{ 
+                        background: `linear-gradient(135deg, ${banner.bannerColor || '#C5A065'}dd 0%, ${banner.bannerColor || '#C5A065'}88 100%)`
+                      }}
+                    />
+                  )}
+                  
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors" />
+                  
+                  {/* Decorative elements */}
+                  <div className="absolute inset-0 opacity-20">
+                    <div className="absolute top-4 right-4 text-4xl">✨</div>
+                    <div className="absolute bottom-4 left-4 text-3xl">🎂</div>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="relative z-10 flex flex-col items-center justify-center h-full p-6 text-center">
+                    <h3 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg" style={{ fontFamily: styles.fontScript }}>
+                      {banner.name}
+                    </h3>
+                    <p className="mt-2 text-white/90 font-medium">
+                      {banner.description || 'Découvrez notre sélection'}
+                    </p>
+                    <button className="mt-4 px-6 py-2 bg-white/20 hover:bg-white/30 text-white rounded-full text-sm font-semibold transition-all">
+                      Découvrir →
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              // Fallback: show message if no banners configured
+              <div className="col-span-3 text-center py-8 text-gray-500">
+                <p className="text-lg">Pas d'événements spéciaux configurés</p>
+                <p className="text-sm mt-2">L'administrateur peut ajouter des catégories bannières depuis le panneau d'administration</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="relative py-12 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-10 space-y-4">
@@ -157,12 +237,30 @@ const Shop: React.FC<CategoryShowcaseProps> = ({ onCategoryClick, onAddToCart })
       {/* ZONE D'AFFICHAGE DES PRODUITS */}
       <div ref={productsRef}>
         {selectedCat ? (
-          <ProductSelection 
-            categoryId={selectedCat.id} 
-            categoryTitle={selectedCat.title}
-            onAddToCart={onAddToCart}
-            onBack={() => setSelectedCat(null)}
-          />
+          typeof selectedCat.id === 'number' ? (
+            <ProductSelection 
+              categoryId={selectedCat.id} 
+              categoryTitle={selectedCat.title}
+              onAddToCart={onAddToCart}
+              onBack={() => setSelectedCat(null)}
+            />
+          ) : (
+            // Special occasion - show message or all products
+            <div className="py-12 text-center">
+              <h3 className="text-2xl" style={{ fontFamily: '"Great Vibes", cursive', color: '#C5A065' }}>
+                {selectedCat.title}
+              </h3>
+              <p className="mt-4 text-gray-600">
+                Bientôt disponible - Découvrez nos créations spéciales pour {selectedCat.title}!
+              </p>
+              <button 
+                onClick={() => setSelectedCat(null)}
+                className="mt-6 px-6 py-2 bg-[#C5A065] text-white rounded-full"
+              >
+                Retour aux catégories
+              </button>
+            </div>
+          )
         ) : null}
       </div>
     </div>
