@@ -52,6 +52,35 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
   // Logique de filtrage (Backend-logic preserved)
   const normalizeStr = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const normalizeCategoryKey = (s: string) =>
+    normalizeStr(s)
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const singularizeToken = (token: string) => {
+    if (token === "plateaux") return "plateau";
+    if (token.endsWith("s") && token.length > 3) return token.slice(0, -1);
+    return token;
+  };
+  const categoryTokens = (value: string) =>
+    normalizeCategoryKey(value)
+      .split(" ")
+      .filter(Boolean)
+      .map(singularizeToken);
+  const categoryMatches = (productCategory: string, selectedCategory: string) => {
+    const productTokens = categoryTokens(productCategory);
+    const selectedTokens = categoryTokens(selectedCategory);
+
+    if (!productTokens.length || !selectedTokens.length) return false;
+
+    const productJoined = productTokens.join(" ");
+    const selectedJoined = selectedTokens.join(" ");
+    if (productJoined === selectedJoined) return true;
+
+    // Secondary tolerant match: same token set (order-insensitive) only.
+    if (productTokens.length !== selectedTokens.length) return false;
+    return selectedTokens.every((t) => productTokens.includes(t));
+  };
   const isLunchCategory = (category: string) => {
     const n = normalizeStr(category);
     return n.includes("lunch") || n.includes("salade repas") || n.includes("plateau repas");
@@ -129,8 +158,8 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
     if (products.length === 0) return;
 
     const filtered = currentName
-      ? products.filter(p => p.available && p.category.toLowerCase() === currentName)
-      : products.filter(p => p.available);
+      ? products.filter((p) => p.available && categoryMatches(p.category, currentName))
+      : products.filter((p) => p.available);
 
     setFilteredProducts(filtered);
   }, [categoryId, categoryTitle, subCategory, products, categoryTree]);
