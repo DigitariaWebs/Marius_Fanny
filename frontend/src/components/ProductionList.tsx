@@ -3,19 +3,14 @@ import {
   ChefHat, 
   Clock, 
   Package, 
-  CheckCircle2, 
   AlertCircle,
-  Filter,
-  Calendar,
   Search,
   Printer,
   Download,
-  Eye,
-  MapPin,
-  Phone,
   RefreshCw,
   LayoutGrid,
-  List
+  List,
+  ArrowUpDown
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -57,6 +52,15 @@ interface GroupedProduct {
   allergies: string[]; // Liste des allergies uniques pour ce produit
 }
 
+interface OrderGroup {
+  orderId: string;
+  orderNumber: string;
+  deliveryTimeSlot: string;
+  allergies: string[];
+  items: ProductionItem[];
+  done: boolean;
+}
+
 const ProductionList: React.FC = () => {
   const [productionItems, setProductionItems] = useState<ProductionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +70,7 @@ const ProductionList: React.FC = () => {
     getLocalDateYYYYMMDD()
   );
   const [viewMode, setViewMode] = useState<"list" | "orders">("list"); // Deux vues
+  const [sortByPickupTime, setSortByPickupTime] = useState(false);
 
   // Fetch production data from API
   useEffect(() => {
@@ -147,6 +152,78 @@ const ProductionList: React.FC = () => {
     }
   };
 
+  const toggleOrderDone = async (orderId: string) => {
+    const orderItems = productionItems.filter(i => i.orderId === orderId);
+    if (orderItems.length === 0) return;
+
+    const allDone = orderItems.every(i => i.done);
+    const nextDone = !allDone;
+
+    setProductionItems(prev =>
+      prev.map(i => i.orderId === orderId ? { ...i, done: nextDone } : i)
+    );
+
+    try {
+      await Promise.all(orderItems.map(item =>
+        fetch(`${API_URL}/api/orders/production/status`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productionItemId: item.id,
+            date: selectedDate,
+            done: nextDone,
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            location: item.pickupLocation,
+          }),
+        })
+      ));
+    } catch (err: any) {
+      console.error("❌ Erreur mise à jour statut commande:", err);
+      setProductionItems(prev =>
+        prev.map(i => i.orderId === orderId ? { ...i, done: !nextDone } : i)
+      );
+    }
+  };
+
+  const toggleProductDone = async (productId: number) => {
+    const productItems = productionItems.filter(i => i.productId === productId);
+    if (productItems.length === 0) return;
+
+    const allDone = productItems.every(i => i.done);
+    const nextDone = !allDone;
+
+    setProductionItems(prev =>
+      prev.map(i => i.productId === productId ? { ...i, done: nextDone } : i)
+    );
+
+    try {
+      await Promise.all(productItems.map(item =>
+        fetch(`${API_URL}/api/orders/production/status`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productionItemId: item.id,
+            date: selectedDate,
+            done: nextDone,
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            location: item.pickupLocation,
+          }),
+        })
+      ));
+    } catch (err: any) {
+      console.error("❌ Erreur mise à jour statut produit:", err);
+      setProductionItems(prev =>
+        prev.map(i => i.productId === productId ? { ...i, done: !nextDone } : i)
+      );
+    }
+  };
+
   // Align order number display with the Commandes page formatting
   const formatOrderNumber = (orderNumber: string) => {
     const trimmed = orderNumber.trim();
@@ -194,6 +271,40 @@ const ProductionList: React.FC = () => {
     return Array.from(groups.values());
   }, [productionItems]);
 
+  // Grouper les éléments par commande pour la vue par commande
+  const groupedOrders: OrderGroup[] = React.useMemo(() => {
+    const groups = new Map<string, OrderGroup>();
+
+    productionItems.forEach(item => {
+      const key = item.orderId || item.orderNumber;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          orderId: item.orderId || item.orderNumber,
+          orderNumber: item.orderNumber,
+          deliveryTimeSlot: item.deliveryTimeSlot,
+          allergies: [],
+          items: [],
+          done: false,
+        });
+      }
+
+      const group = groups.get(key)!;
+      group.items.push(item);
+
+      if (item.allergies) {
+        item.allergies.split(',').map(a => a.trim()).forEach(allergy => {
+          if (!group.allergies.includes(allergy)) group.allergies.push(allergy);
+        });
+      }
+    });
+
+    groups.forEach(group => {
+      group.done = group.items.every(i => i.done);
+    });
+
+    return Array.from(groups.values());
+  }, [productionItems]);
+
   // Filtrer les articles
   const filteredItems = productionItems.filter(item => {
     if (searchTerm) {
@@ -216,54 +327,171 @@ const ProductionList: React.FC = () => {
     return true;
   });
 
+  const filteredOrders: OrderGroup[] = React.useMemo(() => {
+    let orders = groupedOrders;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      orders = orders.filter(group =>
+        group.orderNumber.toLowerCase().includes(term) ||
+        group.items.some(i => i.productName.toLowerCase().includes(term))
+      );
+    }
+    if (sortByPickupTime) {
+      orders = [...orders].sort((a, b) =>
+        a.deliveryTimeSlot.localeCompare(b.deliveryTimeSlot)
+      );
+    }
+    return orders;
+  }, [groupedOrders, searchTerm, sortByPickupTime]);
+
   const doneItems = filteredItems.filter(item => item.done);
   const notDoneItems = filteredItems.filter(item => !item.done);
 
   // Inventory adjustments are handled elsewhere (not from the production list).
 
-  // Vue par commandes (comme avant mais avec checkbox)
-  const OrdersView = () => (
-    <div className="space-y-4">
-      {notDoneItems.length > 0 && (
-        <div>
-          <h3 className="text-lg font-bold text-amber-700 mb-3">Non Fait ({notDoneItems.length})</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {notDoneItems.map(item => (
-              <ProductionCard key={item.id} item={item} onToggle={toggleDone} />
-            ))}
+  // Vue par commandes — groupée par numéro de commande
+  const OrdersView = () => {
+    const notDoneOrders = filteredOrders.filter(g => !g.done);
+    const doneOrders = filteredOrders.filter(g => g.done);
+
+    const OrderCard = ({ group }: { group: OrderGroup }) => (
+      <div className={`bg-white rounded-xl border p-4 hover:shadow-md transition-all ${group.done ? 'border-green-200 opacity-70' : 'border-stone-200'}`}>
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={group.done}
+            onChange={() => toggleOrderDone(group.orderId)}
+            className="mt-1 w-5 h-5 rounded border-stone-300 text-[#C5A065] focus:ring-[#C5A065] cursor-pointer"
+          />
+          <div className="flex-1 min-w-0">
+            {/* Header: numéro + heure cueillette */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-[#C5A065] uppercase tracking-wider">
+                #{formatOrderNumber(group.orderNumber)}
+              </span>
+              <div className="flex items-center gap-1 text-stone-600 text-sm font-medium">
+                <Clock size={13} />
+                <span>{group.deliveryTimeSlot || '—'}</span>
+              </div>
+            </div>
+
+            {/* Produits */}
+            <div className="space-y-0.5 mb-2">
+              {group.items.map(item => (
+                <div
+                  key={item.id}
+                  className={`text-sm ${group.done ? 'line-through text-stone-400' : 'text-[#2D2A26] font-medium'}`}
+                >
+                  {item.productName} <span className="text-stone-400 font-normal">× {item.quantity}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Allergies */}
+            {group.allergies.length > 0 && (
+              <div className="mt-2 px-2 py-1.5 bg-red-50 rounded-lg text-xs text-red-700 border border-red-200">
+                <span className="font-bold">⚠️ Allergie : </span>
+                {group.allergies.join(', ')}
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
+    );
 
-      {doneItems.length > 0 && (
-        <div>
-          <h3 className="text-lg font-bold text-green-700 mb-3">Fait ({doneItems.length})</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {doneItems.map(item => (
-              <ProductionCard key={item.id} item={item} onToggle={toggleDone} />
-            ))}
+    return (
+      <div className="space-y-4">
+        {/* Bouton tri par heure de cueillette */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => setSortByPickupTime(s => !s)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+              sortByPickupTime
+                ? 'bg-[#C5A065] text-white border-[#C5A065]'
+                : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'
+            }`}
+          >
+            <ArrowUpDown size={14} />
+            Trier par heure de cueillette
+          </button>
+        </div>
+
+        {notDoneOrders.length > 0 && (
+          <div>
+            <h3 className="text-lg font-bold text-amber-700 mb-3">Non Fait ({notDoneOrders.length})</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {notDoneOrders.map(group => (
+                <OrderCard key={group.orderId} group={group} />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {filteredItems.length === 0 && (
-        <div className="bg-stone-50 rounded-2xl p-12 text-center border border-stone-200">
-          <ChefHat size={48} className="mx-auto mb-4 text-stone-400" />
-          <h3 className="text-xl font-serif text-stone-500 mb-2">
-            Aucun article à produire
-          </h3>
-          <p className="text-stone-400">
-            {searchTerm 
-              ? "Aucun résultat ne correspond à votre recherche" 
-              : "Toutes les commandes sont à jour pour cette date"}
-          </p>
-        </div>
-      )}
-    </div>
-  );
+        {doneOrders.length > 0 && (
+          <div>
+            <h3 className="text-lg font-bold text-green-700 mb-3">Fait ({doneOrders.length})</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {doneOrders.map(group => (
+                <OrderCard key={group.orderId} group={group} />
+              ))}
+            </div>
+          </div>
+        )}
 
-  const ListView = () => (
+        {filteredOrders.length === 0 && (
+          <div className="bg-stone-50 rounded-2xl p-12 text-center border border-stone-200">
+            <ChefHat size={48} className="mx-auto mb-4 text-stone-400" />
+            <h3 className="text-xl font-serif text-stone-500 mb-2">
+              Aucun article à produire
+            </h3>
+            <p className="text-stone-400">
+              {searchTerm
+                ? "Aucun résultat ne correspond à votre recherche"
+                : "Toutes les commandes sont à jour pour cette date"}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const ListView = () => {
+    // Dédupliquer les items par orderId dans chaque groupe produit
+    const uniqueItemsForGroup = (items: ProductionItem[]) => {
+      const seen = new Set<string>();
+      return items.filter(item => {
+        const key = item.orderId || item.orderNumber;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+
+    // Trier les groupes par heure de cueillette min si actif
+    const sortedGroups = sortByPickupTime
+      ? [...filteredGroups].sort((a, b) => {
+          const minA = a.items.map(i => i.deliveryTimeSlot).sort()[0] ?? '';
+          const minB = b.items.map(i => i.deliveryTimeSlot).sort()[0] ?? '';
+          return minA.localeCompare(minB);
+        })
+      : filteredGroups;
+
+    return (
     <div className="space-y-6">
+      {/* Bouton tri par heure de cueillette */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setSortByPickupTime(s => !s)}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+            sortByPickupTime
+              ? 'bg-[#C5A065] text-white border-[#C5A065]'
+              : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'
+          }`}
+        >
+          <ArrowUpDown size={14} />
+          Trier par heure de cueillette
+        </button>
+      </div>
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <table className="w-full">
           <thead className="bg-stone-50 border-b border-stone-200">
@@ -275,8 +503,14 @@ const ProductionList: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
-            {filteredGroups.map(group => {
-              const totalCount = group.items.length;
+            {sortedGroups.map(group => {
+              const uniqueOrders = (() => {
+                const sorted = sortByPickupTime
+                  ? [...group.items].sort((a, b) => a.deliveryTimeSlot.localeCompare(b.deliveryTimeSlot))
+                  : group.items;
+                return uniqueItemsForGroup(sorted);
+              })();
+              const totalCount = uniqueOrders.length;
               
               return (
                 <tr key={group.productId} className="hover:bg-stone-50/50 transition-colors">
@@ -321,33 +555,22 @@ const ProductionList: React.FC = () => {
                       </div>
                     </div>
                     
-                    {/* Liste des commandes individuelles avec checkbox */}
-                    <div className="space-y-2">
-                      {group.items.map(item => (
-                        <div key={item.id} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={item.done}
-                            onChange={() => toggleDone(item.id)}
-                            className="w-4 h-4 rounded border-stone-300 text-[#C5A065] focus:ring-[#C5A065]"
-                          />
-                          <span className={item.done ? "line-through text-stone-400" : "text-stone-700 font-medium"}>
-                            {formatOrderNumber(item.orderNumber)} - {item.customerName}
-                          </span>
-                          {item.allergies && (
-                            <span className="text-red-500 text-xs" title={item.allergies}>⚠️</span>
-                          )}
-                          {/* Petit indicateur de statut */}
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${item.done ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {item.done ? 'Remis' : 'Non remis'}
-                          </span>
-                        </div>
-                      ))}
+                    {/* Une seule case à cocher par produit */}
+                    <div className="flex items-center gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={group.items.every(i => i.done)}
+                        onChange={() => toggleProductDone(group.productId)}
+                        className="w-4 h-4 rounded border-stone-300 text-[#C5A065] focus:ring-[#C5A065]"
+                      />
+                      <span className="text-stone-700 font-medium">
+                        {group.items.every(i => i.done) ? 'Fait' : 'Non fait'}
+                      </span>
                     </div>
                     
                     {/* Indicateur global du groupe */}
                     <div className="mt-3 text-xs text-stone-500 border-t border-stone-100 pt-2">
-                      {group.items.filter(i => i.done).length} sur {totalCount} fait
+                      {group.items.filter(i => i.done).length} sur {group.items.length} fait
                     </div>
                   </td>
                 </tr>
@@ -357,7 +580,7 @@ const ProductionList: React.FC = () => {
         </table>
       </div>
 
-      {filteredGroups.length === 0 && (
+      {sortedGroups.length === 0 && (
         <div className="bg-stone-50 rounded-2xl p-12 text-center border border-stone-200">
           <Package size={48} className="mx-auto mb-4 text-stone-400" />
           <h3 className="text-xl font-serif text-stone-500 mb-2">
@@ -371,89 +594,8 @@ const ProductionList: React.FC = () => {
         </div>
       )}
     </div>
-  );
-
-  const ProductionCard = ({ item, onToggle }: { item: ProductionItem; onToggle: (id: string) => void }) => (
-    <div className="bg-white rounded-xl border border-stone-200 p-4 hover:shadow-md transition-all">
-      <div className="flex items-start gap-3">
-        {/* Checkbox */}
-        <input
-          type="checkbox"
-          checked={item.done}
-          onChange={() => onToggle(item.id)}
-          className="mt-1 w-5 h-5 rounded border-stone-300 text-[#C5A065] focus:ring-[#C5A065]"
-        />
-        
-        <div className="flex-1">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-                  {formatOrderNumber(item.orderNumber)}
-                </span>
-                {item.done ? (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200">
-                    <span className="flex items-center gap-1">
-                      <CheckCircle2 size={16} />
-                      Remis
-                    </span>
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-amber-100 text-amber-700 border-amber-200">
-                    <span className="flex items-center gap-1">
-                      <Clock size={16} />
-                      Non remis
-                    </span>
-                  </span>
-                )}
-              </div>
-              <h3 className="text-lg font-serif text-[#2D2A26]">{item.productName}</h3>
-              <p className="text-sm text-stone-500">× {item.quantity}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-stone-400">Client</p>
-              <p className="text-sm font-medium text-[#2D2A26]">{item.customerName}</p>
-              {item.customerPhone && (
-                <p className="text-xs text-stone-400 flex items-center gap-1 justify-end mt-0.5">
-                  <Phone size={10} />
-                  {item.customerPhone}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 mb-3 text-sm flex-wrap">
-            <div className="flex items-center gap-1 text-stone-500">
-              <Calendar size={14} />
-              <span>{new Date(item.deliveryDate).toLocaleDateString('fr-CA')}</span>
-            </div>
-            <div className="flex items-center gap-1 text-stone-500">
-              <Clock size={14} />
-              <span>{item.deliveryTimeSlot}</span>
-            </div>
-            <div className="flex items-center gap-1 text-stone-500">
-              <MapPin size={14} />
-              <span>{item.deliveryType === "pickup" ? `Cueillette - ${item.pickupLocation}` : "Livraison"}</span>
-            </div>
-          </div>
-
-          {/* Allergies */}
-          {item.allergies && (
-            <div className="mb-2 p-2 bg-red-50 rounded-lg text-xs text-red-700 border border-red-200">
-              <span className="font-bold">⚠️ Allergie: </span>
-              {item.allergies}
-            </div>
-          )}
-
-          {item.notes && !item.allergies && (
-            <div className="mb-2 p-2 bg-stone-50 rounded-lg text-xs text-stone-600 border border-stone-100">
-              📝 {item.notes}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
