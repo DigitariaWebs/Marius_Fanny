@@ -37,6 +37,7 @@ import {
   validateMinimumOrder,
   DELIVERY_ZONES,
 } from "../utils/deliveryZones";
+import { calculatePriceWithOptions } from "../utils/customOptions";
 
 interface OrderFormProps {
   onSubmit: (formData: OrderFormData) => void;
@@ -309,6 +310,12 @@ export default function OrderForm({
       }
     }
 
+    const initialUnitPrice = calculatePriceWithOptions(
+      product.price,
+      product.customOptions || [],
+      initialOptions,
+    );
+
     setFormData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
@@ -319,8 +326,8 @@ export default function OrderForm({
             productId: product.id,
             productName: product.name,
             quantity,
-            unitPrice: product.price,
-            amount: quantity * product.price,
+            unitPrice: initialUnitPrice,
+            amount: quantity * initialUnitPrice,
             selectedOptions: initialOptions,
             isPacked: false,
           };
@@ -417,17 +424,35 @@ export default function OrderForm({
   const handleOptionChange = (itemId: string, optionName: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      items: prev.items.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              selectedOptions: {
-                ...(item.selectedOptions || {}),
-                [optionName]: value,
-              },
-            }
-          : item,
-      ),
+      items: prev.items.map((item) => {
+        if (item.id !== itemId) return item;
+
+        const selectedOptions = {
+          ...(item.selectedOptions || {}),
+          [optionName]: value,
+        };
+
+        const product = getProductById(item.productId);
+        if (!product) {
+          return {
+            ...item,
+            selectedOptions,
+          };
+        }
+
+        const unitPrice = calculatePriceWithOptions(
+          product.price,
+          product.customOptions || [],
+          selectedOptions,
+        );
+
+        return {
+          ...item,
+          selectedOptions,
+          unitPrice,
+          amount: unitPrice * item.quantity,
+        };
+      }),
     }));
   };
 

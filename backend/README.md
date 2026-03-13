@@ -61,6 +61,20 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 > **Note**: Image uploads will be disabled if Cloudinary credentials are not configured.
 
+### Twilio SMS Setup (Optional)
+
+If you want invoice links sent by SMS, add the following to your `.env`:
+
+```env
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_FROM_NUMBER=+10000000000
+SMS_DRY_RUN=true
+```
+
+- `SMS_DRY_RUN=true` lets you test the invoice SMS flow without sending any real SMS (no Twilio call).
+- Set `SMS_DRY_RUN=false` only when you are ready to send real SMS.
+
 ## Running
 
 ### Development mode (with hot reload):

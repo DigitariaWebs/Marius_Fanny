@@ -779,8 +779,12 @@ export function OrderManagement() {
   const sendPaymentLink = async (order: OrderWithPacking) => {
     const invoicePayload = {
       orderId: order.id,
+      orderNumber: order.orderNumber,
       customerEmail: order.client.email,
-      customerPhone: order.client.phone,
+      customerPhone:
+        (order.paymentLinkChannel || "email") === "sms"
+          ? order.client.phone
+          : undefined,
       customerName: `${order.client.firstName} ${order.client.lastName}`.trim(),
       deliveryChannel: order.paymentLinkChannel || "email",
       items: order.items.map((item) => ({
@@ -2003,14 +2007,122 @@ export function OrderManagement() {
           onSubmit={async (formData) => {
             setIsSubmitting(true);
             try {
-              console.log("Updating order:", formData);
-              setTimeout(() => {
-                setIsEditModalOpen(false);
-                setSelectedOrder(null);
-                setIsSubmitting(false);
-              }, 500);
-            } catch (err) {
+              if (!selectedOrder) {
+                throw new Error("Aucune commande sélectionnée");
+              }
+
+              const apiItems = formData.items
+                .filter((item) => item.productId && item.quantity > 0)
+                .map((item) => ({
+                  productId: item.productId!,
+                  productName: item.productName,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
+                  amount: item.amount,
+                  notes: item.notes || undefined,
+                }));
+
+              const payload: any = {
+                clientInfo: {
+                  firstName: formData.firstName,
+                  lastName: formData.lastName,
+                  email: formData.email,
+                  phone: formData.phone,
+                },
+                pickupLocation: formData.pickupLocation,
+                deliveryType: formData.deliveryType,
+                items: apiItems,
+                notes: formData.notes || undefined,
+                paymentLinkChannel: formData.paymentLinkChannel,
+              };
+
+              if (formData.date) {
+                const pickupDateTime = `${formData.date}T${formData.pickupTime || "00:00"}:00`;
+                payload.pickupDate = new Date(pickupDateTime).toISOString();
+              }
+
+              if (formData.deliveryType === "delivery" && formData.deliveryAddress) {
+                payload.deliveryAddress = {
+                  street: formData.deliveryAddress.street,
+                  city: formData.deliveryAddress.city,
+                  province: formData.deliveryAddress.province,
+                  postalCode: formData.deliveryAddress.postalCode,
+                };
+                if (formData.date) {
+                  payload.deliveryDate = formData.date;
+                }
+              }
+
+              const result = await orderAPI.updateOrder(selectedOrder.id, payload);
+              const saved = result?.data;
+
+              const updatedOrder: OrderWithPacking = {
+                ...selectedOrder,
+                client: {
+                  ...selectedOrder.client,
+                  firstName: formData.firstName,
+                  lastName: formData.lastName,
+                  email: formData.email,
+                  phone: formData.phone,
+                },
+                pickupDate: payload.pickupDate || selectedOrder.pickupDate,
+                pickupLocation: formData.pickupLocation,
+                deliveryType: formData.deliveryType,
+                deliveryAddress:
+                  formData.deliveryType === "delivery" && formData.deliveryAddress
+                    ? {
+                        id: selectedOrder.deliveryAddress?.id || 0,
+                        type: "shipping",
+                        street: formData.deliveryAddress.street,
+                        city: formData.deliveryAddress.city,
+                        province: formData.deliveryAddress.province,
+                        postalCode: formData.deliveryAddress.postalCode,
+                        isDefault: selectedOrder.deliveryAddress?.isDefault || false,
+                      }
+                    : undefined,
+                items: formData.items
+                  .filter((item) => item.productId && item.quantity > 0)
+                  .map((item, idx) => ({
+                    id: idx + 1,
+                    productId: item.productId!,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    subtotal: item.amount,
+                    productionStatus: "pending",
+                    notes: item.notes || undefined,
+                    product: {
+                      id: item.productId!,
+                      name: item.productName || `Produit #${item.productId}`,
+                      price: item.unitPrice,
+                    },
+                    isPacked: false,
+                  })),
+                subtotal: saved?.subtotal ?? formData.subtotal,
+                taxAmount: saved?.taxAmount ?? formData.taxAmount,
+                deliveryFee: saved?.deliveryFee ?? formData.deliveryFee,
+                total: saved?.total ?? formData.total,
+                depositAmount: saved?.depositAmount ?? formData.depositAmount,
+                notes: formData.notes || undefined,
+                updatedAt: saved?.updatedAt || new Date().toISOString(),
+              };
+
+              setOrders((prev) =>
+                prev.map((order) =>
+                  order.id === selectedOrder.id ? updatedOrder : order,
+                ),
+              );
+              setFilteredOrders((prev) =>
+                prev.map((order) =>
+                  order.id === selectedOrder.id ? updatedOrder : order,
+                ),
+              );
+
+              setIsEditModalOpen(false);
+              setSelectedOrder(null);
+            } catch (err: any) {
               console.error(err);
+              alert(err?.message || "Erreur lors de la modification de la commande");
+            } finally {
               setIsSubmitting(false);
             }
           }}
@@ -2021,7 +2133,7 @@ export function OrderManagement() {
           initialData={
             selectedOrder
               ? {
-                  date: selectedOrder.orderDate.split("T")[0],
+                  date: (selectedOrder.pickupDate || selectedOrder.orderDate).split("T")[0],
                   pickupTime: new Date(selectedOrder.pickupDate).toLocaleTimeString("fr-CA", {
                     hour: "2-digit",
                     minute: "2-digit",

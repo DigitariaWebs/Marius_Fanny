@@ -9,6 +9,12 @@ const users = [
     password: 'delivery123',
     name: 'Delivery Driver',
     role: 'deliveryDriver'
+  },
+  {
+    email: 'vendeuse@gmail.com',
+    password: 'vendeuse123',
+    name: 'Vendeuse',
+    role: 'vendeur'
   }
 ];
 

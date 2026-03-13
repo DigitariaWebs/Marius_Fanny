@@ -153,29 +153,78 @@ export const createOrder = async (
     // Automatically create a client record when this email does not exist yet.
     try {
       const normalizedEmail = orderData.clientInfo.email.trim().toLowerCase();
+      const firstName = orderData.clientInfo.firstName.trim();
+      const lastName = orderData.clientInfo.lastName.trim();
+      const fullName = `${firstName} ${lastName}`.trim();
+      const normalizedPhone = orderData.clientInfo.phone.trim();
+
       const existingClient = await User.findOne({ email: normalizedEmail });
 
       if (!existingClient) {
-        const firstName = orderData.clientInfo.firstName.trim();
-        const lastName = orderData.clientInfo.lastName.trim();
-        const fullName = `${firstName} ${lastName}`.trim();
-
-        const client = new User({
-          email: normalizedEmail,
-          name: fullName,
-          role: "user",
-          status: "active",
-          emailVerified: true,
-          profile: {
-            phoneNumber: orderData.clientInfo.phone,
+        await User.findOneAndUpdate(
+          { email: normalizedEmail },
+          {
+            $setOnInsert: {
+              email: normalizedEmail,
+              role: "user",
+              status: "active",
+              emailVerified: true,
+            },
+            $set: {
+              name: fullName,
+              "profile.phoneNumber": normalizedPhone,
+            },
           },
-        });
+          {
+            upsert: true,
+            new: true,
+            setDefaultsOnInsert: true,
+            runValidators: true,
+          },
+        );
 
-        await client.save();
         console.log("✅ Client auto-created from order:", normalizedEmail);
+      } else if (existingClient.role === "user") {
+        const needsUpdate =
+          existingClient.name !== fullName ||
+          (existingClient.profile?.phoneNumber || "") !== normalizedPhone ||
+          existingClient.status !== "active" ||
+          existingClient.emailVerified !== true ||
+          existingClient.isDeleted === true;
+
+        if (needsUpdate) {
+          await User.updateOne(
+            { _id: existingClient._id },
+            {
+              $set: {
+                name: fullName,
+                status: "active",
+                emailVerified: true,
+                isDeleted: false,
+                "profile.phoneNumber": normalizedPhone,
+              },
+              $unset: {
+                deletedAt: 1,
+              },
+            },
+            { runValidators: true },
+          );
+
+          console.log("✅ Existing client synced from order:", normalizedEmail);
+        }
+      } else {
+        console.warn(
+          "⚠️ Auto-create client skipped because email belongs to non-client role:",
+          normalizedEmail,
+          existingClient.role,
+        );
       }
     } catch (clientError: any) {
-      console.error("⚠️ Failed to auto-create client from order:", clientError.message);
+      console.error(
+        "⚠️ Failed to auto-create client from order:",
+        clientError.message,
+        clientError.stack,
+      );
     }
 
     // Update daily inventory - add order quantities to Comm CLIENT column
@@ -536,8 +585,8 @@ export const getOrders = async (
       if (toDate) query.orderDate.$lte = new Date(toDate);
     }
 
-    // If user is authenticated and not admin, only show their orders
-    if (req.user && req.user.role !== "admin") {
+    // If user is authenticated and not admin/vendeur, only show their orders
+    if (req.user && req.user.role !== "admin" && req.user.role !== "vendeur") {
       query.userId = req.user.id;
     }
 
@@ -594,6 +643,7 @@ export const getOrderById = async (
     if (
       req.user &&
       req.user.role !== "admin" &&
+      req.user.role !== "vendeur" &&
       order.userId !== req.user.id
     ) {
       return res.status(403).json({
@@ -911,6 +961,7 @@ export const getOrderHistory = async (
     if (
       req.user &&
       req.user.role !== "admin" &&
+      req.user.role !== "vendeur" &&
       order.userId !== req.user.id
     ) {
       return res.status(403).json({
@@ -954,8 +1005,8 @@ export const deleteOrder = async (
       });
     }
 
-    // Only admin can delete orders
-    if (req.user && req.user.role !== "admin") {
+    // Only admin and vendeur can delete orders
+    if (req.user && req.user.role !== "admin" && req.user.role !== "vendeur") {
       return res.status(403).json({
         success: false,
         error: "Vous n'avez pas la permission de supprimer cette commande",

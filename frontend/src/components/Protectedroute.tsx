@@ -7,7 +7,9 @@ type RoleType =
   | "kitchen_staff"
   | "customer_service"
   | "client"
-  | "deliveryDriver";
+  | "deliveryDriver"
+  | "vendeur"
+  | "four";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -100,6 +102,8 @@ export function ProtectedRoute({
       return <Navigate to="/staff/commandes" replace />;
     if (userRole === "deliveryDriver")
       return <Navigate to="/staff/delivery" replace />;
+    if (userRole === "vendeur" || userRole === "four")
+      return <Navigate to="/staff/vendeur" replace />;
     if (userRole === "client") return <Navigate to="/mon-compte" replace />;
 
     return <Navigate to="/" replace />;

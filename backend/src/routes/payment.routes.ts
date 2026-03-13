@@ -22,7 +22,7 @@ import {
   listPaymentsSchema,
   createInvoiceSchema,
 } from "../schemas/payment.schema.js";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import { requireAuth, requireAdmin, requireRole } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -61,7 +61,13 @@ router.post(
  */
 
 // Create a Square invoice
-router.post("/invoice", requireAuth, requireAdmin, validateBody(createInvoiceSchema), createInvoice);
+router.post(
+  "/invoice",
+  requireAuth,
+  requireRole("admin", "vendeur"),
+  validateBody(createInvoiceSchema),
+  createInvoice,
+);
 
 // Get invoice by ID
 router.get("/invoice/:invoiceId", getInvoice);

@@ -25,7 +25,7 @@ export const updateCurrentUserSchema = z.object({
  */
 export const updateUserSchema = z.object({
   name: z.string().min(2).max(100).optional(),
-  role: z.enum(["user", "pro", "staff", "customerService", "admin", "deliveryDriver", "cuisinier", "patissier", "four"]).optional(),
+  role: z.enum(["user", "pro", "staff", "customerService", "admin", "deliveryDriver", "cuisinier", "patissier", "four", "vendeur"]).optional(),
   profile: userProfileSchema.optional(),
   // Client-specific fields
   firstName: z.string().min(1).max(100).optional(),
@@ -41,7 +41,7 @@ export const updateUserSchema = z.object({
 export const createUserProfileSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2).max(100),
-  role: z.enum(["user", "pro", "staff", "customerService", "admin", "deliveryDriver", "cuisinier", "patissier", "four"]).optional().default("user"),
+  role: z.enum(["user", "pro", "staff", "customerService", "admin", "deliveryDriver", "cuisinier", "patissier", "four", "vendeur"]).optional().default("user"),
 });
 
 /**

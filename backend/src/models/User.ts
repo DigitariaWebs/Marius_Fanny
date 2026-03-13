@@ -3,8 +3,10 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IUser extends Document {
   email: string;
   name: string;
-  role: "user" | "pro" | "staff" | "customerService" | "admin" | "deliveryDriver" | "cuisinier" | "patissier" | "four";
+  role: "user" | "pro" | "staff" | "customerService" | "admin" | "deliveryDriver" | "cuisinier" | "patissier" | "four" | "vendeur";
   status?: "active" | "inactive" | "placeholder";
+  isDeleted?: boolean;
+  deletedAt?: Date;
   password?: string;
   emailVerified: boolean;
   emailVerificationCode?: string;
@@ -36,13 +38,21 @@ const UserSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ["user", "pro", "staff", "customerService", "admin", "deliveryDriver", "cuisinier", "patissier", "four"],
+      enum: ["user", "pro", "staff", "customerService", "admin", "deliveryDriver", "cuisinier", "patissier", "four", "vendeur"],
       default: "user",
     },
     status: {
       type: String,
       enum: ["active", "inactive", "placeholder"],
       default: "active",
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
     },
     emailVerified: {
       type: Boolean,

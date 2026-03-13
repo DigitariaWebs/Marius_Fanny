@@ -896,7 +896,8 @@ export async function sendInvoiceOrderConfirmation(
             </h2>
 
             <p style="color: #555; line-height: 1.6; text-align: center; margin-bottom: 30px;">
-              Votre commande a été confirmée. Une facture Square vous a été envoyée séparément pour effectuer le paiement.
+              Votre commande chez <strong>Marius &amp; Fanny</strong> a bien été confirmée.
+              Vous pouvez finaliser votre paiement en ligne à l'aide du bouton ci-dessous.
             </p>
 
             <div style="background-color: #F9F7F2; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
@@ -950,10 +951,10 @@ export async function sendInvoiceOrderConfirmation(
 
             <div style="background-color: #E3F2FD; padding: 15px; border-radius: 8px; margin-top: 30px; border-left: 4px solid #2196F3;">
               <p style="color: #0D47A1; margin: 0; font-weight: bold;">
-                🧾 Facture envoyée par email
+                💳 Lien de paiement sécurisé
               </p>
               <p style="color: #555; margin: 5px 0 0 0; font-size: 14px;">
-                Vous allez recevoir un email séparé de Square avec votre facture et un lien pour effectuer le paiement en ligne de manière sécurisée.
+                Utilisez ce lien pour régler votre commande en toute sécurité. Si vous avez la moindre question, l'équipe de Marius &amp; Fanny est là pour vous aider.
               </p>
               ${
                 invoiceUrl
@@ -962,7 +963,7 @@ export async function sendInvoiceOrderConfirmation(
                 <a href="${invoiceUrl}" 
                    style="display: inline-block; padding: 12px 30px; background-color: #2196F3; color: white;
                           text-decoration: none; border-radius: 5px; font-weight: bold;">
-                  💳 Voir la facture
+                  Régler ma commande
                 </a>
               </div>
               `

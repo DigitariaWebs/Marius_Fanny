@@ -365,7 +365,7 @@ export interface UserWithRole {
   emailVerified: boolean;
   name: string;
   image?: string | null;
-  role?: "user" | "pro" | "staff" | "customerService" | "admin" | "deliveryDriver" | "cuisinier" | "patissier" | "four";
+  role?: "user" | "pro" | "staff" | "customerService" | "admin" | "deliveryDriver" | "cuisinier" | "patissier" | "four" | "vendeur";
   user_metadata?: {
     [key: string]: any;
   }; 

@@ -9,6 +9,59 @@ import { SquareError } from "square";
 import squareClient, { squareConfig } from "../config/square.js";
 import Order from "../models/Order.js";
 import { sendSms } from "../utils/smsService.js";
+import { sendInvoiceOrderConfirmation } from "../utils/mail.js";
+
+const safeStringify = (value: unknown) =>
+  JSON.stringify(value, (_, currentValue) =>
+    typeof currentValue === "bigint" ? currentValue.toString() : currentValue,
+  2);
+
+const normalizeSquarePhoneNumber = (value?: string): string | null => {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^\+[1-9]\d{7,14}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const digitsOnly = trimmed.replace(/\D/g, "");
+
+  if (digitsOnly.length === 10) {
+    return `+1${digitsOnly}`;
+  }
+
+  if (digitsOnly.length === 11 && digitsOnly.startsWith("1")) {
+    return `+${digitsOnly}`;
+  }
+
+  return null;
+};
+
+const toBigIntAmount = (value: unknown): bigint => {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(Math.trunc(value));
+  if (typeof value === "string" && value.trim() !== "") {
+    return BigInt(value);
+  }
+  return 0n;
+};
+
+const getRefundableAmountCents = async (paymentId: string): Promise<bigint> => {
+  const paymentResponse = await squareClient.payments.get({ paymentId });
+  const payment = (paymentResponse as any)?.payment;
+
+  const capturedAmount = toBigIntAmount(
+    payment?.totalMoney?.amount ??
+      payment?.amountMoney?.amount ??
+      payment?.approvedMoney?.amount,
+  );
+  const refundedAmount = toBigIntAmount(payment?.refundedMoney?.amount);
+  const refundable = capturedAmount - refundedAmount;
+
+  return refundable > 0n ? refundable : 0n;
+};
 
 /**
  * Create a Square payment
@@ -296,14 +349,27 @@ export const refundPayment = async (req: Request, res: Response) => {
       });
     }
 
-    const amountInCents = Math.round(amount * 100);
+    const requestedAmountInCents = BigInt(Math.round(amount * 100));
+    const refundableAmountInCents = await getRefundableAmountCents(paymentId);
+
+    if (refundableAmountInCents <= 0n) {
+      return res.status(400).json({
+        success: false,
+        error: "Ce paiement est deja totalement rembourse ou non remboursable",
+      });
+    }
+
+    const amountInCents =
+      requestedAmountInCents > refundableAmountInCents
+        ? refundableAmountInCents
+        : requestedAmountInCents;
     const idempotencyKey = randomUUID();
 
     console.log(
-      `💸 [REFUND] Processing refund for payment ${paymentId}, amount: ${amount} CAD (${amountInCents} cents), reason: ${reason || "Not specified"}`,
+      `💸 [REFUND] Processing refund for payment ${paymentId}, requested: ${requestedAmountInCents} cents, final: ${amountInCents} cents, refundable: ${refundableAmountInCents} cents, reason: ${reason || "Not specified"}`,
     );
 
-    const response = await (squareClient.refunds as any).create({
+    const response = await squareClient.refunds.refundPayment({
       idempotencyKey,
       paymentId,
       amountMoney: {
@@ -331,6 +397,7 @@ export const refundPayment = async (req: Request, res: Response) => {
               currency: refund.amountMoney.currency,
             }
           : undefined,
+        cappedToAvailableAmount: requestedAmountInCents !== amountInCents,
       },
     });
   } catch (error: any) {
@@ -425,6 +492,7 @@ export const createInvoice = async (req: Request, res: Response) => {
   try {
     const {
       orderId,
+      orderNumber,
       customerEmail,
       customerPhone,
       customerName,
@@ -448,16 +516,22 @@ export const createInvoice = async (req: Request, res: Response) => {
 
     console.log(`📧 [INVOICE] Creating invoice for ${customerEmail} (Order: ${orderId})`);
 
-    // Create idempotency key
-    const idempotencyKey = randomUUID();
+    const normalizedPhone = normalizeSquarePhoneNumber(customerPhone);
+
+    if (deliveryChannel === "sms" && !normalizedPhone) {
+      return res.status(400).json({
+        success: false,
+        error: "Un numero de telephone valide est requis pour l'envoi par SMS",
+      });
+    }
 
     // Build line items for the invoice
-    const lineItems = items.map((item: any, index: number) => ({
+    const lineItems = items.map((item: any) => ({
       name: item.name,
       quantity: item.quantity.toString(),
       itemType: "ITEM",
       basePriceMoney: {
-        amount: Math.round(item.unitPrice * 100),
+        amount: BigInt(Math.round(item.unitPrice * 100)),
         currency: "CAD",
       },
     }));
@@ -469,7 +543,7 @@ export const createInvoice = async (req: Request, res: Response) => {
         quantity: "1",
         itemType: "ITEM",
         basePriceMoney: {
-          amount: Math.round(deliveryFee * 100),
+          amount: BigInt(Math.round(deliveryFee * 100)),
           currency: "CAD",
         },
       });
@@ -478,57 +552,89 @@ export const createInvoice = async (req: Request, res: Response) => {
     // Calculate due date (default to 7 days from now)
     const invoiceDueDate = dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // Create the invoice
-    const invoiceRequest: any = {
-      idempotencyKey,
-      locationId: squareConfig.locationId,
+    const taxUid = "order-tax";
+    const orderRequest: any = {
+      idempotencyKey: randomUUID(),
       order: {
         locationId: squareConfig.locationId,
         referenceId: orderId,
         lineItems,
-        taxes: [
+        ...(taxAmount > 0
+          ? {
+              taxes: [
+                {
+                  uid: taxUid,
+                  name: "Taxes",
+                  percentage: "14.975",
+                  scope: "ORDER",
+                },
+              ],
+            }
+          : {}),
+      },
+    };
+
+    const orderResponse = await squareClient.orders.create(orderRequest);
+    const squareOrderId = (orderResponse as any)?.order?.id;
+
+    if (!squareOrderId) {
+      throw new Error("Creation de commande Square echouee: orderId manquant");
+    }
+
+    const customerResponse = await squareClient.customers.create({
+      givenName: customerName.split(" ")[0] || customerName,
+      familyName: customerName.split(" ").slice(1).join(" ") || undefined,
+      emailAddress: customerEmail,
+      ...(normalizedPhone ? { phoneNumber: normalizedPhone } : {}),
+      referenceId: orderId,
+    });
+
+    const squareCustomerId = (customerResponse as any)?.customer?.id;
+
+    if (!squareCustomerId) {
+      throw new Error("Creation du client Square echouee: customerId manquant");
+    }
+
+    const invoiceRequest: any = {
+      idempotencyKey: randomUUID(),
+      invoice: {
+        locationId: squareConfig.locationId,
+        orderId: squareOrderId,
+        invoiceNumber: orderId,
+        title: `Commande ${orderId}`,
+        description: notes || `Facture pour la commande ${orderId}`,
+        primaryRecipient: {
+          customerId: squareCustomerId,
+        },
+        paymentRequests: [
           {
-            name: "TPS + TVQ",
-            percentage: "14.975",
-            scope: "ORDER",
+            requestType: "BALANCE",
+            dueDate: invoiceDueDate,
+            automaticPaymentSource: "NONE",
           },
         ],
-      },
-      invoiceNumber: orderId,
-      title: `Commande ${orderId}`,
-      description: notes || `Facture pour la commande ${orderId}`,
-      scheduledAt: new Date().toISOString(),
-      dueDate: invoiceDueDate,
-      primaryRecipient: {
-        emailAddress: customerEmail,
-        givenName: customerName.split(" ")[0] || customerName,
-        familyName: customerName.split(" ").slice(1).join(" ") || "",
-      },
-      paymentRequests: [
-        {
-          requestType: "BALANCE",
-          dueDate: invoiceDueDate,
-          automaticPaymentSource: "NONE",
+        deliveryMethod: "SHARE_MANUALLY",
+        acceptedPaymentMethods: {
+          card: true,
+          squareGiftCard: false,
+          bankAccount: false,
+          buyNowPayLater: false,
         },
-      ],
-      deliveryMethod: deliveryChannel === "sms" ? "SHARE_MANUALLY" : "EMAIL",
-      acceptedPaymentMethods: {
-        card: true,
-        squareGiftCard: false,
-        bankAccount: false,
-        buyNowPayLater: false,
       },
     };
 
     const response = await squareClient.invoices.create(invoiceRequest);
     console.log(`📦 [INVOICE] Response structure:`, Object.keys(response));
-    console.log(`📦 [INVOICE] Full response:`, JSON.stringify(response, null, 2));
+    console.log(`📦 [INVOICE] Full response:`, safeStringify(response));
     const invoice = (response as any).invoice;
     const processingTime = Date.now() - startTime;
 
     console.log(
       `✅ [INVOICE] Invoice created successfully! ID: ${invoice?.id}, Number: ${invoice?.invoiceNumber}, Processing time: ${processingTime}ms`,
     );
+
+    let notificationWarning: string | undefined;
+    let publishedPublicUrl: string | undefined;
 
     // Publish the invoice to make it active and send through selected channel.
     if (invoice?.id) {
@@ -540,23 +646,90 @@ export const createInvoice = async (req: Request, res: Response) => {
           idempotencyKey: randomUUID(),
         });
 
+        publishedPublicUrl = (publishResponse as any)?.invoice?.publicUrl || invoice.publicUrl;
+
         if (deliveryChannel === "sms") {
-          const publicUrl = (publishResponse as any)?.invoice?.publicUrl || invoice.publicUrl;
-          if (!customerPhone || !publicUrl) {
+          const publicUrl = publishedPublicUrl;
+          if (!normalizedPhone || !publicUrl) {
             throw new Error("SMS impossible: numero client ou lien facture manquant");
           }
 
           await sendSms({
-            to: customerPhone,
+            to: normalizedPhone,
             body: `Maison Fanny: votre lien de paiement pour la commande ${orderId}: ${publicUrl}`,
           });
           console.log(`✅ [INVOICE] Invoice published and SMS sent`);
         } else {
-          console.log(`✅ [INVOICE] Invoice published and email sent`);
+          const publicUrl = publishedPublicUrl;
+          if (!publicUrl) {
+            throw new Error("Email impossible: lien facture manquant");
+          }
+
+          await sendInvoiceOrderConfirmation(
+            customerEmail,
+            customerName,
+            orderNumber || orderId,
+            items.map((item: any) => ({
+              productName: item.name,
+              quantity: item.quantity,
+              amount: item.unitPrice * item.quantity,
+            })),
+            total - taxAmount - deliveryFee,
+            taxAmount,
+            deliveryFee,
+            total,
+            publicUrl,
+            new Date(),
+          );
+          console.log(`✅ [INVOICE] Invoice published and branded email sent`);
         }
       } catch (publishError: any) {
         console.error(`⚠️ [INVOICE] Failed to publish invoice:`, publishError.message);
-        // Continue even if publish fails - invoice is still created
+        if (deliveryChannel === "sms") {
+          notificationWarning =
+            publishError?.message ||
+            "Facture creee mais SMS non envoye (verifier configuration Twilio)";
+          console.warn(`⚠️ [INVOICE] SMS warning: ${notificationWarning}`);
+          // On ne bloque pas la creation de facture si l'envoi SMS echoue.
+          // Cela permet d'utiliser le lien de paiement manuellement.
+          if (publishedPublicUrl) {
+            console.log(`🔗 [INVOICE] Payment link remains available: ${publishedPublicUrl}`);
+          }
+          
+          // Optional fallback: send branded email when available
+          if (customerEmail && publishedPublicUrl) {
+            try {
+              await sendInvoiceOrderConfirmation(
+                customerEmail,
+                customerName,
+                orderNumber || orderId,
+                items.map((item: any) => ({
+                  productName: item.name,
+                  quantity: item.quantity,
+                  amount: item.unitPrice * item.quantity,
+                })),
+                total - taxAmount - deliveryFee,
+                taxAmount,
+                deliveryFee,
+                total,
+                publishedPublicUrl,
+                new Date(),
+              );
+              console.log(`✅ [INVOICE] Fallback email sent after SMS failure`);
+            } catch (fallbackEmailError: any) {
+              console.warn(
+                `⚠️ [INVOICE] Fallback email also failed: ${fallbackEmailError?.message || fallbackEmailError}`,
+              );
+            }
+          }
+          
+          // Continue normally
+        } else {
+          // Pour email, on continue même si la publication échoue - la facture est quand même créée
+          notificationWarning =
+            publishError?.message ||
+            "Facture creee mais publication/envoi email incomplet";
+        }
       }
     }
 
@@ -566,9 +739,10 @@ export const createInvoice = async (req: Request, res: Response) => {
         invoiceId: invoice?.id,
         invoiceNumber: invoice?.invoiceNumber,
         status: invoice?.status,
-        publicUrl: invoice?.publicUrl,
+        publicUrl: publishedPublicUrl || invoice?.publicUrl,
         deliveryChannel,
         dueDate: invoice?.paymentRequests?.[0]?.dueDate,
+        notificationWarning,
       },
     });
   } catch (error: any) {
@@ -655,11 +829,26 @@ export const refundOrderPayment = async (req: Request, res: Response) => {
       });
     }
 
-    const refundResponse = await (squareClient.refunds as any).create({
+    const requestedAmountInCents = BigInt(Math.round(order.total * 100));
+    const refundableAmountInCents = await getRefundableAmountCents(paymentId);
+
+    if (refundableAmountInCents <= 0n) {
+      return res.status(400).json({
+        success: false,
+        error: "Ce paiement est deja totalement rembourse ou non remboursable",
+      });
+    }
+
+    const refundAmountInCents =
+      requestedAmountInCents > refundableAmountInCents
+        ? refundableAmountInCents
+        : requestedAmountInCents;
+
+    const refundResponse = await squareClient.refunds.refundPayment({
       idempotencyKey: randomUUID(),
       paymentId,
       amountMoney: {
-        amount: BigInt(Math.round(order.total * 100)),
+        amount: refundAmountInCents,
         currency: "CAD",
       },
       reason: reason || `Remboursement commande ${order.orderNumber}`,
@@ -691,6 +880,8 @@ export const refundOrderPayment = async (req: Request, res: Response) => {
         paymentId,
         refundId: refund?.id,
         refundStatus: refund?.status,
+        refundAmountCents: Number(refundAmountInCents),
+        cappedToAvailableAmount: requestedAmountInCents !== refundAmountInCents,
       },
       message: "Remboursement Square effectue avec succes",
     });

@@ -3,6 +3,11 @@ export interface SmsPayload {
   body: string;
 }
 
+const isTruthy = (value?: string) => {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+};
+
 const normalizeCanadianPhone = (phone: string) => {
   const digits = phone.replace(/\D/g, "");
 
@@ -25,6 +30,29 @@ export const sendSms = async ({ to, body }: SmsPayload) => {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_FROM_NUMBER;
+  const dryRun = isTruthy(process.env.SMS_DRY_RUN);
+
+  console.log(`📱 [SMS] Mode: ${dryRun ? "dry-run" : "real"} (SMS_DRY_RUN=${process.env.SMS_DRY_RUN ?? "undefined"})`);
+
+  const destination = normalizeCanadianPhone(to);
+
+  if (dryRun) {
+    console.log("📱 [SMS] Dry-run enabled: Twilio request skipped", {
+      to: destination,
+      from: from || "TWILIO_FROM_NUMBER_NOT_SET",
+      body,
+    });
+
+    return {
+      dryRun: true,
+      to: destination,
+      from: from || null,
+      body,
+      provider: "twilio",
+      sid: "SM_DRY_RUN",
+      status: "queued",
+    };
+  }
 
   if (!sid || !token || !from) {
     throw new Error(
@@ -32,7 +60,6 @@ export const sendSms = async ({ to, body }: SmsPayload) => {
     );
   }
 
-  const destination = normalizeCanadianPhone(to);
   const payload = new URLSearchParams({
     To: destination,
     From: from,

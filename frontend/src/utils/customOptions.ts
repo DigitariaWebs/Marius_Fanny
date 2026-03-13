@@ -63,3 +63,66 @@ export const getChoicePrice = (choice: string): number | null => {
   const parsed = parseChoiceInput(choice);
   return parsed.price;
 };
+
+export interface ProductCustomOptionLike {
+  name: string;
+  choices: string[];
+}
+
+export const getChoicePriceDeltaForOption = (
+  optionChoices: string[] = [],
+  selectedChoice: string,
+  basePrice: number = 0,
+): number => {
+  const selectedPrice = getChoicePrice(selectedChoice);
+  if (selectedPrice === null) return 0;
+
+  const selectedRaw = selectedChoice?.trim() || "";
+  const isExplicitSupplement = /\+\s*[\d.,]+\s*\$?/i.test(selectedRaw);
+  if (isExplicitSupplement) {
+    return Math.max(0, selectedPrice);
+  }
+
+  const numericPrices = optionChoices
+    .map((choice) => getChoicePrice(choice))
+    .filter((price): price is number => price !== null);
+
+  const hasUnpricedChoices =
+    optionChoices.length > 0 && numericPrices.length < optionChoices.length;
+
+  const allChoicesHavePrice =
+    optionChoices.length > 0 && numericPrices.length === optionChoices.length;
+
+  if (hasUnpricedChoices) {
+    return Math.max(0, selectedPrice - basePrice);
+  }
+
+  if (allChoicesHavePrice) {
+    const hasBasePriceInChoices = numericPrices.some(
+      (price) => Math.abs(price - basePrice) < 0.0001,
+    );
+
+    if (hasBasePriceInChoices) {
+      return Math.max(0, selectedPrice - basePrice);
+    }
+
+    const minChoicePrice = Math.min(...numericPrices);
+    return Math.max(0, selectedPrice - minChoicePrice);
+  }
+
+  return Math.max(0, selectedPrice - basePrice);
+};
+
+export const calculatePriceWithOptions = (
+  basePrice: number,
+  customOptions: ProductCustomOptionLike[] = [],
+  selectedOptions: Record<string, string> = {},
+): number => {
+  const additionalTotal = customOptions.reduce((sum, option) => {
+    const selectedChoice = selectedOptions[option.name];
+    if (!selectedChoice) return sum;
+    return sum + getChoicePriceDeltaForOption(option.choices || [], selectedChoice, basePrice);
+  }, 0);
+
+  return basePrice + additionalTotal;
+};

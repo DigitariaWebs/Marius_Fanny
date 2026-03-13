@@ -44,6 +44,7 @@ export const listPaymentsSchema = z.object({
  */
 export const createInvoiceSchema = z.object({
   orderId: z.string().min(1, "Order ID is required"),
+  orderNumber: z.string().optional(),
   customerEmail: z.string().email("Valid email is required"),
   customerPhone: z.string().optional(),
   customerName: z.string().min(1, "Customer name is required"),

@@ -4,7 +4,11 @@ import { productAPI } from '../lib/ProductAPI';
 import { categoryAPI } from '../lib/CategoryAPI';
 import type { Product, Category as CategoryType } from '../types';
 import { getImageUrl } from '../utils/api';
-import { formatChoiceDisplay, getChoicePrice } from '../utils/customOptions';
+import {
+  calculatePriceWithOptions,
+  formatChoiceDisplay,
+  getChoicePriceDeltaForOption,
+} from '../utils/customOptions';
 
 const styles = {
   gold: '#337957',
@@ -208,38 +212,12 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
 
   const getCurrentPrice = () => {
     if (!selectedProduct) return 0;
-    
-    // Prix de base du produit
-    let totalPrice = selectedProduct.price;
-    
-    // CORRECTION : Dictionnaire des prix ADDITIONNELS (pas les prix totaux)
-    const optionAdditionalPrices: Record<string, number> = {
-      "10 personnes": 5.00,   // 25$ - 20$ = 5$
-      "13 personnes": 10.00,  // 30$ - 20$ = 10$
-      "Baguette": 0,
-      "Roulé pita": 0,
-      "Croissant": 0,
-      "Tranché": 0,
-      "Non tranché": 0,
-    };
-    
-    // Ajouter les prix additionnels des options sélectionnées
-    Object.values(selectedOptions).forEach(choice => {
-      if (optionAdditionalPrices[choice] !== undefined) {
-        totalPrice += optionAdditionalPrices[choice];
-      } else {
-        // Fallback: utiliser getChoicePrice mais en le convertissant en prix additionnel
-        const price = getChoicePrice(choice);
-        if (price && price > selectedProduct.price) {
-          // Si le prix est plus grand que le prix de base, c'est probablement le prix total
-          totalPrice += (price - selectedProduct.price);
-        } else if (price) {
-          totalPrice += price;
-        }
-      }
-    });
-    
-    return totalPrice;
+
+    return calculatePriceWithOptions(
+      selectedProduct.price,
+      selectedProduct.customOptions || [],
+      selectedOptions,
+    );
   };
 
   const getDiscountedPrice = (price: number, discount: number = 0) => {
@@ -656,10 +634,11 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                         <div className="flex gap-2 flex-wrap">
                           {(option.choices || []).map((choice) => {
                             const displayText = formatChoiceDisplay(choice) || choice;
-                            // Prix additionnel pour l'affichage
-                            let additionalPrice = 0;
-                            if (choice === "10 personnes") additionalPrice = 5.00;
-                            else if (choice === "13 personnes") additionalPrice = 10.00;
+                            const additionalPrice = getChoicePriceDeltaForOption(
+                              option.choices || [],
+                              choice,
+                              selectedProduct.price,
+                            );
                             
                             return (
                               <button

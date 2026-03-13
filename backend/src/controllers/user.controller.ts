@@ -5,6 +5,69 @@ import Order from "../models/Order.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { canManageUser } from "../utils/roles.js";
 
+async function backfillMissingClientsFromOrders() {
+  const orderClientRecords = await Order.find({
+    "clientInfo.email": { $exists: true, $ne: "" },
+  })
+    .sort({ orderDate: -1 })
+    .select("clientInfo")
+    .lean();
+
+  const candidates = new Map<
+    string,
+    { email: string; name: string; phoneNumber: string }
+  >();
+
+  for (const order of orderClientRecords) {
+    const email = order.clientInfo?.email?.trim().toLowerCase();
+    if (!email || candidates.has(email)) continue;
+
+    const firstName = order.clientInfo?.firstName?.trim() || "";
+    const lastName = order.clientInfo?.lastName?.trim() || "";
+    const phoneNumber = order.clientInfo?.phone?.trim() || "";
+
+    candidates.set(email, {
+      email,
+      name: `${firstName} ${lastName}`.trim() || email,
+      phoneNumber,
+    });
+  }
+
+  const emails = [...candidates.keys()];
+  if (emails.length === 0) return;
+
+  const existingUsers = await User.find({ email: { $in: emails } })
+    .select("email")
+    .lean();
+  const existingEmails = new Set(
+    existingUsers.map((user) => user.email.trim().toLowerCase()),
+  );
+
+  const missingClients = emails
+    .filter((email) => !existingEmails.has(email))
+    .map((email) => {
+      const candidate = candidates.get(email)!;
+      return {
+        email: candidate.email,
+        name: candidate.name,
+        role: "user" as const,
+        status: "active" as const,
+        isDeleted: false,
+        emailVerified: true,
+        profile: {
+          phoneNumber: candidate.phoneNumber,
+        },
+      };
+    });
+
+  if (missingClients.length === 0) return;
+
+  await User.insertMany(missingClients, { ordered: false });
+  console.log(
+    `✅ Backfilled ${missingClients.length} missing client(s) from orders`,
+  );
+}
+
 /**
  * Get current user profile
  */
@@ -224,6 +287,25 @@ export async function deleteUser(req: AuthRequest, res: Response) {
       throw new AppError("Cannot delete user with equal or higher role", 403);
     }
 
+    if (targetUser.role === "user") {
+      await User.findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            isDeleted: true,
+            deletedAt: new Date(),
+            status: "inactive",
+          },
+        },
+        { runValidators: true },
+      );
+
+      return res.json({
+        success: true,
+        message: "Client supprimé avec succès",
+      });
+    }
+
     await User.findByIdAndDelete(id);
 
     res.json({
@@ -295,6 +377,7 @@ export async function createClient(req: AuthRequest, res: Response) {
 export async function getAllClients(req: AuthRequest, res: Response) {
   try {
     console.log("📥 getAllClients called, query:", req.query);
+    await backfillMissingClientsFromOrders();
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const search = req.query.search as string || "";
@@ -302,7 +385,7 @@ export async function getAllClients(req: AuthRequest, res: Response) {
     const skip = (page - 1) * limit;
 
     // Always filter by role: "user" to get only clients
-    const query: any = { role: "user" };
+    const query: any = { role: "user", isDeleted: { $ne: true } };
     
     // If search is provided, filter by name or email (combined with role filter)
     if (search) {
@@ -384,6 +467,7 @@ export async function searchClients(req: AuthRequest, res: Response) {
     // Only search users with role "user" (clients)
     const users = await User.find({
       role: "user",
+      isDeleted: { $ne: true },
       $or: [
         { email: { $regex: q, $options: "i" } },
         { name: { $regex: q, $options: "i" } },

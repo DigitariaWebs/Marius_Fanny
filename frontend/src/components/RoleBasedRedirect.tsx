@@ -46,10 +46,14 @@ export function RoleBasedRedirect({ children }: RoleBasedRedirectProps) {
             return;
           }
 
-          // If user is a four and NOT on their designated route
-          if (userRole === "four" && location.pathname !== "/staff/four") {
-            console.log("🔥 Redirecting four to their dashboard");
-            navigate("/staff/four", { replace: true });
+          // If user is a vendeur/four and NOT on their designated route
+          if (
+            (userRole === "vendeur" || userRole === "four") &&
+            location.pathname !== "/staff/vendeur" &&
+            location.pathname !== "/staff/four"
+          ) {
+            console.log("🛍️ Redirecting vendeur to their dashboard");
+            navigate("/staff/vendeur", { replace: true });
             return;
           }
         }

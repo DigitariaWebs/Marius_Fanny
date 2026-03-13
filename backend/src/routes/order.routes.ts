@@ -20,7 +20,12 @@ import {
   orderQuerySchema,
 } from "../schemas/order.schema.js";
 import { productionStatusSchema } from "../schemas/inventory.schema.js";
-import { requireAuth, requireAdmin, optionalAuth } from "../middleware/auth.js";
+import {
+  requireAuth,
+  requireAdmin,
+  requireRole,
+  optionalAuth,
+} from "../middleware/auth.js";
 
 const router = Router();
 
@@ -69,16 +74,16 @@ router.get("/:id/history", requireAuth, getOrderHistory);
 // Update delivery status (for delivery drivers)
 router.patch("/:id/delivery-status", requireAuth, updateDeliveryStatus);
 
-// Update an order (admin only)
+// Update an order (admin and vendeur)
 router.patch(
   "/:id",
   requireAuth,
-  requireAdmin,
+  requireRole("admin", "vendeur"),
   validateBody(updateOrderSchema),
   updateOrder,
 );
 
-// Delete an order (admin only)
-router.delete("/:id", requireAuth, requireAdmin, deleteOrder);
+// Delete an order (admin and vendeur)
+router.delete("/:id", requireAuth, requireRole("admin", "vendeur"), deleteOrder);
 
 export default router;
