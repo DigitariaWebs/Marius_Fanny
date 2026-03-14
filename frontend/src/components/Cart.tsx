@@ -25,6 +25,7 @@ import {
   DELIVERY_ZONES,
 } from "../utils/deliveryZones";
 import { authClient } from "../lib/AuthClient";
+import { promoAPI } from "../lib/PromoAPI";
 import { TAX_RATE } from "../data";
 import { getImageUrl } from "../utils/api";
 
@@ -86,11 +87,12 @@ const CartDrawer: React.FC<CartProps> = ({
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<{
     code: string;
-    label: string;
-    type: "percent" | "fixed";
-    value: number;
+    discountPercent: number;
+    discountAmount: number;
+    appliesToProductIds: number[] | null;
   } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
   const PROMO_CODES: Record<string, { label: string; type: "percent" | "fixed"; value: number }> = {
     "BIENVENUE10": { label: "Bienvenue -10%",  type: "percent", value: 10  },
@@ -99,16 +101,36 @@ const CartDrawer: React.FC<CartProps> = ({
     "VIP20":       { label: "VIP -20%",        type: "percent", value: 20  },
   };
 
-  const handleApplyPromo = () => {
-    const code = promoInput.trim().toUpperCase();
+  const handleApplyPromo = async () => {
+    const code = promoInput.trim();
     if (!code) return;
-    const promo = PROMO_CODES[code];
-    if (promo) {
-      setAppliedPromo({ code, ...promo });
+    setIsApplyingPromo(true);
+    setPromoError(null);
+    const promo = await promoAPI.validatePromo({
+      code,
+      subtotal,
+      items: items.map((item) => ({
+        productId: item.id,
+        amount: item.price * item.quantity,
+      })),
+    }).catch((err: any) => {
+      setAppliedPromo(null);
+      setPromoError(err?.message || "Code promo invalide ou expiré.");
+      return null;
+    });
+    if (promo?.data) {
+      setAppliedPromo({
+        code: promo.data.code,
+        discountPercent: promo.data.discountPercent,
+        discountAmount: promo.data.discountAmount,
+        appliesToProductIds: promo.data.appliesToProductIds,
+      });
       setPromoError(null);
       setPromoInput("");
+      setIsApplyingPromo(false);
     } else {
       setPromoError("Code promo invalide ou expiré.");
+      setIsApplyingPromo(false);
     }
   };
 
@@ -178,11 +200,7 @@ const CartDrawer: React.FC<CartProps> = ({
       ? deliveryZoneInfo.fee
       : 0;
 
-  const discount = appliedPromo
-    ? appliedPromo.type === "percent"
-      ? Math.min(subtotal * (appliedPromo.value / 100), subtotal)
-      : Math.min(appliedPromo.value, subtotal)
-    : 0;
+  const discount = appliedPromo ? Math.min(appliedPromo.discountAmount, subtotal) : 0;
 
   const total = subtotal - discount + taxes + delivery;
 
@@ -236,6 +254,7 @@ const CartDrawer: React.FC<CartProps> = ({
       deliveryFee: delivery,
       subtotal: subtotal,
       discount: discount,
+      promoCode: appliedPromo?.code || undefined,
       taxes: taxes,
       total: total,
       timestamp: Date.now(),
@@ -713,10 +732,10 @@ const CartDrawer: React.FC<CartProps> = ({
                       </div>
                       <button
                         onClick={handleApplyPromo}
-                        disabled={!promoInput.trim()}
+                        disabled={!promoInput.trim() || isApplyingPromo}
                         className="px-4 py-2 text-sm font-semibold rounded-lg bg-[#2D2A26] text-white hover:bg-[#337957] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        Appliquer
+                        {isApplyingPromo ? "..." : "Appliquer"}
                       </button>
                     </div>
                     {promoError && (
@@ -730,7 +749,7 @@ const CartDrawer: React.FC<CartProps> = ({
                     <div className="flex items-center gap-2">
                       <Check size={14} className="text-emerald-600" />
                       <span className="text-sm font-semibold text-emerald-700">{appliedPromo.code}</span>
-                      <span className="text-xs text-emerald-600">{appliedPromo.label}</span>
+                      <span className="text-xs text-emerald-600">-{appliedPromo.discountPercent}%</span>
                     </div>
                     <button onClick={handleRemovePromo} className="text-emerald-500 hover:text-red-500 transition-colors ml-2">
                       <X size={14} />

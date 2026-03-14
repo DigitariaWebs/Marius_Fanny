@@ -20,6 +20,7 @@ import {
   Truck,
   ChefHat,
   Clock,
+  TicketPercent,
 } from "lucide-react";
 import StaffManagement from "./StaffManagement";
 import ClientManagement from "./ClientManagement";
@@ -30,6 +31,7 @@ import SettingsManagement from "./SettingsManagement";
 import DeliveryAssignment from "./DeliveryAssignment";
 import ProductionList from "./ProductionList";
 import InventaireJournalier from "./InventaireJournalier";
+import PromoManagement from "./PromoManagement";
 import { authClient } from "../lib/AuthClient";
 import GoldenBackground from "./GoldenBackground";
 import type { Product } from "../types";
@@ -57,6 +59,7 @@ type ViewMode =
   | "clients"
   | "orders"
   | "products"
+  | "promos"
   | "categories"
   | "delivery"
   | "settings"
@@ -267,6 +270,15 @@ export default function AdminDashboard() {
                 active={viewMode === "categories"}
                 onClick={() => {
                   setViewMode("categories");
+                  setIsMobileMenuOpen(false);
+                }}
+              />
+              <NavItem
+                icon={<TicketPercent size={20} />}
+                label="Codes promo"
+                active={viewMode === "promos"}
+                onClick={() => {
+                  setViewMode("promos");
                   setIsMobileMenuOpen(false);
                 }}
               />
@@ -517,6 +529,9 @@ export default function AdminDashboard() {
 
         {/* VUE PRODUITS */}
         {viewMode === "products" && <ProductManagement />}
+
+        {/* VUE CODES PROMO */}
+        {viewMode === "promos" && <PromoManagement products={products} />}
 
         {/* VUE CATÉGORIES */}
         {viewMode === "categories" && <CategoryManagement />}

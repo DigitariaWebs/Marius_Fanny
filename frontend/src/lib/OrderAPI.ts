@@ -64,6 +64,7 @@ class OrderAPI {
       email: string;
       phone: string;
     };
+    promoCode?: string;
     pickupDate?: string;
     pickupLocation: "Montreal" | "Laval";
     deliveryType: "pickup" | "delivery";

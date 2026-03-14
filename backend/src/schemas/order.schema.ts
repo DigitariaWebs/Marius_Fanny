@@ -62,6 +62,7 @@ export const createOrderSchema = z
         "Tous les articles doivent avoir une quantité positive",
       ),
     notes: z.string().optional(),
+    promoCode: z.string().min(2).max(32).optional(),
     paymentType: z
       .enum(["full", "deposit"], {
         message: "Le type de paiement doit être full ou deposit",
