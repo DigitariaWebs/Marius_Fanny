@@ -53,6 +53,11 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const currentWeekDay = new Date().getDay();
 
+  const normalizeOptionName = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const isAllergyOptionName = (name: string) =>
+    normalizeOptionName(name).includes("allerg");
+
   const getMissingRequiredOptions = (
     product: Product | null,
     options: Record<string, string>,
@@ -60,6 +65,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
     if (!product?.customOptions?.length) return [] as string[];
 
     return product.customOptions
+      .filter((option) => !isAllergyOptionName(option.name))
       .filter((option) => !String(options[option.name] || "").trim())
       .map((option) => option.name);
   };
@@ -619,7 +625,7 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                             : "text-stone-500"
                         }`}>
                           <span className="w-1 h-4 bg-[#337957] rounded-full"></span>
-                          {option.name} *
+                          {option.name}{!isAllergyOptionName(option.name) ? " *" : ""}
                         </h4>
                         {option.type === "text" ? (
                           <input

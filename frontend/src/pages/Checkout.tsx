@@ -28,6 +28,8 @@ interface CheckoutState {
   pickupLocation?: "Montreal" | "Laval";
   deliveryFee: number;
   subtotal: number;
+  discount?: number;
+  promoCode?: string;
   taxes: number;
   total: number;
 }
@@ -451,6 +453,7 @@ const Checkout: React.FC = () => {
           email: customerEmail,
           phone: customerPhone,
         },
+        promoCode: state?.promoCode || undefined,
         deliveryType: state.deliveryType,
         deliveryDate: deliveryDate,
         deliveryTimeSlot: deliveryTime, // Sera vide pour ramassage
@@ -1146,6 +1149,12 @@ const Checkout: React.FC = () => {
                     <span>Sous-total</span>
                     <span>{state.subtotal.toFixed(2)} $</span>
                   </div>
+                  {!!state.discount && state.discount > 0 && (
+                    <div className="flex justify-between text-emerald-700">
+                      <span>Réduction{state.promoCode ? ` (${state.promoCode})` : ""}</span>
+                      <span>-{state.discount.toFixed(2)} $</span>
+                    </div>
+                  )}
                   {state.deliveryType === "delivery" && (
                     <div className="flex justify-between text-stone-600">
                       <span>Livraison</span>

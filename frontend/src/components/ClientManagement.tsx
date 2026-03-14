@@ -273,6 +273,13 @@ function ClientManagement() {
     return colors[status];
   };
 
+  const isArchivedOrderStatus = (status: Order["status"]) =>
+    status === "completed" || status === "delivered";
+
+  const clientOrders = Array.isArray(viewingClient?.orders) ? viewingClient?.orders : [];
+  const activeOrders = clientOrders.filter((order: any) => !isArchivedOrderStatus(order.status));
+  const archivedOrders = clientOrders.filter((order: any) => isArchivedOrderStatus(order.status));
+
   const columns = [
     {
       key: "name",
@@ -782,7 +789,10 @@ function ClientManagement() {
                   <div>
                     <p className="text-sm text-gray-500">Commandes</p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">
-                      {viewingClient.orders?.length || 0}
+                      {activeOrders.length}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Total: {clientOrders.length} • Terminées: {archivedOrders.length}
                     </p>
                   </div>
                   <Package className="w-8 h-8 text-[#C5A065]" />
@@ -817,10 +827,13 @@ function ClientManagement() {
 
             {/* Tabs */}
             <Tabs defaultValue="profile" className="w-full">
-              <TabsList className="w-full grid grid-cols-3">
+              <TabsList className="w-full grid grid-cols-4">
                 <TabsTrigger value="profile">Profil</TabsTrigger>
                 <TabsTrigger value="orders">
-                  Commandes ({viewingClient.orders?.length || 0})
+                  Commandes ({activeOrders.length})
+                </TabsTrigger>
+                <TabsTrigger value="archived">
+                  Terminées ({archivedOrders.length})
                 </TabsTrigger>
                 <TabsTrigger value="addresses">
                   Adresses ({viewingClient.addresses?.length || 0})
@@ -893,8 +906,8 @@ function ClientManagement() {
               </TabsContent>
 
               <TabsContent value="orders" className="space-y-3">
-                {viewingClient.orders?.length > 0 ? (
-                  viewingClient.orders?.map((order) => (
+                {activeOrders.length > 0 ? (
+                  activeOrders.map((order: any) => (
                     <div
                       key={order.id}
                       className="p-4 bg-white rounded-lg border border-(--bakery-border) hover:shadow-md transition-shadow"
@@ -937,6 +950,29 @@ function ClientManagement() {
                           </div>
                         )}
                       </div>
+
+                      {Array.isArray(order.items) && order.items.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-(--bakery-border)">
+                          <p className="text-xs text-(--bakery-text-secondary) mb-2">
+                            Produits
+                          </p>
+                          <div className="space-y-1">
+                            {order.items.map((item: any, idx: number) => (
+                              <div
+                                key={item.id ?? `${order.id}-item-${idx}`}
+                                className="flex items-start justify-between gap-3 text-sm"
+                              >
+                                <span className="text-(--bakery-text) truncate">
+                                  {item.quantity ?? 1}x{" "}
+                                  {item.productName ||
+                                    item.product?.name ||
+                                    (item.productId != null ? `Produit #${item.productId}` : "Produit")}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 ) : (
@@ -944,6 +980,86 @@ function ClientManagement() {
                     <Package className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                     <p className="text-(--bakery-text-secondary)">
                       Aucune commande
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="archived" className="space-y-3">
+                {archivedOrders.length > 0 ? (
+                  archivedOrders.map((order: any) => (
+                    <div
+                      key={order.id}
+                      className="p-4 bg-white rounded-lg border border-(--bakery-border) hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="font-medium text-(--bakery-text)">
+                            {order.orderNumber}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1 text-sm text-(--bakery-text-secondary)">
+                            <Calendar className="w-4 h-4" />
+                            {formatDate(order.orderDate)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-2 text-lg font-bold text-(--bakery-text)">
+                            <DollarSign className="w-5 h-5 text-(--bakery-gold)" />
+                            {order.total.toFixed(2)} $
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${getOrderStatusColor(
+                            order.status,
+                          )}`}
+                        >
+                          {getOrderStatusLabel(order.status)}
+                        </span>
+                        {order.pickupLocation && (
+                          <div className="flex items-center gap-2 text-sm text-(--bakery-text-secondary)">
+                            <MapPin className="w-4 h-4" />
+                            {order.deliveryType === "delivery"
+                              ? "Livraison"
+                              : order.pickupLocation}
+                            {order.pickupDate && (
+                              <span>• {formatDate(order.pickupDate)}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {Array.isArray(order.items) && order.items.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-(--bakery-border)">
+                          <p className="text-xs text-(--bakery-text-secondary) mb-2">
+                            Produits
+                          </p>
+                          <div className="space-y-1">
+                            {order.items.map((item: any, idx: number) => (
+                              <div
+                                key={item.id ?? `${order.id}-item-${idx}`}
+                                className="flex items-start justify-between gap-3 text-sm"
+                              >
+                                <span className="text-(--bakery-text) truncate">
+                                  {item.quantity ?? 1}x{" "}
+                                  {item.productName ||
+                                    item.product?.name ||
+                                    (item.productId != null ? `Produit #${item.productId}` : "Produit")}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 bg-gray-50 rounded-lg text-center">
+                    <Package className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-(--bakery-text-secondary)">
+                      Aucune commande terminée
                     </p>
                   </div>
                 )}

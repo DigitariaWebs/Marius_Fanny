@@ -47,6 +47,10 @@ export interface IOrder extends Document {
   deliveryAddress?: IAddress;
   items: IOrderItem[];
   subtotal: number;
+  promoCode?: string;
+  promoDiscountPercent?: number;
+  promoDiscountAmount?: number;
+  promoAppliesToProductIds?: number[];
   taxAmount: number;
   deliveryFee: number;
   total: number;
@@ -229,6 +233,26 @@ const OrderSchema = new Schema<IOrder>(
       type: Number,
       required: true,
       min: 0,
+    },
+    promoCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      index: true,
+    },
+    promoDiscountPercent: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    promoDiscountAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    promoAppliesToProductIds: {
+      type: [Number],
+      default: undefined,
     },
     taxAmount: {
       type: Number,

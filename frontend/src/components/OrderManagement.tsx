@@ -30,6 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -273,6 +274,7 @@ export function OrderManagement() {
 
   const [filteredOrders, setFilteredOrders] = useState<OrderWithPacking[]>(orders);
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [showArchived, setShowArchived] = useState(false);
   const [selectedOrderForProducts, setSelectedOrderForProducts] = useState<OrderWithPacking | null>(null);
   const [isProductsModalOpen, setIsProductsModalOpen] = useState(false);
   
@@ -286,19 +288,32 @@ export function OrderManagement() {
   const [orderToCancel, setOrderToCancel] = useState<OrderWithPacking | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<"simple" | "complete">("simple");
+  const [refundEmployeeName, setRefundEmployeeName] = useState<string>("");
 
-  // Filtrer par date
-  useEffect(() => {
+  const isArchivedStatus = (status: OrderWithPacking["status"]) =>
+    status === "completed" || status === "delivered";
+
+  const applyOrderFilters = (list: OrderWithPacking[]) => {
+    let next = list;
+
+    if (!showArchived) {
+      next = next.filter((order) => !isArchivedStatus(order.status));
+    }
+
     if (selectedDate) {
-      const filtered = orders.filter(order => {
+      next = next.filter((order) => {
         const orderDate = (order.orderDate || "").split("T")[0];
         return orderDate === selectedDate;
       });
-      setFilteredOrders(filtered);
-    } else {
-      setFilteredOrders(orders);
     }
-  }, [selectedDate, orders]);
+
+    return next;
+  };
+
+  // Filtrer par date + archivage (ramassées/terminées)
+  useEffect(() => {
+    setFilteredOrders(applyOrderFilters(orders));
+  }, [selectedDate, showArchived, orders]);
 
   // Charger les commandes depuis l'API au montage
   useEffect(() => {
@@ -386,7 +401,7 @@ export function OrderManagement() {
           });
           
           setOrders(mapped);
-          setFilteredOrders(mapped);
+          setFilteredOrders(applyOrderFilters(mapped));
         }
       } catch (err) {
         console.error("Failed to fetch orders:", err);
@@ -508,7 +523,7 @@ export function OrderManagement() {
   };
 
   const parseItemNotes = (notes?: string) => {
-    if (!notes) return { options: [] as string[], allergies: "", note: "" };
+    if (!notes) return { options: [] as string[], allergies: "", note: "", description: "" };
 
     const lines = notes
       .split("\n")
@@ -518,6 +533,7 @@ export function OrderManagement() {
     const optionsLine = lines.find((line) => line.toLowerCase().startsWith("options:"));
     const allergiesLine = lines.find((line) => line.toLowerCase().startsWith("allergies:"));
     const noteLine = lines.find((line) => line.toLowerCase().startsWith("note:"));
+  const descriptionLine = lines.find((line) => line.toLowerCase().startsWith("description:"));
 
     const options = optionsLine
       ? optionsLine
@@ -542,7 +558,11 @@ export function OrderManagement() {
       ? noteLine.replace(/^note:\s*/i, "").trim()
       : fallbackLines.join(" ");
 
-    return { options, allergies, note };
+    const description = descriptionLine
+      ? descriptionLine.replace(/^description:\s*/i, "").trim()
+      : "";
+
+    return { options, allergies, note, description };
   };
 
   const formatCurrency = (amount: number) => {
@@ -700,7 +720,7 @@ export function OrderManagement() {
       await orderAPI.deleteOrder(orderToDelete.id);
       const newOrders = orders.filter((o) => o.id !== orderToDelete.id);
       setOrders(newOrders);
-      setFilteredOrders(newOrders);
+      setFilteredOrders(applyOrderFilters(newOrders));
       setIsDeleteModalOpen(false);
       setOrderToDelete(null);
     } catch (err: any) {
@@ -712,6 +732,7 @@ export function OrderManagement() {
   };
 
   const handleRefundClick = (order: OrderWithPacking) => {
+    setRefundEmployeeName("");
     setOrderToCancel(order);
     setIsCancelModalOpen(true);
   };
@@ -730,6 +751,7 @@ export function OrderManagement() {
         body: JSON.stringify({
           orderId: orderToCancel.id,
           reason: `Remboursement admin pour commande ${orderToCancel.orderNumber}`,
+          employeeName: refundEmployeeName.trim(),
         }),
       });
 
@@ -744,11 +766,12 @@ export function OrderManagement() {
           : o,
       );
       setOrders(updatedOrders);
-      setFilteredOrders(updatedOrders);
+      setFilteredOrders(applyOrderFilters(updatedOrders));
       setIsCancelModalOpen(false);
       setOrderToCancel(null);
     } catch (err: any) {
       console.error("❌ Failed to refund order:", err);
+        setRefundEmployeeName("");
       alert(`Erreur lors du remboursement: ${err.message || err}`);
     } finally {
       setIsSubmitting(false);
@@ -760,7 +783,7 @@ export function OrderManagement() {
       o.id === orderId ? { ...o, status: newStatus } : o,
     );
     setOrders(updatedOrders);
-    setFilteredOrders(updatedOrders);
+    setFilteredOrders(applyOrderFilters(updatedOrders));
 
     // Persist status change to the backend
     try {
@@ -1057,7 +1080,10 @@ export function OrderManagement() {
             return (
               <div key={`${order.id}-${item.id}`} className="rounded-md border border-gray-200 bg-gray-50 p-2">
                 <div className="text-xs font-semibold text-gray-900">
-                  {item.product?.name ?? `Produit #${item.productId}`} x{item.quantity}
+                  {item.productId === 0
+                    ? <span className="text-purple-700">[Personnalisé] {item.product?.name || "Item personnalisé"}</span>
+                    : (item.product?.name || `Produit #${item.productId}`)
+                  }{" "}x{item.quantity}
                 </div>
                 {parsed.options.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
@@ -1071,6 +1097,11 @@ export function OrderManagement() {
                 {parsed.allergies && (
                   <div className="mt-1 rounded bg-amber-100 text-amber-900 px-2 py-1 text-[10px] font-medium">
                     Allergies: {parsed.allergies}
+                                  {parsed.description && (
+                                    <div className="mt-1 text-[11px] text-purple-800 italic">
+                                      {parsed.description}
+                                    </div>
+                                  )}
                   </div>
                 )}
               </div>
@@ -1135,6 +1166,17 @@ export function OrderManagement() {
               Effacer
             </Button>
           )}
+
+          <div className="flex items-center gap-2 sm:ml-2">
+            <Checkbox
+              id="orders-show-archived"
+              checked={showArchived}
+              onCheckedChange={(value) => setShowArchived(value === true)}
+            />
+            <Label htmlFor="orders-show-archived" className="text-xs text-gray-600 cursor-pointer">
+              Afficher ramassées/terminées ({orders.filter((o) => isArchivedStatus(o.status)).length})
+            </Label>
+          </div>
           <Button
             onClick={handlePrintOrders}
             variant="outline"
@@ -1829,7 +1871,7 @@ export function OrderManagement() {
             setIsSubmitting(true);
             try {
               const apiItems = formData.items
-                .filter((item) => item.productId && item.quantity > 0)
+                .filter((item) => (item.productId != null) && item.quantity > 0)
                 .map((item) => ({
                   productId: item.productId!,
                   productName: item.productName,
@@ -1904,19 +1946,19 @@ export function OrderManagement() {
                   ? { id: 0, type: "shipping", ...formData.deliveryAddress, isDefault: false }
                   : undefined,
                 items: formData.items
-                  .filter((item) => item.productId && item.quantity > 0)
+                  .filter((item) => (item.productId != null || (item as any).isCustom) && item.quantity > 0)
                   .map((item, idx) => ({
                     id: idx + 1,
                     orderId: 0,
-                    productId: item.productId!,
+                    productId: item.productId ?? 0,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     subtotal: item.amount,
                     productionStatus: "pending",
                     notes: item.notes || undefined,
                     product: {
-                      id: item.productId!,
-                      name: item.productName || `Produit #${item.productId}`,
+                      id: item.productId ?? 0,
+                      name: item.productName || ((item as any).isCustom ? "Item personnalisé" : `Produit #${item.productId}`),
                       price: item.unitPrice
                     },
                     isPacked: false
@@ -1956,8 +1998,11 @@ export function OrderManagement() {
                 }
               }
 
-              setOrders((prev) => [newOrder, ...prev]);
-              setFilteredOrders((prev) => [newOrder, ...prev]);
+              setOrders((prev) => {
+                const next = [newOrder, ...prev];
+                setFilteredOrders(applyOrderFilters(next));
+                return next;
+              });
               setIsCreateModalOpen(false);
             } catch (err: any) {
               console.error("Failed to create order:", err);
@@ -2012,10 +2057,10 @@ export function OrderManagement() {
               }
 
               const apiItems = formData.items
-                .filter((item) => item.productId && item.quantity > 0)
+                .filter((item) => (item.productId != null || (item as any).isCustom) && item.quantity > 0)
                 .map((item) => ({
-                  productId: item.productId!,
-                  productName: item.productName,
+                  productId: item.productId ?? 0,
+                  productName: item.productName || ((item as any).isCustom ? "Item personnalisé" : `Produit #${item.productId}`),
                   quantity: item.quantity,
                   unitPrice: item.unitPrice,
                   amount: item.amount,
@@ -2081,18 +2126,18 @@ export function OrderManagement() {
                       }
                     : undefined,
                 items: formData.items
-                  .filter((item) => item.productId && item.quantity > 0)
+                  .filter((item) => (item.productId != null || (item as any).isCustom) && item.quantity > 0)
                   .map((item, idx) => ({
                     id: idx + 1,
-                    productId: item.productId!,
+                    productId: item.productId ?? 0,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     subtotal: item.amount,
                     productionStatus: "pending",
                     notes: item.notes || undefined,
                     product: {
-                      id: item.productId!,
-                      name: item.productName || `Produit #${item.productId}`,
+                      id: item.productId ?? 0,
+                      name: item.productName || ((item as any).isCustom ? "Item personnalisé" : `Produit #${item.productId}`),
                       price: item.unitPrice,
                     },
                     isPacked: false,
@@ -2106,16 +2151,13 @@ export function OrderManagement() {
                 updatedAt: saved?.updatedAt || new Date().toISOString(),
               };
 
-              setOrders((prev) =>
-                prev.map((order) =>
+              setOrders((prev) => {
+                const next = prev.map((order) =>
                   order.id === selectedOrder.id ? updatedOrder : order,
-                ),
-              );
-              setFilteredOrders((prev) =>
-                prev.map((order) =>
-                  order.id === selectedOrder.id ? updatedOrder : order,
-                ),
-              );
+                );
+                setFilteredOrders(applyOrderFilters(next));
+                return next;
+              });
 
               setIsEditModalOpen(false);
               setSelectedOrder(null);
@@ -2248,7 +2290,7 @@ export function OrderManagement() {
             label: "Rembourser via Square",
             onClick: handleRefund,
             variant: "destructive",
-            disabled: isSubmitting,
+            disabled: isSubmitting || !refundEmployeeName.trim(),
             loading: isSubmitting,
           },
           secondary: {
@@ -2266,6 +2308,24 @@ export function OrderManagement() {
             <p className="text-gray-700">
               Etes-vous sur de vouloir rembourser cette commande via Square ?
             </p>
+            <div>
+              <Label className="text-sm font-semibold text-gray-800">
+                Votre nom (employé qui effectue le remboursement) *
+              </Label>
+              <Input
+                type="text"
+                placeholder="ex: Marie Dupont"
+                value={refundEmployeeName}
+                onChange={(e) => setRefundEmployeeName(e.target.value)}
+                className="mt-1"
+                autoFocus
+              />
+              {!refundEmployeeName.trim() && (
+                <p className="text-xs text-red-500 mt-1">
+                  Obligatoire — ce nom sera enregistré dans l'historique de la commande.
+                </p>
+              )}
+            </div>
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="space-y-2">
                 <p className="font-medium text-gray-900">

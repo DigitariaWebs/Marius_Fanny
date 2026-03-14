@@ -4,6 +4,8 @@ import { Product } from "../models/Product.js";
 import { ProductionItemStatus } from "../models/ProductionItemStatus.js";
 import { DailyInventory } from "../models/DailyInventory.js";
 import { User } from "../models/User.js";
+import { PromoCode } from "../models/PromoCode.js";
+import { PromoRedemption } from "../models/PromoRedemption.js";
 import type { ApiResponse, PaginatedResponse } from "../types.js";
 import type {
   CreateOrderInput,
@@ -16,9 +18,51 @@ import {
   getAllDeliveryZones,
 } from "../utils/deliveryZones.js";
 import { sendOrderReceipt } from "../utils/emailService.js";
+import {
+  calculatePromoDiscount,
+  isPromoCurrentlyValid,
+  normalizePromoCode,
+} from "../utils/promo.js";
 
 // Tax rate for Quebec (TPS + TVQ)
 const TAX_RATE = 0.14975;
+
+async function computeTaxAmount(items: { productId: number; quantity: number; amount: number }[]) {
+  const ids = Array.from(new Set(items.map((i) => i.productId).filter((id) => id > 0)));
+  const products = ids.length
+    ? await Product.find({ id: { $in: ids } }).select("id category productionType hasTaxes").lean()
+    : [];
+  const productMap = new Map<number, any>(products.map((p: any) => [p.id, p]));
+
+  const viennoiseriesCount = items.reduce((sum, item) => {
+    const p = productMap.get(item.productId);
+    const category = String(p?.category || "").toLowerCase();
+    return category.includes("viennoiser") ? sum + (item.quantity || 0) : sum;
+  }, 0);
+
+  const patisseriesCount = items.reduce((sum, item) => {
+    const p = productMap.get(item.productId);
+    const category = String(p?.category || "").toLowerCase();
+    const isPatisserie = p?.productionType === "patisserie" || category.includes("patisser");
+    return isPatisserie ? sum + (item.quantity || 0) : sum;
+  }, 0);
+
+  const bakedGoodsExempt = viennoiseriesCount + patisseriesCount >= 6;
+
+  return items.reduce((sum, item) => {
+    const p = productMap.get(item.productId);
+    const category = String(p?.category || "").toLowerCase();
+    const isViennoiserie = category.includes("viennoiser");
+    const isPatisserie = p?.productionType === "patisserie" || category.includes("patisser");
+    const isBakedGood = isViennoiserie || isPatisserie;
+
+    const hasTaxes = p?.hasTaxes !== undefined ? !!p.hasTaxes : true;
+    const itemIsTaxable = isBakedGood ? hasTaxes && !bakedGoodsExempt : hasTaxes;
+
+    if (!itemIsTaxable) return sum;
+    return sum + (item.amount || 0) * TAX_RATE;
+  }, 0);
+}
 
 /**
  * Create a new order
@@ -62,7 +106,82 @@ export const createOrder = async (
       (sum, item) => sum + item.amount,
       0,
     );
-    const taxAmount = subtotal * TAX_RATE;
+
+    // Promo code (optional)
+    const nowForPromo = new Date();
+    let promoDoc: any = null;
+    let promoCode: string | undefined;
+    let promoDiscountAmount = 0;
+    let promoDiscountPercent: number | undefined;
+    let promoAppliesToProductIds: number[] | undefined;
+
+    if (orderData.promoCode && String(orderData.promoCode).trim()) {
+      promoCode = normalizePromoCode(orderData.promoCode);
+      promoDoc = await PromoCode.findOne({
+        code: promoCode,
+        deletedAt: { $exists: false },
+      });
+
+      if (!promoDoc) {
+        return res.status(400).json({
+          success: false,
+          error: "Code promo invalide",
+        });
+      }
+
+      const validity = isPromoCurrentlyValid(promoDoc, nowForPromo);
+      if (!validity.ok) {
+        return res.status(400).json({
+          success: false,
+          error: validity.reason,
+        });
+      }
+
+      const discount = calculatePromoDiscount({
+        promo: promoDoc,
+        items: orderData.items,
+        subtotal,
+      });
+
+      if (discount.discountAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Ce code promo ne s'applique pas à votre panier.",
+        });
+      }
+
+      if (
+        promoDoc.usageLimitPerUser !== undefined &&
+        promoDoc.usageLimitPerUser > 0
+      ) {
+        const userId = req.user?.id;
+        const email = (orderData.clientInfo?.email || "").trim().toLowerCase();
+        if (!userId && !email) {
+          return res.status(400).json({
+            success: false,
+            error: "Veuillez vous identifier pour utiliser ce code promo.",
+          });
+        }
+
+        const perUserFilter: Record<string, any> = { promoCodeId: promoDoc._id };
+        if (userId) perUserFilter.userId = userId;
+        else perUserFilter.email = email;
+
+        const usedCount = await PromoRedemption.countDocuments(perUserFilter);
+        if (usedCount >= promoDoc.usageLimitPerUser) {
+          return res.status(400).json({
+            success: false,
+            error: "Limite d'utilisation atteinte pour ce code promo.",
+          });
+        }
+      }
+
+      promoDiscountAmount = discount.discountAmount;
+      promoDiscountPercent = promoDoc.discountPercent;
+      promoAppliesToProductIds = promoDoc.appliesToProductIds || undefined;
+    }
+
+    const taxAmount = await computeTaxAmount(orderData.items as any);
     let deliveryFee = 0;
 
     // If delivery, calculate and validate delivery fee
@@ -94,7 +213,7 @@ export const createOrder = async (
       }
     }
 
-    const total = subtotal + taxAmount + deliveryFee;
+    const total = Math.max(0, subtotal - promoDiscountAmount) + taxAmount + deliveryFee;
     // In-store/full payments are charged at 100%; deposit flow stays at 50%.
     const depositAmount = orderData.paymentType === "full" ? total : total * 0.5;
 
@@ -126,6 +245,10 @@ export const createOrder = async (
       deliveryAddress: orderData.deliveryAddress,
       items: orderData.items,
       subtotal,
+      promoCode,
+      promoDiscountPercent,
+      promoDiscountAmount,
+      promoAppliesToProductIds,
       taxAmount,
       deliveryFee,
       total,
@@ -148,6 +271,56 @@ export const createOrder = async (
         error: "Erreur lors de la sauvegarde de la commande",
         message: saveError.message,
       });
+    }
+
+    // Redeem promo (if any) before other side-effects
+    if (promoDoc && promoCode && promoDiscountAmount > 0) {
+      try {
+        const promoUpdateFilter: Record<string, any> = {
+          _id: promoDoc._id,
+          deletedAt: { $exists: false },
+          isActive: true,
+        };
+        if (promoDoc.usageLimit !== undefined) {
+          promoUpdateFilter.timesUsed = { $lt: promoDoc.usageLimit };
+        }
+
+        const updated = await PromoCode.updateOne(
+          promoUpdateFilter,
+          { $inc: { timesUsed: 1 } },
+        );
+
+        if (!updated.modifiedCount) {
+          await order.deleteOne();
+          return res.status(400).json({
+            success: false,
+            error: "Ce code promo n'est plus disponible.",
+          });
+        }
+
+        await new PromoRedemption({
+          promoCodeId: promoDoc._id,
+          code: promoCode,
+          orderId: order._id,
+          userId: req.user?.id,
+          email: (orderData.clientInfo?.email || "").trim().toLowerCase() || undefined,
+          discountAmount: promoDiscountAmount,
+          redeemedAt: new Date(),
+        }).save();
+      } catch (promoErr: any) {
+        // Best-effort rollback
+        try {
+          await PromoCode.updateOne(
+            { _id: promoDoc._id },
+            { $inc: { timesUsed: -1 } },
+          );
+        } catch {}
+        await order.deleteOne();
+        return res.status(400).json({
+          success: false,
+          error: promoErr?.message || "Erreur lors de l'application du code promo.",
+        });
+      }
     }
 
     // Automatically create a client record when this email does not exist yet.
@@ -776,7 +949,25 @@ export const updateOrder = async (
       
       // Recalculate totals
       const subtotal = updateData.items.reduce((sum, item) => sum + item.amount, 0);
-      const taxAmount = subtotal * TAX_RATE;
+
+      let promoDiscountAmount = order.promoDiscountAmount || 0;
+      if (order.promoCode && (order.promoDiscountPercent ?? 0) > 0) {
+        const discount = calculatePromoDiscount({
+          promo: {
+            code: order.promoCode,
+            discountPercent: order.promoDiscountPercent ?? 0,
+            appliesToProductIds: order.promoAppliesToProductIds,
+            isActive: true,
+            timesUsed: 0,
+          } as any,
+          items: updateData.items,
+          subtotal,
+        });
+        promoDiscountAmount = discount.discountAmount;
+        order.promoDiscountAmount = promoDiscountAmount;
+      }
+
+      const taxAmount = await computeTaxAmount(updateData.items as any);
       let deliveryFee = order.deliveryFee;
 
       // Recalculate delivery fee if needed
@@ -785,7 +976,7 @@ export const updateOrder = async (
         deliveryFee = deliveryInfo.fee;
       }
 
-      const total = subtotal + taxAmount + deliveryFee;
+      const total = Math.max(0, subtotal - promoDiscountAmount) + taxAmount + deliveryFee;
       const depositAmount = order.paymentType === "full" ? total : total * 0.5;
 
       order.subtotal = subtotal;
