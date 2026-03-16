@@ -460,8 +460,13 @@ const Checkout: React.FC = () => {
         },
         promoCode: state?.promoCode || undefined,
         deliveryType: state.deliveryType,
-        deliveryDate: deliveryDate,
-        deliveryTimeSlot: deliveryTime, // Sera vide pour ramassage
+        pickupDate:
+          state.deliveryType === "pickup" && deliveryDate
+            ? new Date(`${deliveryDate}T${deliveryTime || "00:00"}:00`).toISOString()
+            : undefined,
+        pickupLocation: state.pickupLocation || "Laval",
+        deliveryDate: state.deliveryType === "delivery" ? deliveryDate : undefined,
+        deliveryTimeSlot: state.deliveryType === "delivery" ? deliveryTime : undefined,
         deliveryAddress:
           state.deliveryType === "delivery" && state.postalCode
             ? {
@@ -472,10 +477,6 @@ const Checkout: React.FC = () => {
                 contactPhone: deliveryContactPhone || undefined,
                 details: deliveryDetails || undefined,
               }
-            : undefined,
-        pickupLocation:
-          state.deliveryType === "pickup"
-            ? state.pickupLocation || "Laval"
             : undefined,
         items: state.items.map((item) => ({
           productId: item.id,

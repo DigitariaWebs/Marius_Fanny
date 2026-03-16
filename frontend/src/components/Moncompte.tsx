@@ -145,6 +145,13 @@ const Dashboard: React.FC = () => {
       day: "numeric",
     });
 
+  const getScheduledDate = (order: any) => {
+    if (order?.deliveryType === "pickup") {
+      return order.pickupDate || order.deliveryDate || order.orderDate || order.createdAt;
+    }
+    return order.deliveryDate || order.pickupDate || order.orderDate || order.createdAt;
+  };
+
   const formatAmount = (amount: number) =>
     `${amount.toFixed(2).replace(".", ",")} $`;
 
@@ -174,6 +181,55 @@ const Dashboard: React.FC = () => {
 
         // Récupérer les commandes depuis l'API backend
         console.log("📡 Récupération des commandes depuis le backend...");
+
+        // Pagination: récupérer plusieurs pages (sinon les anciennes commandes disparaissent après 100).
+        const API_URL = (await import('../utils/api')).API_URL;
+        const limit = 100;
+        const maxPages = 20;
+        let page = 1;
+        let pagedOrders: any[] = [];
+
+        while (page <= maxPages) {
+          const apiUrl = `${API_URL}/api/orders?page=${page}&limit=${limit}`;
+          const response = await fetch(apiUrl, {
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          const responseText = await response.text();
+          if (
+            responseText.includes("<!") ||
+            responseText.includes("<html") ||
+            responseText.includes("<!DOCTYPE")
+          ) {
+            throw new Error("Page HTML reçue au lieu de JSON");
+          }
+
+          if (!response.ok) {
+            const data = JSON.parse(responseText);
+            throw new Error(data.message || `Erreur ${response.status}`);
+          }
+
+          const data = JSON.parse(responseText);
+          const pageItems = data.data?.items || data.data || [];
+          pagedOrders = pagedOrders.concat(pageItems);
+
+          const totalPages = Number(data.data?.pagination?.totalPages || 0);
+          if (totalPages > 0) {
+            if (page >= totalPages) break;
+          } else if (pageItems.length < limit) {
+            break;
+          }
+
+          page += 1;
+        }
+
+        setOrders(pagedOrders);
+        setError(null);
+        console.log(`✅ ${pagedOrders.length} commande(s) chargée(s)`);
+        return;
 
         const apiUrl = `${(await import('../utils/api')).API_URL}/api/orders?limit=100`;
         console.log(`🔗 Appel: ${apiUrl}`);
@@ -483,7 +539,7 @@ const Dashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-stone-600">
-                          {formatDate(order.createdAt)}
+                          {formatDate(getScheduledDate(order))}
                         </td>
                         <td className="py-3 px-4 text-stone-600">
                           {order.items.length} article(s)
@@ -596,7 +652,7 @@ const Dashboard: React.FC = () => {
                         Date
                       </p>
                       <p className="font-bold text-stone-800">
-                        {formatDate(selectedOrder.createdAt)}
+                        {formatDate(getScheduledDate(selectedOrder))}
                       </p>
                     </div>
                     <div>

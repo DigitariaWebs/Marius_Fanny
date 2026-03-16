@@ -75,6 +75,7 @@ const PromoCodeSchema = new Schema<IPromoCode>(
     },
     usageLimitPerUser: {
       type: Number,
+      default: 1,
       min: 0,
     },
     timesUsed: {

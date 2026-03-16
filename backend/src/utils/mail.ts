@@ -23,9 +23,12 @@ const DISPLAY_FROM = `"Marius & Fanny" <${process.env.EMAIL_USER || FROM_EMAIL}>
 const LOGO_URL = "https://res.cloudinary.com/deyjooxbi/image/upload/v1773330080/branding/marius_fanny_logo.avif";
 
 // Google review link for post-order feedback.
+const GOOGLE_REVIEW_PLACE_ID_LAVAL = (process.env.GOOGLE_REVIEW_PLACE_ID_LAVAL || "").trim();
 const GOOGLE_REVIEW_URL =
   process.env.GOOGLE_REVIEW_URL ||
-  "https://www.google.com/maps/search/?api=1&query=Marius%20%26%20Fanny";
+  (GOOGLE_REVIEW_PLACE_ID_LAVAL
+    ? `https://search.google.com/local/writereview?placeid=${encodeURIComponent(GOOGLE_REVIEW_PLACE_ID_LAVAL)}`
+    : "https://www.google.com/maps/search/?api=1&query=Marius%20%26%20Fanny%20Laval");
 
 const buildGoogleReviewSection = () => `
   <div style="background-color: #FFF8E7; padding: 18px; border-radius: 8px; margin-top: 24px; border-left: 4px solid #C5A065; text-align: center;">

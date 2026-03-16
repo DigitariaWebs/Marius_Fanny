@@ -93,8 +93,9 @@ export async function createPromo(req: AuthRequest, res: Response) {
     exists.maxDiscountAmount = input.maxDiscountAmount;
     exists.startsAt = input.startsAt ? new Date(input.startsAt) : undefined;
     exists.endsAt = input.endsAt ? new Date(input.endsAt) : undefined;
+    // Business rule: promo codes are single-use per client.
     exists.usageLimit = input.usageLimit;
-    exists.usageLimitPerUser = input.usageLimitPerUser;
+    exists.usageLimitPerUser = 1;
     exists.createdByUserId = req.user?.id;
     await exists.save();
 
@@ -112,8 +113,9 @@ export async function createPromo(req: AuthRequest, res: Response) {
     maxDiscountAmount: input.maxDiscountAmount,
     startsAt: input.startsAt ? new Date(input.startsAt) : undefined,
     endsAt: input.endsAt ? new Date(input.endsAt) : undefined,
+    // Business rule: promo codes are single-use per client.
     usageLimit: input.usageLimit,
-    usageLimitPerUser: input.usageLimitPerUser,
+    usageLimitPerUser: 1,
     isActive: input.isActive ?? true,
     createdByUserId: req.user?.id,
   });
@@ -152,8 +154,9 @@ export async function updatePromo(req: AuthRequest, res: Response) {
   if (input.maxDiscountAmount !== undefined) promo.maxDiscountAmount = input.maxDiscountAmount;
   if (input.startsAt !== undefined) promo.startsAt = input.startsAt ? new Date(input.startsAt) : undefined;
   if (input.endsAt !== undefined) promo.endsAt = input.endsAt ? new Date(input.endsAt) : undefined;
+  // Business rule: promo codes are single-use per client.
   if (input.usageLimit !== undefined) promo.usageLimit = input.usageLimit;
-  if (input.usageLimitPerUser !== undefined) promo.usageLimitPerUser = input.usageLimitPerUser;
+  promo.usageLimitPerUser = 1;
   if (input.isActive !== undefined) promo.isActive = input.isActive;
 
   if (promo.startsAt && promo.endsAt && promo.endsAt <= promo.startsAt) {
@@ -210,7 +213,9 @@ export async function validatePromo(req: AuthRequest, res: Response) {
   const userId = req.user?.id;
   const email = (input.email || req.user?.email || "").trim().toLowerCase() || undefined;
 
-  if (promo.usageLimitPerUser !== undefined && promo.usageLimitPerUser > 0) {
+  const perUserLimit =
+    promo.usageLimitPerUser === undefined ? 1 : promo.usageLimitPerUser;
+  if (perUserLimit > 0) {
     if (!userId && !email) {
       throw new AppError("Veuillez vous identifier pour utiliser ce code promo.", 400);
     }
@@ -219,7 +224,7 @@ export async function validatePromo(req: AuthRequest, res: Response) {
     else perUserFilter.email = email;
 
     const usedCount = await PromoRedemption.countDocuments(perUserFilter);
-    if (usedCount >= promo.usageLimitPerUser) {
+    if (usedCount >= perUserLimit) {
       throw new AppError("Limite d'utilisation atteinte pour ce code promo.", 400);
     }
   }
