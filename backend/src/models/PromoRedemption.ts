@@ -6,6 +6,7 @@ export interface IPromoRedemption extends Document {
   orderId: mongoose.Types.ObjectId;
   userId?: string;
   email?: string;
+  ipAddress?: string;
   discountAmount: number;
   redeemedAt: Date;
   createdAt: Date;
@@ -44,6 +45,10 @@ const PromoRedemptionSchema = new Schema<IPromoRedemption>(
       lowercase: true,
       index: true,
     },
+    ipAddress: {
+      type: String,
+      index: true,
+    },
     discountAmount: {
       type: Number,
       required: true,
@@ -61,9 +66,9 @@ const PromoRedemptionSchema = new Schema<IPromoRedemption>(
 PromoRedemptionSchema.index({ promoCodeId: 1, redeemedAt: -1 });
 PromoRedemptionSchema.index({ promoCodeId: 1, email: 1 });
 PromoRedemptionSchema.index({ promoCodeId: 1, userId: 1 });
+PromoRedemptionSchema.index({ promoCodeId: 1, ipAddress: 1 });
 
 export const PromoRedemption = mongoose.model<IPromoRedemption>(
   "PromoRedemption",
   PromoRedemptionSchema,
 );
-

@@ -7,6 +7,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { authClient, normalizedApiUrl } from "../lib/AuthClient";
 import { productAPI } from "../lib/ProductAPI";
+import { promoAPI } from "../lib/PromoAPI";
 import { clearCart } from "../utils/cartPersistence";
 
 interface CartItem {
@@ -451,6 +452,33 @@ const Checkout: React.FC = () => {
     console.log(
       `📅 [CHECKOUT] Delivery info collected: ${deliveryDate}${deliveryTime ? ` - ${deliveryTime}` : ''}, moving to payment step`,
     );
+    
+    // Validate promo code before going to payment step
+    if (state.promoCode) {
+      try {
+        console.log("🔍 [CHECKOUT] Validating promo code before payment:", state.promoCode);
+        const promoResult = await promoAPI.validatePromo({
+          code: state.promoCode,
+          subtotal: state.subtotal,
+          email: customerEmail,
+          items: state.items.map((item) => ({
+            productId: item.id,
+            amount: item.price * item.quantity,
+          })),
+        });
+        
+        if (!promoResult?.data?.success) {
+          alert(promoResult?.data?.error || "Code promo invalide ou expiré");
+          return;
+        }
+        console.log("✅ [CHECKOUT] Promo code validated successfully");
+      } catch (promoError: any) {
+        console.error("❌ [CHECKOUT] Promo validation failed:", promoError);
+        alert(promoError?.message || "Code promo invalide ou expiré");
+        return;
+      }
+    }
+    
     setCurrentStep("payment");
   };
 

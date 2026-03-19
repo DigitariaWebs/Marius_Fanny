@@ -157,13 +157,25 @@ export const createOrder = async (
 
       const perUserLimit =
         promoDoc.usageLimitPerUser === undefined ? 1 : promoDoc.usageLimitPerUser;
-      if (perUserLimit > 0) {
+      
+      // Force per-user limit to at least 1 if not explicitly set to 0
+      // This ensures promo codes can't be reused infinitely
+      const effectivePerUserLimit = perUserLimit === 0 ? 1 : perUserLimit;
+      
+      if (effectivePerUserLimit > 0) {
         const userId = req.user?.id;
         const email = (orderData.clientInfo?.email || "").trim().toLowerCase();
 
-        // Build filter to check usage - match by userId OR email
-        // This ensures consistent tracking whether user is authenticated or not
-        const filterConditions = [];
+        // Get client IP address for additional tracking
+        const clientIP = req.headers['x-forwarded-for'] as string || 
+                        req.headers['x-real-ip'] as string || 
+                        req.ip || 
+                        'unknown';
+        const ipAddress = clientIP.split(',')[0].trim();
+
+        // Build filter to check usage - match by userId, email, OR IP
+        // This prevents users from simply changing email to reuse promo codes
+        const filterConditions: Record<string, any>[] = [];
 
         if (userId) {
           filterConditions.push({ userId });
@@ -171,16 +183,17 @@ export const createOrder = async (
         if (email) {
           filterConditions.push({ email });
         }
-
-        if (filterConditions.length === 0) {
-          return res.status(400).json({
-            success: false,
-            error: "Veuillez vous identifier pour utiliser ce code promo.",
-          });
+        // Also check by IP address (all IPs including localhost)
+        if (ipAddress && ipAddress !== 'unknown') {
+          filterConditions.push({ ipAddress });
         }
 
-        // Count usages by this user/email/both.
+        // Allow promo code usage even without login - we just track what we can
+        // No error is thrown if filterConditions is empty
+
+        // Count usages by this user/email/IP.
         // We also check existing orders by promoCode+email as a safety net.
+        console.log("📋 [PROMO] Checking usage for email:", email, "userId:", userId, "IP:", ipAddress);
         const [redemptionCount, orderCountByEmail] = await Promise.all([
           PromoRedemption.countDocuments({
             promoCodeId: promoDoc._id,
@@ -193,8 +206,10 @@ export const createOrder = async (
               })
             : Promise.resolve(0),
         ]);
+        
+        console.log("📋 [PROMO] redemptionCount:", redemptionCount, "orderCountByEmail:", orderCountByEmail, "perUserLimit:", effectivePerUserLimit);
 
-        if (Math.max(redemptionCount, orderCountByEmail) >= perUserLimit) {
+        if (Math.max(redemptionCount, orderCountByEmail) >= effectivePerUserLimit) {
           return res.status(400).json({
             success: false,
             error: "Limite d'utilisation atteinte pour ce code promo.",
@@ -422,6 +437,14 @@ export const createOrder = async (
           orderId: order._id,
           userId: req.user?.id,
           email: (orderData.clientInfo?.email || "").trim().toLowerCase() || undefined,
+          ipAddress: (() => {
+            const clientIP = req.headers['x-forwarded-for'] as string || 
+                            req.headers['x-real-ip'] as string || 
+                            req.ip || 
+                            'unknown';
+            const ip = clientIP.split(',')[0].trim();
+            return (ip && ip !== 'unknown' && ip !== '127.0.0.1' && ip !== '::1') ? ip : undefined;
+          })(),
           discountAmount: promoDiscountAmount,
           redeemedAt: new Date(),
         }).save();

@@ -216,10 +216,30 @@ export async function validatePromo(req: AuthRequest, res: Response) {
 
   const perUserLimit =
     promo.usageLimitPerUser === undefined ? 1 : promo.usageLimitPerUser;
-  if (perUserLimit > 0) {
+    
+  // Force per-user limit to at least 1 if not explicitly set to 0
+  const effectivePerUserLimit = perUserLimit === 0 ? 1 : perUserLimit;
+  
+  // Get IP address from request
+  const clientIP = req.headers['x-forwarded-for'] as string || 
+                  req.headers['x-real-ip'] as string || 
+                  req.ip || 
+                  'unknown';
+  const ipAddress = clientIP.split(',')[0].trim();
+  
+  // For promo code to work, we check by userId, email, OR IP
+  // No login required - we just track what we can
+  if (effectivePerUserLimit > 0) {
     const conditions: Record<string, any>[] = [];
     if (userId) conditions.push({ userId });
     if (email) conditions.push({ email });
+    // Add IP to conditions
+    if (ipAddress && ipAddress !== 'unknown') {
+      conditions.push({ ipAddress });
+    }
+
+    // Allow promo usage even without login - just track what we can
+    // No error thrown if no identification is available
 
     // Guest validation (cart step) must not require authentication.
     // Enforced check still happens at order creation using client email/user.
@@ -237,7 +257,9 @@ export async function validatePromo(req: AuthRequest, res: Response) {
           : Promise.resolve(0),
       ]);
 
-      if (Math.max(redemptionCount, orderCountByEmail) >= perUserLimit) {
+      console.log("📋 [PROMO VALIDATE] redemptionCount:", redemptionCount, "orderCountByEmail:", orderCountByEmail, "perUserLimit:", effectivePerUserLimit);
+
+      if (Math.max(redemptionCount, orderCountByEmail) >= effectivePerUserLimit) {
         throw new AppError("Limite d'utilisation atteinte pour ce code promo.", 400);
       }
     }

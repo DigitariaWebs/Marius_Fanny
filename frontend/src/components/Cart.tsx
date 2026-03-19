@@ -108,9 +108,20 @@ const CartDrawer: React.FC<CartProps> = ({
     if (!code) return;
     setIsApplyingPromo(true);
     setPromoError(null);
+    
+    // Get user email for promo code validation
+    let userEmail: string | undefined;
+    try {
+      const session = await authClient.getSession();
+      userEmail = session?.data?.user?.email;
+    } catch (e) {
+      // Not logged in, that's ok
+    }
+    
     const promo = await promoAPI.validatePromo({
       code,
       subtotal,
+      email: userEmail,
       items: items.map((item) => ({
         productId: item.id,
         amount: item.price * item.quantity,
