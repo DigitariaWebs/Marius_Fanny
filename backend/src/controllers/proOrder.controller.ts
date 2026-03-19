@@ -12,7 +12,7 @@ const PRO_DELIVERY_MINIMUM = 150;
 async function computeTaxAmount(items: { productId: number; quantity: number; amount: number }[]) {
   const ids = Array.from(new Set(items.map((i) => i.productId).filter((id) => id > 0)));
   const products = ids.length
-    ? await Product.find({ id: { $in: ids } }).select("id category productionType hasTaxes").lean()
+    ? await Product.find({ id: { $in: ids }, deletedAt: { $exists: false } }).select("id category productionType hasTaxes").lean()
     : [];
   const productMap = new Map<number, any>(products.map((p: any) => [p.id, p]));
 

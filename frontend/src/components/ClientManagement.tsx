@@ -201,7 +201,7 @@ function ClientManagement() {
                 billing: {
                   kind: formData.billingKind,
                   organization: formData.billingOrganization || undefined,
-                  paymentTermsDays: formData.billingKind === "gouvernement" ? 30 : 0,
+                  paymentTermsDays: formData.billingKind === "gouvernement" ? 180 : 0,
                   allowUnpaidOrders: formData.billingKind !== "standard",
                 },
                 updatedAt: new Date().toISOString(),
@@ -370,7 +370,7 @@ function ClientManagement() {
           kind === "representant"
             ? "Représentant (jour même)"
             : kind === "gouvernement"
-              ? `Gouvernemental (30j)${client.billing?.organization ? ` • ${client.billing.organization}` : ""}`
+              ? `Gouvernemental (60j)${client.billing?.organization ? ` • ${client.billing.organization}` : ""}`
               : "Standard";
         const classes =
           kind === "representant"

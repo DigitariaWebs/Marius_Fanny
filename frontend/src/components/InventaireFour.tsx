@@ -27,6 +27,17 @@ function todayISO(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+function hasInventoryValue(entry?: any): boolean {
+  if (!entry) return false;
+  return (
+    (entry.stock_stdo ?? 0) > 0 ||
+    (entry.stdo ?? 0) > 0 ||
+    (entry.berri ?? 0) > 0 ||
+    (entry.comm_berri ?? 0) > 0 ||
+    (entry.client ?? 0) > 0
+  );
+}
+
 export default function InventaireFour() {
   const gold = "#C5A065";
   const [date, setDate] = useState(todayISO());
@@ -99,7 +110,20 @@ export default function InventaireFour() {
           client: s?.client ?? 0
         };
       });
-      setRows(built);
+
+      const historicalRows = res.data.entries
+        .filter((entry: any) => !products.includes(entry.productId) && hasInventoryValue(entry))
+        .map((entry: any) => ({
+          id: entry.productId,
+          name: entry.productName,
+          stock_stdo: entry.stock_stdo ?? 0,
+          stdo: entry.stdo ?? 0,
+          berri: entry.berri ?? 0,
+          comm_berri: entry.comm_berri ?? 0,
+          client: entry.client ?? 0,
+        }));
+
+      setRows([...built, ...historicalRows]);
     } catch {
       setToast({ type: "error", msg: "Erreur de chargement" });
     } finally { setLoading(false); }

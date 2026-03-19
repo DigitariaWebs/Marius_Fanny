@@ -58,6 +58,17 @@ interface RowState {
   client: number;
 }
 
+function hasInventoryValue(entry?: Partial<DailyInventoryEntry> | null): boolean {
+  if (!entry) return false;
+  return (
+    (entry.stock_stdo ?? 0) > 0 ||
+    (entry.stdo ?? 0) > 0 ||
+    (entry.berri ?? 0) > 0 ||
+    (entry.comm_berri ?? 0) > 0 ||
+    (entry.client ?? 0) > 0
+  );
+}
+
 type Col = "stock_stdo" | "stdo" | "berri" | "comm_berri" | "client";
 
 const COLUMNS: { key: Col; label: string; sublabel: string }[] = [
@@ -205,7 +216,21 @@ export default function InventaireJournalier() {
         };
       });
 
-      setRows(sortAsc ? built : [...built].reverse());
+      const historicalRows: RowState[] = res.data.entries
+        .filter((entry) => !customProducts.includes(entry.productId) && hasInventoryValue(entry))
+        .map((entry) => ({
+          productId: entry.productId,
+          productName: entry.productName,
+          stock_stdo: entry.stock_stdo ?? 0,
+          stdo: entry.stdo ?? 0,
+          berri: entry.berri ?? 0,
+          comm_berri: entry.comm_berri ?? 0,
+          client: entry.client ?? 0,
+        }));
+
+      const mergedRows = [...built, ...historicalRows];
+
+      setRows(sortAsc ? mergedRows : [...mergedRows].reverse());
       setLastSaved(res.data.updatedAt);
       setSavedBy(res.data.savedBy);
     } catch {

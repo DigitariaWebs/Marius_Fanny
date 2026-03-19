@@ -30,7 +30,7 @@ const TAX_RATE = 0.14975;
 async function computeTaxAmount(items: { productId: number; quantity: number; amount: number }[]) {
   const ids = Array.from(new Set(items.map((i) => i.productId).filter((id) => id > 0)));
   const products = ids.length
-    ? await Product.find({ id: { $in: ids } }).select("id category productionType hasTaxes").lean()
+    ? await Product.find({ id: { $in: ids }, deletedAt: { $exists: false } }).select("id category productionType hasTaxes").lean()
     : [];
   const productMap = new Map<number, any>(products.map((p: any) => [p.id, p]));
 
@@ -124,7 +124,7 @@ export const createOrder = async (
       promoCode = normalizePromoCode(orderData.promoCode);
       promoDoc = await PromoCode.findOne({
         code: promoCode,
-        deletedAt: { $exists: false },
+        deletedAt: null,
       });
 
       if (!promoDoc) {
@@ -160,19 +160,41 @@ export const createOrder = async (
       if (perUserLimit > 0) {
         const userId = req.user?.id;
         const email = (orderData.clientInfo?.email || "").trim().toLowerCase();
-        if (!userId && !email) {
+
+        // Build filter to check usage - match by userId OR email
+        // This ensures consistent tracking whether user is authenticated or not
+        const filterConditions = [];
+
+        if (userId) {
+          filterConditions.push({ userId });
+        }
+        if (email) {
+          filterConditions.push({ email });
+        }
+
+        if (filterConditions.length === 0) {
           return res.status(400).json({
             success: false,
             error: "Veuillez vous identifier pour utiliser ce code promo.",
           });
         }
 
-        const perUserFilter: Record<string, any> = { promoCodeId: promoDoc._id };
-        if (userId) perUserFilter.userId = userId;
-        else perUserFilter.email = email;
+        // Count usages by this user/email/both.
+        // We also check existing orders by promoCode+email as a safety net.
+        const [redemptionCount, orderCountByEmail] = await Promise.all([
+          PromoRedemption.countDocuments({
+            promoCodeId: promoDoc._id,
+            $or: filterConditions,
+          }),
+          email
+            ? Order.countDocuments({
+                promoCode,
+                "clientInfo.email": email,
+              })
+            : Promise.resolve(0),
+        ]);
 
-        const usedCount = await PromoRedemption.countDocuments(perUserFilter);
-        if (usedCount >= perUserLimit) {
+        if (Math.max(redemptionCount, orderCountByEmail) >= perUserLimit) {
           return res.status(400).json({
             success: false,
             error: "Limite d'utilisation atteinte pour ce code promo.",
@@ -235,48 +257,70 @@ export const createOrder = async (
       balancePaid = false;
     }
 
-    // Billing privileges (only when authenticated AND email matches the order email)
+    // Billing privileges - look up from client email in all cases
     let billingKind: "standard" | "representant" | "gouvernement" | undefined;
     let billingOrganization: string | undefined;
     let paymentDueDate: Date | undefined;
 
-    if (req.user) {
-      const orderEmail = (orderData.clientInfo?.email || "").trim().toLowerCase();
-      const sessionEmail = (req.user.email || "").trim().toLowerCase();
-      if (orderEmail && sessionEmail) {
-        const actingUser = await User.findOne({ email: sessionEmail })
-          .select("role")
-          .lean();
-        const actingRole = (actingUser as any)?.role || "user";
-        const isStaffOrder =
-          actingRole !== "user" && actingRole !== "pro";
+    const orderEmail = (orderData.clientInfo?.email || "").trim().toLowerCase();
+    
+    // Always try to look up billing info from the client email
+    console.log("📋 [BILLING] Looking up billing for email:", orderEmail);
+    
+    if (orderEmail) {
+      const billingUser = await User.findOne({ email: orderEmail })
+        .select("billing")
+        .lean();
+      const billing = (billingUser as any)?.billing;
+      
+      console.log("📋 [BILLING] Found user:", billingUser ? "YES" : "NO");
+      console.log("📋 [BILLING] Billing info:", JSON.stringify(billing));
+      
+      if (billing) {
+        billingKind = billing?.kind || "standard";
+        billingOrganization = billing?.organization || undefined;
+        console.log("📋 [BILLING] Setting billingKind:", billingKind);
 
-        // If the order is created by staff/admin, apply billing rules from the target client email.
-        // If the order is created by a client, only apply when they are ordering for themselves.
-        const billingEmail = isStaffOrder ? orderEmail : sessionEmail === orderEmail ? orderEmail : "";
+        const allowUnpaidOrders = !!billing?.allowUnpaidOrders;
+        const termsDays = Number.isFinite(billing?.paymentTermsDays)
+          ? Number(billing.paymentTermsDays)
+          : 0;
+        
+        // For government clients, always use 60 days if not explicitly set to something else
+        // For representatives, use 0 days (pay on delivery) unless specified
+        let effectiveTermsDays: number;
+        if (billingKind === "gouvernement") {
+          // Always default to 60 days for government, unless explicitly set otherwise
+          effectiveTermsDays = termsDays > 0 && termsDays !== 180 ? termsDays : 60;
+        } else if (billingKind === "representant") {
+          effectiveTermsDays = termsDays;
+        } else {
+          effectiveTermsDays = termsDays;
+        }
 
-        if (billingEmail) {
-          const billingUser = await User.findOne({ email: billingEmail })
-            .select("billing")
-            .lean();
-          const billing = (billingUser as any)?.billing;
-          billingKind = billing?.kind || "standard";
-          billingOrganization = billing?.organization || undefined;
-
-          const allowUnpaidOrders = !!billing?.allowUnpaidOrders;
-          const termsDays = Number.isFinite(billing?.paymentTermsDays)
-            ? Number(billing.paymentTermsDays)
-            : 0;
-          const effectiveTermsDays =
-            billingKind === "gouvernement" && termsDays === 0 ? 60 : termsDays;
-
-          // If the client is allowed to order without paying, keep payment status as "unpaid"
-          // and track a due date when not paid yet.
-          if (allowUnpaidOrders && !depositPaid) {
-            const due = new Date();
-            due.setDate(due.getDate() + Math.max(0, effectiveTermsDays));
-            paymentDueDate = due;
-          }
+        // If the client is allowed to order without paying, keep payment status as "unpaid"
+        // and track a due date when not paid yet.
+        // Also set due date for government clients even if they need to pay
+        console.log("📋 [BILLING] allowUnpaidOrders:", allowUnpaidOrders);
+        console.log("📋 [BILLING] depositPaid:", depositPaid);
+        console.log("📋 [BILLING] billingKind:", billingKind);
+        console.log("📋 [BILLING] effectiveTermsDays:", effectiveTermsDays);
+        
+        // For government and representative clients, ALWAYS set depositPaid to false
+        // regardless of what the frontend sent. They should pay later, not upfront.
+        if (billingKind === "gouvernement" || billingKind === "representant") {
+          console.log("📋 [BILLING] FORCING depositPaid to false for", billingKind);
+          depositPaid = false;
+          balancePaid = false;
+        }
+        
+        if ((allowUnpaidOrders && !depositPaid) || billingKind === "gouvernement") {
+          const due = new Date();
+          due.setDate(due.getDate() + Math.max(0, effectiveTermsDays));
+          paymentDueDate = due;
+          console.log("📋 [BILLING] Setting paymentDueDate to:", paymentDueDate);
+        } else {
+          console.log("📋 [BILLING] NOT setting paymentDueDate");
         }
       }
     }
@@ -288,6 +332,21 @@ export const createOrder = async (
     } else if (orderData.deliveryType === "pickup" && orderData.deliveryDate) {
       const slot = String(orderData.deliveryTimeSlot || "00:00").trim() || "00:00";
       pickupDate = new Date(`${orderData.deliveryDate}T${slot}:00`);
+    }
+
+    // For representatives: payment due on pickup/delivery date (not 60 days like government)
+    if (billingKind === "representant" && !paymentDueDate) {
+      if (pickupDate) {
+        paymentDueDate = pickupDate;
+        console.log("📋 [BILLING] Setting representative paymentDueDate to pickupDate:", paymentDueDate);
+      } else if (orderData.deliveryDate) {
+        paymentDueDate = new Date(orderData.deliveryDate);
+        console.log("📋 [BILLING] Setting representative paymentDueDate to deliveryDate:", paymentDueDate);
+      } else {
+        // No pickup/delivery date - payment due same day as order
+        paymentDueDate = new Date();
+        console.log("📋 [BILLING] Setting representative paymentDueDate to today (same day payment)");
+      }
     }
 
     const order = new Order({
@@ -337,7 +396,7 @@ export const createOrder = async (
       try {
         const promoUpdateFilter: Record<string, any> = {
           _id: promoDoc._id,
-          deletedAt: { $exists: false },
+          deletedAt: null,
           isActive: true,
         };
         if (promoDoc.usageLimit !== undefined) {
@@ -658,6 +717,7 @@ export const getProductionList = async (
 
     // Fetch product data for all products (ID first, name fallback for legacy/mismatch cases)
     const products = await Product.find({
+      deletedAt: { $exists: false },
       $or: [
         { id: { $in: productIds } },
         { name: { $in: productNames } },
@@ -843,12 +903,31 @@ export const getOrders = async (
       Order.countDocuments(query),
     ]);
 
+    // Add payment status indicators
+    const ordersWithStatus = orders.map((order: any) => {
+      const orderObj = order.toObject?.() || order;
+      const isPaymentOverdue = 
+        orderObj.paymentDueDate && 
+        orderObj.paymentStatus === "unpaid" &&
+        new Date() > new Date(orderObj.paymentDueDate);
+      
+      const daysOverdue = isPaymentOverdue && orderObj.paymentDueDate
+        ? Math.ceil((new Date().getTime() - new Date(orderObj.paymentDueDate).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+
+      return {
+        ...orderObj,
+        isPaymentOverdue,
+        daysOverdue,
+      };
+    });
+
     const totalPages = Math.ceil(total / Number(limit));
 
     res.json({
       success: true,
       data: {
-        items: orders,
+        items: ordersWithStatus,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -898,9 +977,24 @@ export const getOrderById = async (
       });
     }
 
+    // Add payment status indicators
+    const orderObj = order.toObject?.() || order;
+    const isPaymentOverdue = 
+      orderObj.paymentDueDate && 
+      orderObj.paymentStatus === "unpaid" &&
+      new Date() > new Date(orderObj.paymentDueDate);
+    
+    const daysOverdue = isPaymentOverdue && orderObj.paymentDueDate
+      ? Math.ceil((new Date().getTime() - new Date(orderObj.paymentDueDate).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
     res.json({
       success: true,
-      data: order,
+      data: {
+        ...orderObj,
+        isPaymentOverdue,
+        daysOverdue,
+      },
     });
   } catch (error: any) {
     console.error("Error fetching order:", error);

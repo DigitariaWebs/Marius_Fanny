@@ -20,6 +20,8 @@ import {
   Check,
   Printer,
   Undo2,
+  Bell,
+  RefreshCw,
 } from "lucide-react";
 import { DataTable } from "./ui/DataTable";
 import { Modal } from "./ui/modal";
@@ -294,6 +296,19 @@ export function OrderManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<"simple" | "complete">("simple");
   const [refundEmployeeName, setRefundEmployeeName] = useState<string>("");
+  const [isProcessingReminders, setIsProcessingReminders] = useState(false);
+  const [reminderResult, setReminderResult] = useState<{
+    success: boolean;
+    message: string;
+    summary?: {
+      totalOrders: number;
+      remindersSentWeek: number;
+      remindersSent48h: number;
+      remindersSentOverdue: number;
+      ordersCancelled: number;
+      errors: number;
+    };
+  } | null>(null);
 
   const isArchivedStatus = (status: OrderWithPacking["status"]) =>
     status === "completed" || status === "delivered";
@@ -351,6 +366,17 @@ export function OrderManagement() {
         }
         
         if (items.length > 0) {
+          // Debug: log billing info for all government orders
+          const govOrders = items.filter((o: any) => o.billingKind === "gouvernement");
+          if (govOrders.length > 0) {
+            console.log("📦 Government orders from API:", govOrders.map((o: any) => ({
+              orderNumber: o.orderNumber,
+              billingKind: o.billingKind,
+              paymentDueDate: o.paymentDueDate,
+              paymentStatus: o.paymentStatus
+            })));
+          }
+          
           const mapped: OrderWithPacking[] = items.map((o: any) => {
             // S'assurer que les items ont des produits avec des noms
             const orderItems = (o.items || []).map((item: any, idx: number) => {
@@ -441,7 +467,7 @@ export function OrderManagement() {
               status: o.status || "pending",
               source: "in_store" as const,
               paymentMethod:
-                o.paymentType === "deposit" ? "payment_link" : "in_store",
+                o.paymentType === "deposit" ? "payment_link" : "payment_link",
               paymentLinkChannel: o.paymentLinkChannel || "email",
               notes: o.notes,
               createdAt: o.createdAt,
@@ -544,14 +570,39 @@ export function OrderManagement() {
   };
 
   const getPaymentDueDateForOrder = (order: any): Date | null => {
-    if (order?.paymentStatus === "paid") return null;
-    if (order?.paymentDueDate) return new Date(order.paymentDueDate);
+    // Only show date limit for unpaid orders
+    // Check both paymentStatus and depositPaid to handle all cases
+    const isPaid = order?.paymentStatus === "paid" || order?.depositPaid === true;
+    if (isPaid) return null;
+    
+    // For government clients: show due date (from DB or calculate 60 days)
     if (order?.billingKind === "gouvernement") {
+      if (order?.paymentDueDate) {
+        return new Date(order.paymentDueDate);
+      }
+      // Calculate 60 days from order date
       const base = new Date(order.orderDate || order.createdAt);
       const due = new Date(base);
       due.setDate(due.getDate() + 60);
       return due;
     }
+    
+    // For representative clients: payment due on delivery/pickup date
+    // If no delivery/pickup date is set, use order date (same day payment)
+    if (order?.billingKind === "representant") {
+      if (order.pickupDate) {
+        return new Date(order.pickupDate);
+      }
+      if (order.deliveryDate) {
+        return new Date(order.deliveryDate);
+      }
+      // For same-day payment, return order date (payment should be made now)
+      const base = new Date(order.orderDate || order.createdAt);
+      return base;
+    }
+    
+    // For other clients with payment due date
+    if (order?.paymentDueDate) return new Date(order.paymentDueDate);
     return null;
   };
 
@@ -828,6 +879,35 @@ export function OrderManagement() {
       alert(`Erreur lors de la suppression: ${err.message || err}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleProcessReminders = async () => {
+    setIsProcessingReminders(true);
+    setReminderResult(null);
+    
+    try {
+      const response = await fetch(`${normalizedApiUrl}/api/payment-reminders/process`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+      
+      const data = await response.json();
+      setReminderResult(data);
+      
+      // Note: Orders will be updated automatically when the status changes
+      // The admin can manually refresh the page to see updated statuses
+    } catch (err: any) {
+      console.error("❌ Failed to process reminders:", err);
+      setReminderResult({
+        success: false,
+        message: `Erreur: ${err.message || err}`,
+      });
+    } finally {
+      setIsProcessingReminders(false);
     }
   };
 
@@ -1272,6 +1352,55 @@ export function OrderManagement() {
 
   return (
     <>
+      {/* ALERT FOR OVERDUE PAYMENTS - AT TOP CENTER */}
+      {(() => {
+        const overdueOrders = orders.filter((order) => {
+          const dueDate = getPaymentDueDateForOrder(order);
+          return dueDate && new Date() > dueDate && order.paymentStatus !== "paid";
+        });
+        
+        if (overdueOrders.length === 0) return null;
+        
+        return (
+          <div className="p-4 md:p-4">
+            <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 md:p-6 max-w-4xl mx-auto">
+              <div className="flex items-start gap-4">
+                <div className="text-3xl">🚨</div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-red-900 text-lg mb-2">
+                    {overdueOrders.length} Paiement{overdueOrders.length > 1 ? 's' : ''} en Retard
+                  </h3>
+                  <p className="text-red-800 text-sm mb-3">
+                    Les paiements suivants ont dépassé leur date limite:
+                  </p>
+                  <div className="space-y-2">
+                    {overdueOrders.slice(0, 5).map((order) => {
+                      const dueDate = getPaymentDueDateForOrder(order);
+                      const daysOverdue = dueDate 
+                        ? Math.ceil((new Date().getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+                        : 0;
+                      return (
+                        <div key={order.id} className="text-sm text-red-900 flex justify-between items-center p-2 bg-white rounded">
+                          <span className="font-medium">{order.orderNumber}</span>
+                          <span className="text-xs bg-red-200 px-2 py-1 rounded font-bold">
+                            {daysOverdue} jour{daysOverdue > 1 ? 's' : ''} en retard
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {overdueOrders.length > 5 && (
+                    <p className="text-red-800 text-sm mt-2 font-semibold">
+                      +{overdueOrders.length - 5} autre{overdueOrders.length - 5 > 1 ? 's' : ''} paiement(s) en retard
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <header className="p-4 md:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -1285,15 +1414,66 @@ export function OrderManagement() {
               Gerer toutes les commandes (en ligne, telephone, en magasin)
             </p>
           </div>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 bg-[#337957] hover:bg-[#2D2A26] text-white font-bold px-4 md:px-6 py-2.5 md:py-3 rounded-xl transition-all duration-300 hover:shadow-lg text-sm md:text-base whitespace-nowrap"
-          >
-            <Plus size={20} />
-            <span>Nouvelle Commande</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleProcessReminders}
+              disabled={isProcessingReminders}
+              className="flex items-center gap-2 bg-[#F59E0B] hover:bg-[#D97706] text-white font-bold px-4 md:px-6 py-2.5 md:py-3 rounded-xl transition-all duration-300 hover:shadow-lg text-sm md:text-base whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isProcessingReminders ? (
+                <RefreshCw size={20} className="animate-spin" />
+              ) : (
+                <Bell size={20} />
+              )}
+              <span>{isProcessingReminders ? "Traitement..." : "Rappels"}</span>
+            </button>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 bg-[#337957] hover:bg-[#2D2A26] text-white font-bold px-4 md:px-6 py-2.5 md:py-3 rounded-xl transition-all duration-300 hover:shadow-lg text-sm md:text-base whitespace-nowrap"
+            >
+              <Plus size={20} />
+              <span>Nouvelle Commande</span>
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* REMINDER PROCESSING RESULT */}
+      {reminderResult && (
+        <div className="p-4 md:p-8 pt-0">
+          <div className={`border-2 rounded-xl p-4 md:p-6 ${reminderResult.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+            <div className="flex items-start gap-4">
+              <div className="text-2xl">{reminderResult.success ? '✅' : '❌'}</div>
+              <div className="flex-1">
+                <h3 className={`font-bold text-lg mb-2 ${reminderResult.success ? 'text-green-900' : 'text-red-900'}`}>
+                  {reminderResult.success ? 'Rappels traités avec succès' : 'Erreur lors du traitement'}
+                </h3>
+                <p className={`text-sm mb-3 ${reminderResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                  {reminderResult.message}
+                </p>
+                {reminderResult.summary && (
+                  <div className="text-sm text-green-800 bg-white p-3 rounded">
+                    <p><strong>Total commandes:</strong> {reminderResult.summary.totalOrders}</p>
+                    <p><strong>Rappels (1 semaine):</strong> {reminderResult.summary.remindersSentWeek}</p>
+                    <p><strong>Rappels (48h):</strong> {reminderResult.summary.remindersSent48h}</p>
+                    <p><strong>Rappels (en retard):</strong> {reminderResult.summary.remindersSentOverdue}</p>
+                    <p><strong>Commandes annulées:</strong> {reminderResult.summary.ordersCancelled}</p>
+                    {reminderResult.summary.errors > 0 && (
+                      <p className="text-red-600"><strong>Erreurs:</strong> {reminderResult.summary.errors}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button 
+                onClick={() => setReminderResult(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="p-4 md:p-8">
         {/* Filtre par date */}
@@ -2196,7 +2376,7 @@ export function OrderManagement() {
                 paymentStatus: "unpaid",
                 status: "pending",
                 source: "in_store",
-                paymentMethod: formData.paymentMethod || "in_store",
+                paymentMethod: formData.paymentMethod || "payment_link",
                 paymentLinkChannel: formData.paymentLinkChannel || "email",
                 notes: formData.notes || undefined,
                 createdAt: now,

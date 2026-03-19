@@ -4,6 +4,7 @@ import { AuthRequest } from "../middleware/auth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { PromoCode } from "../models/PromoCode.js";
 import { PromoRedemption } from "../models/PromoRedemption.js";
+import Order from "../models/Order.js";
 import type {
   CreatePromoInput,
   UpdatePromoInput,
@@ -24,7 +25,7 @@ export async function listPromos(req: AuthRequest, res: Response) {
 
   const filter: Record<string, any> = {};
   if (!query.includeDeleted) {
-    filter.deletedAt = { $exists: false };
+    filter.deletedAt = null;
   }
   if (!query.includeInactive) {
     filter.isActive = true;
@@ -137,7 +138,7 @@ export async function updatePromo(req: AuthRequest, res: Response) {
     const existing = await PromoCode.findOne({
       code,
       _id: { $ne: new mongoose.Types.ObjectId(id) },
-      deletedAt: { $exists: false },
+      deletedAt: null,
     });
     if (existing) throw new AppError("Ce code promo existe déjà", 409);
     promo.code = code;
@@ -183,7 +184,7 @@ export async function deletePromo(req: AuthRequest, res: Response) {
 export async function validatePromo(req: AuthRequest, res: Response) {
   const input = req.body as ValidatePromoInput;
   const code = normalizePromoCode(input.code);
-  const promo = await PromoCode.findOne({ code, deletedAt: { $exists: false } });
+  const promo = await PromoCode.findOne({ code, deletedAt: null });
   if (!promo) throw new AppError("Ce code promo n'existe pas.", 404);
 
   const now = new Date();
@@ -216,16 +217,29 @@ export async function validatePromo(req: AuthRequest, res: Response) {
   const perUserLimit =
     promo.usageLimitPerUser === undefined ? 1 : promo.usageLimitPerUser;
   if (perUserLimit > 0) {
-    if (!userId && !email) {
-      throw new AppError("Veuillez vous identifier pour utiliser ce code promo.", 400);
-    }
-    const perUserFilter: Record<string, any> = { promoCodeId: promo._id };
-    if (userId) perUserFilter.userId = userId;
-    else perUserFilter.email = email;
+    const conditions: Record<string, any>[] = [];
+    if (userId) conditions.push({ userId });
+    if (email) conditions.push({ email });
 
-    const usedCount = await PromoRedemption.countDocuments(perUserFilter);
-    if (usedCount >= perUserLimit) {
-      throw new AppError("Limite d'utilisation atteinte pour ce code promo.", 400);
+    // Guest validation (cart step) must not require authentication.
+    // Enforced check still happens at order creation using client email/user.
+    if (conditions.length > 0) {
+      const [redemptionCount, orderCountByEmail] = await Promise.all([
+        PromoRedemption.countDocuments({
+          promoCodeId: promo._id,
+          $or: conditions,
+        }),
+        email
+          ? Order.countDocuments({
+              promoCode: promo.code,
+              "clientInfo.email": email,
+            })
+          : Promise.resolve(0),
+      ]);
+
+      if (Math.max(redemptionCount, orderCountByEmail) >= perUserLimit) {
+        throw new AppError("Limite d'utilisation atteinte pour ce code promo.", 400);
+      }
     }
   }
 
