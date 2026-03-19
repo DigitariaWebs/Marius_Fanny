@@ -467,8 +467,9 @@ const Checkout: React.FC = () => {
           })),
         });
         
-        if (!promoResult?.data?.success) {
-          alert(promoResult?.data?.error || "Code promo invalide ou expiré");
+        // If promoResult has data, it means success
+        if (!promoResult?.data) {
+          alert("Code promo invalide ou expiré");
           return;
         }
         console.log("✅ [CHECKOUT] Promo code validated successfully");
