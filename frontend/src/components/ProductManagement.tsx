@@ -399,9 +399,10 @@ export function ProductManagement() {
         available: productForm.available,
         minOrderQuantity: parseInt(productForm.minOrderQuantity),
         maxOrderQuantity: parseInt(productForm.maxOrderQuantity),
-        preparationTimeHours: productForm.preparationTimeHours
-          ? parseInt(productForm.preparationTimeHours)
-          : undefined,
+        preparationTimeHours:
+          productForm.preparationTimeHours === ""
+            ? null
+            : parseInt(productForm.preparationTimeHours),
         hasTaxes: productForm.hasTaxes,
         allergens: productForm.allergens || undefined,
         productionType: productForm.productionType,

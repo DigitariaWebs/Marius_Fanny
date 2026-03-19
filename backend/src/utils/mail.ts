@@ -152,6 +152,129 @@ export async function sendVerificationEmail(
   }
 }
 
+/**
+ * Send a professional (partner) order email directly to admin (no production/admin order entry).
+ */
+export async function sendProOrderEmailToAdmin(
+  adminEmail: string,
+  proOrder: any,
+): Promise<void> {
+  const orderNumber = String(proOrder?.orderNumber || "").trim();
+  const client = proOrder?.clientInfo || {};
+  const items: any[] = Array.isArray(proOrder?.items) ? proOrder.items : [];
+
+  const itemsHtml = items
+    .map((item) => {
+      const qty = Number(item.quantity || 0);
+      const name = String(item.productName || "").trim();
+      const amount = Number(item.amount || 0);
+      const options =
+        item.selectedOptions && Object.keys(item.selectedOptions).length > 0
+          ? Object.entries(item.selectedOptions)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(" | ")
+          : "";
+      return `
+        <tr>
+          <td style="padding: 10px; border-bottom: 1px solid #eee; color: #555;">
+            <div style="font-weight: 600; color: #2D2A26;">${name}</div>
+            ${options ? `<div style="font-size: 12px; color: #777; margin-top: 4px;">${options}</div>` : ""}
+          </td>
+          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center; color: #555;">
+            ${qty}
+          </td>
+          <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right; color: #555;">
+            ${amount.toFixed(2)}$
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const deliveryType = proOrder?.deliveryType === "delivery" ? "Livraison" : "Ramassage";
+  const distanceTier =
+    proOrder?.deliveryType === "delivery"
+      ? proOrder?.deliveryDistanceTier === "gt20"
+        ? "> 20 km"
+        : "< 20 km"
+      : "";
+
+  const addr = proOrder?.deliveryAddress || null;
+  const addressLine = addr
+    ? `${addr.street || ""}, ${addr.city || ""}, ${addr.province || "QC"} ${addr.postalCode || ""}`.trim()
+    : "";
+
+  const mailOptions = {
+    from: DISPLAY_FROM,
+    to: adminEmail,
+    subject: `Nouvelle commande PRO - ${orderNumber}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; background-color: #F9F7F2; border-radius: 10px;">
+        <div style="text-align: center; margin-bottom: 18px;">
+          <img src="${LOGO_URL}" alt="Marius & Fanny" style="max-width: 160px; height: auto;" />
+        </div>
+
+        <div style="background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);">
+          <h2 style="color: #2D2A26; margin: 0 0 10px 0;">Nouvelle commande PRO</h2>
+          <p style="margin: 0 0 16px 0; color: #555;">
+            <strong>Numéro:</strong> ${orderNumber}
+          </p>
+
+          <div style="background-color: #F9F7F2; padding: 14px; border-radius: 8px; margin-bottom: 18px;">
+            <div style="color: #2D2A26; font-weight: bold; margin-bottom: 6px;">Client</div>
+            <div style="color: #555; font-size: 14px;">
+              ${client.firstName || ""} ${client.lastName || ""}<br/>
+              ${client.email || ""}<br/>
+              ${client.phone || ""}
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px;">
+            <div style="background: #EAF6EF; border: 1px solid #CFE9D8; padding: 12px; border-radius: 8px;">
+              <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #337957; font-weight: bold;">Type</div>
+              <div style="margin-top: 4px; font-weight: bold; color: #2D2A26;">${deliveryType}</div>
+              ${distanceTier ? `<div style="margin-top: 4px; font-size: 13px; color: #555;">Distance: <strong>${distanceTier}</strong></div>` : ""}
+            </div>
+            <div style="background: #FFF8E7; border: 1px solid #F1E2C4; padding: 12px; border-radius: 8px;">
+              <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #C5A065; font-weight: bold;">Total</div>
+              <div style="margin-top: 4px; font-weight: bold; color: #2D2A26;">${Number(proOrder?.total || 0).toFixed(2)}$</div>
+              <div style="margin-top: 4px; font-size: 13px; color: #555;">
+                Sous-total: ${Number(proOrder?.subtotal || 0).toFixed(2)}$ • Taxes: ${Number(proOrder?.taxAmount || 0).toFixed(2)}$ • Livraison: ${Number(proOrder?.deliveryFee || 0).toFixed(2)}$
+              </div>
+            </div>
+          </div>
+
+          ${
+            addressLine
+              ? `<div style="margin-bottom: 18px;">
+                  <div style="font-weight: bold; color: #2D2A26; margin-bottom: 6px;">Adresse</div>
+                  <div style="color: #555; font-size: 14px;">${addressLine}</div>
+                </div>`
+              : ""
+          }
+
+          <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding: 10px; background:#2D2A26; color:white; font-size: 12px; letter-spacing: 0.06em;">Produit</th>
+                <th style="text-align:center; padding: 10px; background:#2D2A26; color:white; font-size: 12px; letter-spacing: 0.06em;">Qté</th>
+                <th style="text-align:right; padding: 10px; background:#2D2A26; color:white; font-size: 12px; letter-spacing: 0.06em;">Montant</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          ${proOrder?.notes ? `<div style="margin-top: 16px; color:#555; font-size: 14px;"><strong>Notes:</strong> ${String(proOrder.notes)}</div>` : ""}
+        </div>
+      </div>
+    `,
+  };
+
+  await sendEmail(mailOptions);
+}
+
 // Template pour email de réinitialisation de mot de passe
 export async function sendPasswordResetEmail(
   email: string,

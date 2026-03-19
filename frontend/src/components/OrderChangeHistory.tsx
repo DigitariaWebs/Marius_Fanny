@@ -64,17 +64,30 @@ const changeTypeConfig = {
   },
 };
 
-const formatValue = (value: any): string => {
+const formatValue = (value: any, field?: string): string => {
   if (value === null || value === undefined) return 'N/A';
   if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+
+  if (field === 'items' && Array.isArray(value)) {
+    if (value.length === 0) return 'Aucun produit';
+
+    return value
+      .map((item: any) => {
+        const productName = item?.productName || (item?.productId ? `Produit #${item.productId}` : 'Produit');
+        const quantity = Number(item?.quantity || 0);
+        const unitPrice = Number(item?.unitPrice || 0);
+        return `• ${productName} × ${quantity} (${unitPrice.toFixed(2)} $)`;
+      })
+      .join('\n');
+  }
+
   if (typeof value === 'object') {
-    // Handle dates
     if (value instanceof Date || (typeof value === 'string' && !isNaN(Date.parse(value)))) {
       return new Date(value).toLocaleDateString('fr-CA');
     }
-    // Handle objects/arrays
     return JSON.stringify(value, null, 2);
   }
+
   return String(value);
 };
 
@@ -285,13 +298,13 @@ export default function OrderChangeHistory({ orderId, orderNumber }: OrderChange
                           <div className="bg-red-50 p-3 rounded border border-red-100">
                             <div className="font-medium text-red-900 mb-1">Ancienne valeur</div>
                             <div className="text-red-700 whitespace-pre-wrap wrap-break-word">
-                              {formatValue(change.oldValue)}
+                              {formatValue(change.oldValue, change.field)}
                             </div>
                           </div>
                           <div className="bg-green-50 p-3 rounded border border-green-100">
                             <div className="font-medium text-green-900 mb-1">Nouvelle valeur</div>
                             <div className="text-green-700 whitespace-pre-wrap wrap-break-word">
-                              {formatValue(change.newValue)}
+                              {formatValue(change.newValue, change.field)}
                             </div>
                           </div>
                         </div>

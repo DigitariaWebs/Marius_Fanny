@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { authClient } from "../lib/AuthClient";
+import { authClient, normalizedApiUrl } from "../lib/AuthClient";
 import { productAPI } from "../lib/ProductAPI";
 import { categoryAPI } from "../lib/CategoryAPI";
 import GoldenBackground from "./GoldenBackground";
 import type { Product, Category } from "../types";
+import {
+  calculatePriceWithOptions,
+  formatChoiceDisplay,
+  getChoicePriceDeltaForOption,
+} from "../utils/customOptions";
 import {
   LogOut,
   Search,
@@ -32,7 +37,17 @@ const styles = {
   fontSans: '"Inter", sans-serif',
 };
 
-export default function ProDashboard() {
+interface ProDashboardProps {
+  onCartClick: () => void;
+  cartCount: number;
+  onAddToCart: (product: any) => void;
+}
+
+export default function ProDashboard({
+  onCartClick,
+  cartCount,
+  onAddToCart,
+}: ProDashboardProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -46,6 +61,17 @@ export default function ProDashboard() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userName, setUserName] = useState("");
+  const [activeView, setActiveView] = useState<"catalog" | "orders">("catalog");
+  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [modalQuantity, setModalQuantity] = useState(1);
+  const [modalSelectedOptions, setModalSelectedOptions] = useState<
+    Record<string, string>
+  >({});
+  const [missingRequiredOptions, setMissingRequiredOptions] = useState<string[]>(
+    [],
+  );
 
   const navigate = useNavigate();
 
@@ -57,6 +83,49 @@ export default function ProDashboard() {
   };
   const categoryText = (product: Product) => categoryList(product).join(", ");
   const primaryCategory = (product: Product) => categoryList(product)[0] || "";
+
+  const normalizeOptionName = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const isAllergyOptionName = (name: string) =>
+    normalizeOptionName(name).includes("allerg");
+  const isClientNoteOptionName = (name: string) => {
+    const normalized = normalizeOptionName(name);
+    return (
+      normalized.includes("note") ||
+      normalized.includes("comment") ||
+      normalized.includes("remarque")
+    );
+  };
+
+  const computeMissingRequiredOptions = (
+    product: Product | null,
+    selected: Record<string, string>,
+  ) => {
+    if (!product?.customOptions?.length) return [] as string[];
+
+    return product.customOptions
+      .filter((option) => !isAllergyOptionName(option.name))
+      .filter((option) => !isClientNoteOptionName(option.name))
+      .filter((option) => !String(selected[option.name] || "").trim())
+      .map((option) => option.name);
+  };
+
+  useEffect(() => {
+    if (!selectedProduct) return;
+
+    const initial: Record<string, string> = {};
+    for (const option of selectedProduct.customOptions || []) {
+      if (option.type === "text") {
+        initial[option.name] = "";
+      } else {
+        initial[option.name] = option.choices?.[0] || "";
+      }
+    }
+
+    setModalSelectedOptions(initial);
+    setModalQuantity(Math.max(selectedProduct.minOrderQuantity || 1, 1));
+    setMissingRequiredOptions(computeMissingRequiredOptions(selectedProduct, initial));
+  }, [selectedProduct]);
 
   // Check auth & load data
   useEffect(() => {
@@ -166,6 +235,48 @@ export default function ProDashboard() {
     }
   };
 
+  const fetchMyProOrders = async () => {
+    setOrdersLoading(true);
+    setOrdersError(null);
+    try {
+      const response = await fetch(`${normalizedApiUrl}/api/pro-orders/mine`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err?.error || err?.message || `HTTP ${response.status}`);
+      }
+      const result = await response.json();
+      setOrderHistory(result?.data?.orders || []);
+    } catch (err: any) {
+      setOrdersError(err?.message || "Impossible de charger l'historique.");
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeView === "orders") {
+      fetchMyProOrders();
+    }
+  }, [activeView]);
+
+  const handleModalOptionChange = (optionName: string, value: string) => {
+    setModalSelectedOptions((prev) => {
+      const next = { ...prev, [optionName]: value };
+      setMissingRequiredOptions(computeMissingRequiredOptions(selectedProduct, next));
+      return next;
+    });
+  };
+
+  const currentModalPrice = selectedProduct
+    ? calculatePriceWithOptions(
+        selectedProduct.price,
+        selectedProduct.customOptions || [],
+        modalSelectedOptions,
+      )
+    : 0;
+
   // Get unique category names from products
   const productCategories = Array.from(
     new Set(allProducts.flatMap((p) => categoryList(p)).filter(Boolean))
@@ -246,11 +357,35 @@ export default function ProDashboard() {
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
           <div>
             <p className="text-[9px] font-black text-stone-400 uppercase tracking-[0.3em] mb-3 px-3">
+              Commandes
+            </p>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveView("orders");
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex items-center gap-3 w-full p-3 rounded-xl transition-all duration-200 ${
+                  activeView === "orders"
+                    ? "bg-linear-to-r from-[#C5A065] to-[#b8935a] text-white shadow-lg shadow-[#C5A065]/30"
+                    : "text-stone-600 hover:bg-stone-100 hover:text-[#C5A065]"
+                }`}
+              >
+                <Clock size={20} />
+                <span className="font-medium text-sm">Historique</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[9px] font-black text-stone-400 uppercase tracking-[0.3em] mb-3 px-3">
               Catalogue
             </p>
             <div className="space-y-2">
               <button
                 onClick={() => {
+                  setActiveView("catalog");
                   setSelectedCategory("all");
                   setIsMobileMenuOpen(false);
                 }}
@@ -271,6 +406,7 @@ export default function ProDashboard() {
                 <button
                   key={cat}
                   onClick={() => {
+                    setActiveView("catalog");
                     setSelectedCategory(cat);
                     setIsMobileMenuOpen(false);
                   }}
@@ -330,20 +466,41 @@ export default function ProDashboard() {
         </div>
 
         {/* Header */}
-        <header className="p-4 md:p-8">
-          <h2
-            className="text-4xl md:text-5xl mb-2"
-            style={{ fontFamily: styles.fontScript, color: styles.gold }}
+        <header className="p-4 md:p-8 flex items-start justify-between gap-4">
+          <div>
+            <h2
+              className="text-4xl md:text-5xl mb-2"
+              style={{ fontFamily: styles.fontScript, color: styles.gold }}
+            >
+              {activeView === "orders" ? "Mes commandes" : "Catalogue Produits"}
+            </h2>
+            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-stone-500">
+              {activeView === "orders"
+                ? `${orderHistory.length} commande${orderHistory.length !== 1 ? "s" : ""}`
+                : `${products.length} produit${products.length !== 1 ? "s" : ""} ${
+                    selectedCategory !== "all" ? `dans ${selectedCategory}` : "disponibles"
+                  }`}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCartClick}
+            className="relative inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-stone-200 bg-white/70 backdrop-blur-md text-sm font-semibold text-stone-700 hover:text-[#C5A065] hover:border-[#C5A065] transition-colors"
+            aria-label="Ouvrir le panier"
           >
-            Catalogue Produits
-          </h2>
-          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-stone-500">
-            {products.length} produit{products.length !== 1 ? "s" : ""}{" "}
-            {selectedCategory !== "all" ? `dans ${selectedCategory}` : "disponibles"}
-          </p>
+            <ShoppingBag size={18} />
+            Panier
+            {cartCount > 0 && (
+              <span className="absolute -top-2 -right-2 min-w-6 h-6 px-2 rounded-full bg-[#C5A065] text-white text-[10px] font-black flex items-center justify-center">
+                {cartCount}
+              </span>
+            )}
+          </button>
         </header>
 
         {/* Search & Toolbar */}
+        {activeView === "catalog" && (
         <div className="px-4 md:px-8 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Search */}
@@ -416,10 +573,94 @@ export default function ProDashboard() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Products */}
         <div className="px-4 md:px-8 pb-8">
-          {products.length === 0 ? (
+          {activeView === "orders" ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-stone-800">
+                  Historique de commandes
+                </h3>
+                <button
+                  type="button"
+                  onClick={fetchMyProOrders}
+                  className="px-4 py-2 rounded-xl border border-stone-200 bg-white/70 text-sm font-semibold text-stone-700 hover:text-[#C5A065] hover:border-[#C5A065] transition-colors"
+                >
+                  Rafraîchir
+                </button>
+              </div>
+
+              {ordersLoading ? (
+                <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 border border-stone-200 text-stone-600">
+                  Chargement...
+                </div>
+              ) : ordersError ? (
+                <div className="bg-red-50 rounded-2xl p-6 border border-red-200 text-red-700">
+                  {ordersError}
+                </div>
+              ) : orderHistory.length === 0 ? (
+                <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 border border-stone-200 text-stone-600">
+                  Aucune commande pro pour le moment.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {orderHistory.map((o: any) => (
+                    <div
+                      key={o._id || o.orderNumber}
+                      className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-stone-200"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-[0.25em] text-stone-400">
+                            Commande pro
+                          </div>
+                          <div className="text-lg font-bold text-stone-800">
+                            {o.orderNumber}
+                          </div>
+                          <div className="text-sm text-stone-600 mt-1">
+                            {o.deliveryType === "delivery"
+                              ? "Livraison"
+                              : "Ramassage"}{" "}
+                            •{" "}
+                            {new Date(
+                              o.createdAt || o.orderDate || Date.now(),
+                            ).toLocaleString("fr-CA")}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] font-black uppercase tracking-[0.25em] text-stone-400">
+                            Total
+                          </div>
+                          <div className="text-xl font-bold text-[#C5A065]">
+                            {Number(o.total || 0).toFixed(2)} $
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 rounded-xl border border-stone-200 bg-white/70 p-3">
+                        <div className="text-[10px] font-black uppercase tracking-[0.25em] text-stone-400 mb-2">
+                          Produits
+                        </div>
+                        {Array.isArray(o.items) && o.items.length > 0 ? (
+                          <ul className="space-y-1 text-sm text-stone-700">
+                            {o.items.map((item: any, idx: number) => (
+                              <li key={`${o._id || o.orderNumber}-item-${idx}`}>
+                                {item.productName || `Produit #${item.productId}`} × {Number(item.quantity || 0)}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-stone-500">Aucun produit trouvé pour cette commande.</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : products.length === 0 ? (
             <div className="text-center py-16">
               <Package size={48} className="mx-auto text-stone-300 mb-4" />
               <p className="text-stone-500 text-lg">Aucun produit trouvé</p>
@@ -672,37 +913,163 @@ export default function ProDashboard() {
                     <h3 className="font-bold text-stone-800 text-sm mb-3">
                       Options personnalisées
                     </h3>
-                    <div className="space-y-2">
-                      {selectedProduct.customOptions.map((opt, idx) => (
-                        <div
-                          key={idx}
-                          className="p-3 bg-stone-50 rounded-xl"
-                        >
-                          <p className="text-xs font-bold text-stone-600 mb-1">
-                            {opt.name}
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {opt.choices.map((choice, cidx) => (
-                              <span
-                                key={cidx}
-                                className="px-2 py-0.5 bg-white rounded-full text-xs text-stone-600 border border-stone-200"
-                              >
-                                {choice}
-                              </span>
-                            ))}
-                          </div>
+                    <div className="space-y-3">
+                      {missingRequiredOptions.length > 0 && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                          Options requises manquantes :{" "}
+                          {missingRequiredOptions.join(", ")}
                         </div>
-                      ))}
+                      )}
+
+                      {selectedProduct.customOptions.map((opt, idx) => {
+                        const currentValue = modalSelectedOptions[opt.name] || "";
+                        const isOptional =
+                          isAllergyOptionName(opt.name) ||
+                          isClientNoteOptionName(opt.name);
+
+                        return (
+                          <div key={idx} className="p-3 bg-stone-50 rounded-xl">
+                            <p className="text-xs font-bold text-stone-600 mb-2">
+                              {opt.name}
+                              {isOptional ? (
+                                <span className="ml-2 text-[10px] font-black uppercase tracking-widest text-stone-400">
+                                  (optionnel)
+                                </span>
+                              ) : null}
+                            </p>
+
+                            {opt.type === "text" ? (
+                              <input
+                                value={currentValue}
+                                onChange={(e) =>
+                                  handleModalOptionChange(opt.name, e.target.value)
+                                }
+                                placeholder={`Entrer ${opt.name.toLowerCase()}...`}
+                                className="w-full px-3 py-2 rounded-xl border border-stone-200 bg-white text-sm focus:border-[#C5A065] outline-none"
+                              />
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2">
+                                {opt.choices.map((choice) => {
+                                  const displayText = formatChoiceDisplay(choice);
+                                  const additionalPrice = getChoicePriceDeltaForOption(
+                                    opt.choices || [],
+                                    choice,
+                                    selectedProduct.price,
+                                  );
+                                  const selected = currentValue === choice;
+                                  return (
+                                    <button
+                                      key={`${opt.name}-${choice}`}
+                                      type="button"
+                                      onClick={() =>
+                                        handleModalOptionChange(opt.name, choice)
+                                      }
+                                      className={`py-2 px-2 rounded-xl text-sm font-semibold transition-colors border ${
+                                        selected
+                                          ? "bg-[#C5A065] text-white border-[#C5A065]"
+                                          : "bg-white text-stone-600 border-stone-200 hover:border-[#C5A065] hover:text-[#C5A065]"
+                                      }`}
+                                    >
+                                      <div className="truncate">{displayText}</div>
+                                      {additionalPrice > 0 && (
+                                        <div className="text-[10px] opacity-80">
+                                          +{additionalPrice.toFixed(2)}$
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
-              <button
-                onClick={() => setSelectedProduct(null)}
-                className="w-full py-3 rounded-xl border-2 border-stone-200 text-stone-600 font-bold text-sm uppercase tracking-widest hover:bg-stone-50 transition-colors"
-              >
-                Fermer
-              </button>
+              {/* Quantity + Add to cart */}
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-widest text-stone-400">
+                    Prix
+                  </div>
+                  <div className="text-lg font-bold text-[#C5A065]">
+                    {currentModalPrice.toFixed(2)} $
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setModalQuantity((q) =>
+                        Math.max(selectedProduct.minOrderQuantity || 1, q - 1),
+                      )
+                    }
+                    className="w-10 h-10 rounded-xl border border-stone-200 bg-white text-stone-700 hover:border-[#C5A065] hover:text-[#C5A065] transition-colors"
+                    aria-label="Diminuer la quantité"
+                  >
+                    -
+                  </button>
+                  <div className="min-w-12 text-center font-bold text-stone-800">
+                    {modalQuantity}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setModalQuantity((q) =>
+                        Math.min(selectedProduct.maxOrderQuantity || 9999, q + 1),
+                      )
+                    }
+                    className="w-10 h-10 rounded-xl border border-stone-200 bg-white text-stone-700 hover:border-[#C5A065] hover:text-[#C5A065] transition-colors"
+                    aria-label="Augmenter la quantité"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedProduct(null)}
+                  className="flex-1 py-3 rounded-xl border-2 border-stone-200 text-stone-600 font-bold text-sm uppercase tracking-widest hover:bg-stone-50 transition-colors"
+                >
+                  Fermer
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedProduct.available || missingRequiredOptions.length > 0}
+                  onClick={() => {
+                    if (!selectedProduct.available) return;
+                    if (missingRequiredOptions.length > 0) return;
+
+                    const payload = {
+                      id: selectedProduct.id,
+                      name: selectedProduct.name,
+                      price: currentModalPrice,
+                      image: selectedProduct.image || "",
+                      selectedOptions: modalSelectedOptions,
+                      hasTaxes: selectedProduct.hasTaxes,
+                      category: (selectedProduct as any).category,
+                      productionType: selectedProduct.productionType,
+                      availableDays: selectedProduct.availableDays,
+                    };
+
+                    for (let i = 0; i < modalQuantity; i++) onAddToCart(payload);
+                    setSelectedProduct(null);
+                    onCartClick();
+                  }}
+                  className={`flex-1 py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-colors ${
+                    !selectedProduct.available || missingRequiredOptions.length > 0
+                      ? "bg-stone-300 text-stone-500 cursor-not-allowed"
+                      : "bg-[#2D2A26] text-white hover:bg-[#C5A065]"
+                  }`}
+                >
+                  Ajouter au panier
+                </button>
+              </div>
             </div>
           </div>
         </div>

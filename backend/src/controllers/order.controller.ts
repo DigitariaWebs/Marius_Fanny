@@ -792,7 +792,7 @@ export const setProductionItemStatus = async (
     console.error("Error updating production item status:", error);
     res.status(500).json({
       success: false,
-      error: "Erreur lors de la mise Ã  jour du statut de production",
+      error: "Erreur lors de la mise à jour du statut de production",
       message: error.message,
     });
   }

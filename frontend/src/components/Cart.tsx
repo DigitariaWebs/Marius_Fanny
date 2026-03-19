@@ -63,6 +63,8 @@ const CartDrawer: React.FC<CartProps> = ({
   const [deliveryType, setDeliveryType] = useState<"pickup" | "delivery">(
     "pickup",
   );
+  const [isProUser, setIsProUser] = useState(false);
+  const [proDistanceTier, setProDistanceTier] = useState<"lt20" | "gt20">("lt20");
   const [pickupLocation, setPickupLocation] = useState<"Montreal" | "Laval">(
     "Laval",
   );
@@ -201,8 +203,12 @@ const CartDrawer: React.FC<CartProps> = ({
     return sum;
   }, 0);
 
-  const delivery =
-    deliveryType === "delivery" && deliveryZoneInfo?.isValid
+  const proDeliveryFee =
+    deliveryType === "delivery" ? (proDistanceTier === "gt20" ? 30 : 15) : 0;
+
+  const delivery = isProUser
+    ? proDeliveryFee
+    : deliveryType === "delivery" && deliveryZoneInfo?.isValid
       ? deliveryZoneInfo.fee
       : 0;
 
@@ -221,16 +227,50 @@ const CartDrawer: React.FC<CartProps> = ({
         }
       : null;
 
-  const handlePostalCodeChange = (postalCode: string) => {
-    setSelectedPostalCode(postalCode);
+  const proMinimumOrderValidation =
+    isProUser && deliveryType === "delivery"
+      ? {
+          isValid: subtotal >= 150,
+          shortfall: Math.max(0, 150 - subtotal),
+          postalCode: selectedPostalCode,
+          minimumOrder: 150,
+        }
+      : null;
 
-    if (postalCode) {
-      const zoneInfo = calculateDeliveryFee(postalCode);
-      setDeliveryZoneInfo(zoneInfo);
-    } else {
+  const effectiveMinimumOrderValidation = isProUser
+    ? proMinimumOrderValidation
+    : minimumOrderValidation;
+
+  const handlePostalCodeChange = (postalCode: string) => {
+    const normalized = (postalCode || "").toUpperCase();
+    setSelectedPostalCode(normalized);
+
+    if (!normalized || isProUser) {
       setDeliveryZoneInfo(null);
+      return;
     }
+
+    const zoneInfo = calculateDeliveryFee(normalized);
+    setDeliveryZoneInfo(zoneInfo);
   };
+
+  useEffect(() => {
+    const loadRole = async () => {
+      try {
+        const session = await authClient.getSession();
+        const user: any = session?.data?.user;
+        const role = user?.role || user?.user_metadata?.role;
+        setIsProUser(role === "pro");
+      } catch {
+        setIsProUser(false);
+      }
+    };
+    loadRole();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isProUser) setDeliveryZoneInfo(null);
+  }, [isProUser]);
 
   const handleProceedToPayment = async () => {
     console.log("🛒 [CART] handleProceedToPayment called", {
@@ -239,14 +279,14 @@ const CartDrawer: React.FC<CartProps> = ({
       itemsCount: items.length,
     });
     
-    if (deliveryType === "delivery" && !selectedPostalCode) {
+    if (deliveryType === "delivery" && selectedPostalCode.trim().length < 3) {
       alert("Veuillez sélectionner un code postal pour la livraison.");
       return;
     }
 
-    if (minimumOrderValidation && !minimumOrderValidation.isValid) {
+    if (effectiveMinimumOrderValidation && !effectiveMinimumOrderValidation.isValid) {
       alert(
-        `Minimum de commande non atteint. Il manque ${minimumOrderValidation.shortfall.toFixed(2)}$ pour ${minimumOrderValidation.postalCode}.`,
+        `Minimum de commande non atteint. Il manque ${effectiveMinimumOrderValidation.shortfall.toFixed(2)}$.`,
       );
       return;
     }
@@ -256,6 +296,8 @@ const CartDrawer: React.FC<CartProps> = ({
       items: items,
       postalCode: selectedPostalCode,
       deliveryType: deliveryType,
+      proDeliveryDistanceTier:
+        isProUser && deliveryType === "delivery" ? proDistanceTier : undefined,
       pickupLocation: deliveryType === "pickup" ? pickupLocation : undefined,
       deliveryFee: delivery,
       subtotal: subtotal,
@@ -270,6 +312,22 @@ const CartDrawer: React.FC<CartProps> = ({
     localStorage.setItem("checkout_data", JSON.stringify(newOrderData));
     
     // Stocker dans l'état et ouvrir le modal
+    try {
+      const session = await authClient.getSession();
+      if (session?.data?.user) {
+        navigate("/checkout", {
+          state: {
+            ...newOrderData,
+            isGuest: false,
+          },
+        });
+        onClose();
+        return;
+      }
+    } catch {
+      // ignore - fallback to login choice modal
+    }
+
     setOrderData(newOrderData);
     setShowLoginChoiceModal(true);
   };
@@ -649,10 +707,55 @@ const CartDrawer: React.FC<CartProps> = ({
                   <MapPin size={16} className="text-[#337957]" />
                   Code Postal pour Livraison:
                 </label>
-                <Select
-                  value={selectedPostalCode}
-                  onValueChange={handlePostalCodeChange}
-                >
+                {isProUser ? (
+                  <>
+                    <input
+                      value={selectedPostalCode}
+                      onChange={(e) => handlePostalCodeChange(e.target.value)}
+                      placeholder="Code postal (ex: H7X 1A1)"
+                      className="w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm focus:outline-none focus:border-[#337957] focus:ring-1 focus:ring-[#337957]/30"
+                    />
+
+                    <div className="mt-3">
+                      <div className="text-xs font-semibold text-stone-600 mb-2">
+                        Distance (frais pro)
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setProDistanceTier("lt20")}
+                          className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                            proDistanceTier === "lt20"
+                              ? "bg-[#337957] text-white border-[#337957]"
+                              : "bg-white text-[#2D2A26] border-stone-300 hover:border-[#337957]"
+                          }`}
+                        >
+                          &lt; 20 km (15$)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setProDistanceTier("gt20")}
+                          className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
+                            proDistanceTier === "gt20"
+                              ? "bg-[#337957] text-white border-[#337957]"
+                              : "bg-white text-[#2D2A26] border-stone-300 hover:border-[#337957]"
+                          }`}
+                        >
+                          &gt; 20 km (30$)
+                        </button>
+                      </div>
+
+                      <div className="mt-2 p-2 rounded text-xs bg-blue-50 text-blue-700">
+                        Frais pro: {proDeliveryFee.toFixed(2)}$ | Minimum livraison pro: 150$
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Select
+                      value={selectedPostalCode}
+                      onValueChange={handlePostalCodeChange}
+                    >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Sélectionnez votre code postal" />
                   </SelectTrigger>
@@ -700,13 +803,15 @@ const CartDrawer: React.FC<CartProps> = ({
                     )}
                   </div>
                 )}
-                {minimumOrderValidation && !minimumOrderValidation.isValid && (
+                  </>
+                )}
+                {effectiveMinimumOrderValidation &&
+                  !effectiveMinimumOrderValidation.isValid && (
                   <div className="mt-2 p-2 rounded text-xs bg-amber-50 text-amber-700 flex items-start gap-1">
                     <AlertCircle size={14} className="mt-0.5 shrink-0" />
                     <div>
                       Minimum de commande non atteint. Il manque{" "}
-                      {minimumOrderValidation.shortfall.toFixed(2)}$ pour{" "}
-                      {minimumOrderValidation.postalCode}.
+                      {effectiveMinimumOrderValidation.shortfall.toFixed(2)}$.
                     </div>
                   </div>
                 )}
@@ -800,24 +905,31 @@ const CartDrawer: React.FC<CartProps> = ({
                   onClick={handleProceedToPayment}
                   disabled={
                     (deliveryType === "delivery" &&
-                      (!deliveryZoneInfo?.isValid ||
-                        (minimumOrderValidation !== null &&
-                          !minimumOrderValidation.isValid)))
+                      ((isProUser
+                        ? selectedPostalCode.trim().length < 3
+                        : !deliveryZoneInfo?.isValid) ||
+                        (effectiveMinimumOrderValidation !== null &&
+                          !effectiveMinimumOrderValidation?.isValid)))
                   }
                   className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all shadow-lg mt-4 group ${
                     (deliveryType === "delivery" &&
-                      (!deliveryZoneInfo?.isValid ||
-                        (minimumOrderValidation !== null &&
-                          !minimumOrderValidation.isValid)))
+                      ((isProUser
+                        ? selectedPostalCode.trim().length < 3
+                        : !deliveryZoneInfo?.isValid) ||
+                        (effectiveMinimumOrderValidation !== null &&
+                          !effectiveMinimumOrderValidation?.isValid)))
                       ? "bg-stone-400 text-stone-600 cursor-not-allowed"
                       : "bg-[#2D2A26] text-white hover:bg-[#337957]"
                   }`}
                   title={
-                    deliveryType === "delivery" && !deliveryZoneInfo?.isValid
+                    deliveryType === "delivery" &&
+                    (isProUser
+                      ? selectedPostalCode.trim().length < 3
+                      : !deliveryZoneInfo?.isValid)
                       ? "Veuillez entrer un code postal valide"
                       : deliveryType === "delivery" &&
-                          minimumOrderValidation &&
-                          !minimumOrderValidation.isValid
+                          effectiveMinimumOrderValidation &&
+                          !effectiveMinimumOrderValidation.isValid
                         ? "Montant minimum non atteint"
                         : ""
                   }

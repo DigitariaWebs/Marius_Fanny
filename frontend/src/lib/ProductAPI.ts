@@ -42,7 +42,7 @@ export interface UpdateProductData {
   description?: string;
   image?: string;
   images?: string[];
-  preparationTimeHours?: number;
+  preparationTimeHours?: number | null;
   availableDays?: number[];
   hasTaxes?: boolean;
   allergens?: string;
