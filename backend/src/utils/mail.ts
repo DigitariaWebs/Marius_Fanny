@@ -1159,3 +1159,188 @@ export async function sendInvoiceOrderConfirmation(
     throw error;
   }
 }
+
+/**
+ * Template pour email de rappel de paiement (1 semaine ou 48h avant échéance)
+ */
+export async function sendPaymentReminderEmail(
+  email: string,
+  name: string,
+  orderNumber: string,
+  total: number,
+  daysUntilDue: number,
+  billingType: string,
+  reminderPeriod: string
+): Promise<void> {
+  try {
+    const formattedTotal = total.toFixed(2);
+    const urgencyColor = daysUntilDue <= 2 ? "#D32F2F" : "#F57C00";
+    const urgencyText = daysUntilDue <= 2 
+      ? "⚠️ URGENT - Paiement requis dans 48 heures" 
+      : "⏰ Rappel - Paiement à venir";
+
+    const mailOptions = {
+      from: DISPLAY_FROM,
+      to: email,
+      subject: daysUntilDue <= 2 
+        ? `🔴 URGENT: Paiement requis dans 48h - Commande ${orderNumber}`
+        : `Rappel: Paiement à effectuer - Commande ${orderNumber}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <img src="${LOGO_URL}" alt="Marius & Fanny" style="max-width: 200px;" />
+          </div>
+
+          <div style="background-color: #FFF3E0; padding: 20px; border-radius: 8px; border-left: 4px solid ${urgencyColor}; margin-bottom: 20px;">
+            <h2 style="color: ${urgencyColor}; margin: 0 0 10px 0;">
+              ${urgencyText}
+            </h2>
+            <p style="color: #333; margin: 0;">
+             Bonjour ${name},<br/><br/>
+              Nous vous rappelons que votre commande <strong>${orderNumber}</strong> doit être réglée ${reminderPeriod === "une semaine" ? "d'ici une semaine" : "dans les prochaines 48 heures"}.
+            </p>
+          </div>
+
+          <div style="background-color: #F5F5F5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #333; margin: 0 0 15px 0; border-bottom: 2px solid #C5A065; padding-bottom: 10px;">
+              Détails de la commande
+            </h3>
+            <p style="color: #555; margin: 8px 0;">
+              <span style="display: inline-block; width: 120px;">Numéro de commande:</span>
+              <strong>${orderNumber}</strong>
+            </p>
+            <p style="color: #555; margin: 8px 0;">
+              <span style="display: inline-block; width: 120px;">Type de client:</span>
+              <strong>${billingType}</strong>
+            </p>
+            <p style="color: #C5A065; font-size: 24px; margin: 15px 0 0 0;">
+              <span style="display: inline-block; width: 120px;">Total à payer:</span>
+              <strong>${formattedTotal}$</strong>
+            </p>
+          </div>
+
+          <div style="background-color: #E8F5E9; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50;">
+            <p style="color: #2E7D32; margin: 0; font-weight: bold;">
+              📧 Comment payer ?
+            </p>
+            <p style="color: #555; margin: 10px 0 0 0; font-size: 14px;">
+              Cliquez sur le bouton ci-dessous pour procéder au paiement sécurisé:
+            </p>
+            <div style="text-align: center; margin-top: 15px;">
+              <a href="https://marius-fanny.com/account/orders" 
+                 style="display: inline-block; padding: 12px 30px; background-color: #337957; color: white;
+                        text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Régler ma commande
+              </a>
+            </div>
+          </div>
+
+          <p style="color: #666; font-size: 14px; margin-top: 25px; text-align: center;">
+            Si vous avez déjà effectué le paiement, veuillez ignorer ce message.
+            <br/>Pour toute question, contactez-nous à <a href="mailto:mariusetfanny@gmail.com" style="color: #C5A065;">mariusetfanny@gmail.com</a>
+          </p>
+
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>© 2026 Marius & Fanny. Tous droits réservés.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    await sendEmail(mailOptions);
+    console.log("✅ Rappel de paiement envoyé vers:", email);
+  } catch (error) {
+    console.error("❌ Erreur lors de l'envoi du rappel de paiement:", error);
+    throw error;
+  }
+}
+
+/**
+ * Template pour email de paiement en retard (après la date d'échéance)
+ */
+export async function sendPaymentOverdueEmail(
+  email: string,
+  name: string,
+  orderNumber: string,
+  total: number,
+  daysOverdue: number,
+  billingType: string
+): Promise<void> {
+  try {
+    const formattedTotal = total.toFixed(2);
+
+    const mailOptions = {
+      from: DISPLAY_FROM,
+      to: email,
+      subject: `⚠️ ALERTE: Paiement en retard - Commande ${orderNumber}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <img src="${LOGO_URL}" alt="Marius & Fanny" style="max-width: 200px;" />
+          </div>
+
+          <div style="background-color: #FFEBEE; padding: 20px; border-radius: 8px; border-left: 4px solid #D32F2F; margin-bottom: 20px;">
+            <h2 style="color: #D32F2F; margin: 0 0 10px 0;">
+              ⚠️ ALERTE: Paiement en retard
+            </h2>
+            <p style="color: #333; margin: 0;">
+              Bonjour ${name},<br/><br/>
+              Nous vous informons que le paiement de votre commande <strong>${orderNumber}</strong> est en retard de <strong style="color: #D32F2F;">${daysOverdue} jour${daysOverdue > 1 ? 's' : ''}</strong>.
+            </p>
+          </div>
+
+          <div style="background-color: #F5F5F5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #333; margin: 0 0 15px 0; border-bottom: 2px solid #C5A065; padding-bottom: 10px;">
+              Détails de la commande
+            </h3>
+            <p style="color: #555; margin: 8px 0;">
+              <span style="display: inline-block; width: 120px;">Numéro de commande:</span>
+              <strong>${orderNumber}</strong>
+            </p>
+            <p style="color: #555; margin: 8px 0;">
+              <span style="display: inline-block; width: 120px;">Type de client:</span>
+              <strong>${billingType}</strong>
+            </p>
+            <p style="color: #D32F2F; font-size: 24px; margin: 15px 0 0 0;">
+              <span style="display: inline-block; width: 120px;">Total en retard:</span>
+              <strong>${formattedTotal}$</strong>
+            </p>
+          </div>
+
+          <div style="background-color: #FFCDD2; padding: 15px; border-radius: 8px; border-left: 4px solid #D32F2F; margin-bottom: 20px;">
+            <p style="color: #D32F2F; margin: 0; font-weight: bold;">
+              ⚠️ Action requise
+            </p>
+            <p style="color: #555; margin: 10px 0 0 0; font-size: 14px;">
+              Votre commande sera <strong>annulée automatiquement</strong> si le paiement n'est pas reçu dans les plus brefs délais.
+              Veuillez procéder au paiement immédiatement pour éviter l'annulation de votre commande.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 20px;">
+            <a href="https://marius-fanny.com/account/orders" 
+               style="display: inline-block; padding: 14px 40px; background-color: #D32F2F; color: white;
+                      text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              PAYER IMMÉDIATEMENT
+            </a>
+          </div>
+
+          <p style="color: #666; font-size: 14px; margin-top: 25px; text-align: center;">
+            Pour toute question ou si vous avez besoin d'un délai supplémentaire, contactez-nous rapidement à 
+            <a href="mailto:mariusetfanny@gmail.com" style="color: #C5A065;">mariusetfanny@gmail.com</a>
+          </p>
+
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>© 2026 Marius & Fanny. Tous droits réservés.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    await sendEmail(mailOptions);
+    console.log("✅ Email de paiement en retard envoyé vers:", email);
+  } catch (error) {
+    console.error("❌ Erreur lors de l'envoi de l'email de paiement en retard:", error);
+    throw error;
+  }
+}

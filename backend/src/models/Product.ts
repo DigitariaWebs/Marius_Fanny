@@ -14,6 +14,7 @@ export interface IProduct {
   images?: string[];
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date;
   sales?: number;
   revenue?: number;
   preparationTimeHours?: number;
@@ -62,6 +63,7 @@ const productSchema = new Schema<IProduct>({
   images: [{ type: String }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+  deletedAt: { type: Date, index: true },
   sales: { type: Number, default: 0 },
   revenue: { type: Number, default: 0 },
   preparationTimeHours: { type: Number },

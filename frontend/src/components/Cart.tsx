@@ -131,7 +131,6 @@ const CartDrawer: React.FC<CartProps> = ({
       setPromoInput("");
       setIsApplyingPromo(false);
     } else {
-      setPromoError("Code promo invalide ou expiré.");
       setIsApplyingPromo(false);
     }
   };

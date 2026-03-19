@@ -12,8 +12,8 @@ export async function getAllProducts(req: AuthRequest, res: Response) {
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
-    // Build filter: optionally restrict by targetAudience
-    const filter: Record<string, unknown> = {};
+    // Build filter: optionally restrict by targetAudience, exclude soft-deleted products
+    const filter: Record<string, unknown> = { deletedAt: { $exists: false } };
     if (req.query.targetAudience === "clients" || req.query.targetAudience === "pro") {
       filter.targetAudience = req.query.targetAudience;
     }
@@ -48,7 +48,7 @@ export async function getProductById(req: AuthRequest, res: Response) {
     const { id } = req.params;
     const idStr = Array.isArray(id) ? id[0] : id;
 
-    const product = await Product.findOne({ id: parseInt(idStr) });
+    const product = await Product.findOne({ id: parseInt(idStr), deletedAt: { $exists: false } });
 
     if (!product) {
       throw new AppError("Product not found", 404);
@@ -138,7 +138,7 @@ export async function updateProduct(req: AuthRequest, res: Response) {
     const idStr = Array.isArray(id) ? id[0] : id;
     const updateData = req.body;
 
-    const product = await Product.findOne({ id: parseInt(idStr) });
+    const product = await Product.findOne({ id: parseInt(idStr), deletedAt: { $exists: false } });
 
     if (!product) {
       throw new AppError("Product not found", 404);
@@ -175,14 +175,18 @@ export async function updateProduct(req: AuthRequest, res: Response) {
 }
 
 /**
- * Delete product by ID
+ * Delete product by ID (soft delete - maintains historical data)
  */
 export async function deleteProduct(req: AuthRequest, res: Response) {
   try {
     const { id } = req.params;
     const idStr = Array.isArray(id) ? id[0] : id;
 
-    const product = await Product.findOneAndDelete({ id: parseInt(idStr) });
+    const product = await Product.findOneAndUpdate(
+      { id: parseInt(idStr) },
+      { deletedAt: new Date() },
+      { new: true }
+    );
 
     if (!product) {
       throw new AppError("Product not found", 404);
@@ -206,7 +210,7 @@ export async function toggleProductAvailability(req: AuthRequest, res: Response)
     const { id } = req.params;
     const idStr = Array.isArray(id) ? id[0] : id;
 
-    const product = await Product.findOne({ id: parseInt(idStr) });
+    const product = await Product.findOne({ id: parseInt(idStr), deletedAt: { $exists: false } });
 
     if (!product) {
       throw new AppError("Product not found", 404);
@@ -236,7 +240,10 @@ export async function reorderProducts(req: AuthRequest, res: Response) {
 
     await Promise.all(
       orders.map(({ id, displayOrder }) =>
-        Product.findOneAndUpdate({ id }, { displayOrder, updatedAt: new Date() })
+        Product.findOneAndUpdate(
+          { id, deletedAt: { $exists: false } },
+          { displayOrder, updatedAt: new Date() }
+        )
       )
     );
 
@@ -264,7 +271,7 @@ export async function updateAllProductsAllergens(req: AuthRequest, res: Response
     const normalizedAllergens = allergens.trim();
 
     const result = await Product.updateMany(
-      {},
+      { deletedAt: { $exists: false } },
       {
         $set: {
           allergens: normalizedAllergens,
@@ -294,7 +301,7 @@ export async function enableClientAllergyTextField(req: AuthRequest, res: Respon
     const OPTION_NAME = "Allergies / note client";
     let modifiedCount = 0;
 
-    const products = await Product.find({});
+    const products = await Product.find({ deletedAt: { $exists: false } });
 
     for (const product of products) {
       const options = Array.isArray(product.customOptions)

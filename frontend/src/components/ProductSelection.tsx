@@ -336,35 +336,39 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
   return (
     <div className="py-8 px-4 md:px-8 bg-white/50 backdrop-blur-sm animate-in fade-in duration-500" style={{ fontFamily: '"Century Gothic", sans-serif' }}>
 
-      {/* NOTIFICATION RECOMMANDATIONS */}
+      {/* NOTIFICATION RECOMMANDATIONS - AGRANDIE */}
       {showRecommendationNotif && recommendationNotif.length > 0 && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[12000] pointer-events-none px-2 w-full flex justify-center">
-        <div className="pointer-events-auto w-[min(22rem,calc(100vw-2rem))] bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="bg-[#2D2A26] px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">✨</span>
-              <p className="text-white text-xs font-bold uppercase tracking-widest">Vous aimerez aussi</p>
+        <div className="fixed inset-0 z-[12000] pointer-events-none flex items-center justify-center px-4 py-8">
+        <div className="pointer-events-auto w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-stone-100 overflow-hidden animate-in zoom-in-95 fade-in duration-300">
+          <div className="bg-gradient-to-r from-[#2D2A26] to-[#337957] px-6 py-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl animate-bounce">✨</span>
+              <div>
+                <p className="text-white text-sm font-bold uppercase tracking-widest">Vous aimerez aussi!</p>
+                <p className="text-white/80 text-xs mt-1">Nos recommandations pour vous</p>
+              </div>
             </div>
             <button
               onClick={() => setShowRecommendationNotif(false)}
-              className="text-white/60 hover:text-white transition-colors text-lg leading-none"
+              className="text-white/60 hover:text-white transition-colors text-2xl leading-none flex-shrink-0"
             >
               ✕
             </button>
           </div>
-          <div className="p-3 space-y-2 max-h-72 overflow-y-auto">
+          <div className="p-6 space-y-3 max-h-96 overflow-y-auto">
             {recommendationNotif.map((rec) => {
               const recPrice = getDiscountedPrice(rec.price, rec.discountPercentage);
               return (
-                <div key={rec.id} className="flex items-center gap-3 bg-stone-50 rounded-xl p-2 hover:bg-stone-100 transition-colors">
+                <div key={rec.id} className="flex items-center gap-4 bg-gradient-to-r from-stone-50 to-white rounded-2xl p-4 hover:from-stone-100 hover:to-stone-50 transition-all border border-stone-200 cursor-pointer group">
                   <img
                     src={getImageUrl(rec.image)}
                     alt={rec.name}
-                    className="w-14 h-14 rounded-lg object-cover shrink-0"
+                    className="w-20 h-20 rounded-xl object-cover shrink-0 group-hover:scale-110 transition-transform shadow-md"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#2D2A26] truncate">{rec.name}</p>
-                    <p className="text-sm font-bold text-[#337957]">{recPrice.toFixed(2)} $</p>
+                    <p className="text-base font-bold text-[#2D2A26]">{rec.name}</p>
+                    <p className="text-sm text-stone-600 mt-1 line-clamp-2">{rec.description || 'Délicieux produit'}</p>
+                    <p className="text-lg font-bold text-[#337957] mt-2">{recPrice.toFixed(2)} $</p>
                   </div>
                   <button
                     type="button"
@@ -380,13 +384,22 @@ const ProductSelection: React.FC<ProductSelectionProps> = ({
                       }
                       setShowRecommendationNotif(false);
                     }}
-                    className="shrink-0 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-[#337957] text-white hover:bg-[#2D2A26] transition-colors"
+                    className="shrink-0 px-5 py-3 text-xs font-bold uppercase tracking-wider rounded-xl bg-[#337957] text-white hover:bg-[#2D2A26] transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     {rec.customOptions?.length ? "Configurer" : "+ Panier"}
                   </button>
                 </div>
               );
             })}
+          </div>
+          <div className="bg-stone-50 px-6 py-4 border-t border-stone-100 flex items-center justify-between">
+            <p className="text-sm text-stone-600 font-medium">Cette notification disparaîtra automatiquement</p>
+            <button
+              onClick={() => setShowRecommendationNotif(false)}
+              className="text-xs font-semibold text-stone-600 hover:text-[#337957] transition-colors"
+            >
+              Fermer
+            </button>
           </div>
         </div>
         </div>

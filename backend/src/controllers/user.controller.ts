@@ -209,7 +209,7 @@ export async function updateUser(req: AuthRequest, res: Response) {
           organization: input.organization ?? existing?.organization,
           paymentTermsDays: Number.isFinite(input.paymentTermsDays)
             ? input.paymentTermsDays
-            : existing?.paymentTermsDays ?? 60,
+            : existing?.paymentTermsDays ?? 180,
           allowUnpaidOrders: input.allowUnpaidOrders ?? true,
         };
       }
@@ -371,7 +371,7 @@ export async function createClient(req: AuthRequest, res: Response) {
         return {
           kind,
           organization: input?.organization,
-          paymentTermsDays: Number.isFinite(input?.paymentTermsDays) ? input.paymentTermsDays : 60,
+          paymentTermsDays: Number.isFinite(input?.paymentTermsDays) ? input.paymentTermsDays : 180,
           allowUnpaidOrders: true,
         };
       }

@@ -12,6 +12,7 @@ import inventoryRoutes from "./inventory.routes.js";
 import dailyInventoryRoutes from "./dailyInventory.routes.js";
 import partnerRoutes from "./partner.routes.js";
 import promoRoutes from "./promo.routes.js";
+import paymentReminderRoutes from "./paymentReminder.routes.js";
 
 const router = Router();
 
@@ -52,5 +53,6 @@ router.use("/inventory", inventoryRoutes);
 router.use("/daily-inventory", dailyInventoryRoutes);
 router.use("/partner-request", partnerRoutes);
 router.use("/promos", promoRoutes);
+router.use("/payment-reminders", paymentReminderRoutes);
 
 export default router;
