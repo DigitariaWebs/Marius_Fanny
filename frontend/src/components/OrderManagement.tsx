@@ -50,6 +50,7 @@ interface OrderItemWithPacking {
   subtotal: number;
   productionStatus: string;
   notes?: string;
+  selectedOptions?: Record<string, string>;
   isPacked?: boolean;
 }
 
@@ -69,6 +70,10 @@ const buildOrderItemsUpdatePayload = (items: OrderItemWithPacking[]) =>
     unitPrice: item.unitPrice,
     amount: item.subtotal,
     notes: item.notes,
+    selectedOptions:
+      item.selectedOptions && Object.keys(item.selectedOptions).length > 0
+        ? item.selectedOptions
+        : undefined,
     productionStatus:
       item.productionStatus === "ready" || item.productionStatus === "in_progress"
         ? item.productionStatus
@@ -302,8 +307,14 @@ export function OrderManagement() {
 
     if (selectedDate) {
       next = next.filter((order) => {
-        const orderDate = (order.orderDate || "").split("T")[0];
-        return orderDate === selectedDate;
+        const raw =
+          (order.pickupDate ||
+            order.deliveryDate ||
+            order.orderDate ||
+            order.createdAt ||
+            "") as string;
+        const dateKey = raw.includes("T") ? raw.split("T")[0] : raw;
+        return dateKey === selectedDate;
       });
     }
 
@@ -319,8 +330,25 @@ export function OrderManagement() {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const res = await orderAPI.getOrders({ limit: 100 });
-        const items = res.data?.items || [];
+        const limit = 100;
+        const maxPages = 20; // safety cap (up to 2000 orders)
+        let page = 1;
+        let items: any[] = [];
+
+        while (page <= maxPages) {
+          const res = await orderAPI.getOrders({ page, limit });
+          const pageItems = res.data?.items || [];
+          items = items.concat(pageItems);
+
+          const totalPages = Number(res.data?.pagination?.totalPages || 0);
+          if (totalPages > 0) {
+            if (page >= totalPages) break;
+          } else if (pageItems.length < limit) {
+            break;
+          }
+
+          page += 1;
+        }
         
         if (items.length > 0) {
           const mapped: OrderWithPacking[] = items.map((o: any) => {
@@ -344,6 +372,10 @@ export function OrderManagement() {
                 subtotal: item.amount || (item.quantity * item.unitPrice),
                 productionStatus: item.productionStatus || "pending",
                 notes: item.notes,
+                selectedOptions:
+                  item.selectedOptions && Object.keys(item.selectedOptions).length > 0
+                    ? item.selectedOptions
+                    : undefined,
                 product: {
                   id: item.productId,
                   name: productName,
@@ -353,10 +385,10 @@ export function OrderManagement() {
               };
             });
 
-            return {
-              id: o._id || o.id,
-              orderNumber: o.orderNumber || "",
-              clientId: 0,
+              return {
+                id: o._id || o.id,
+                orderNumber: o.orderNumber || "",
+                clientId: 0,
               client: {
                 id: 0,
                 firstName: o.clientInfo?.firstName || "",
@@ -370,7 +402,20 @@ export function OrderManagement() {
                 orders: [],
               },
               orderDate: o.orderDate || o.createdAt,
-              pickupDate: o.pickupDate || o.createdAt,
+              pickupDate:
+                o.pickupDate ||
+                (o.deliveryType === "pickup" && o.deliveryDate
+                  ? (() => {
+                      const datePart = String(o.deliveryDate).split("T")[0];
+                      const timeRaw = String(o.deliveryTimeSlot || "00:00").trim();
+                      const timePart = /^([01]\d|2[0-3]):[0-5]\d$/.test(timeRaw)
+                        ? timeRaw
+                        : "00:00";
+                      const parsed = new Date(`${datePart}T${timePart}:00`);
+                      if (Number.isNaN(parsed.getTime())) return o.createdAt || o.orderDate;
+                      return parsed.toISOString();
+                    })()
+                  : o.createdAt),
               pickupLocation: o.pickupLocation || "Laval",
               deliveryType: o.deliveryType || "pickup",
               deliveryDate: o.deliveryDate,
@@ -390,6 +435,9 @@ export function OrderManagement() {
               squareInvoiceId: o.squareInvoiceId,
               paymentStatus: o.paymentStatus || "unpaid",
               refunds: o.refunds || undefined,
+              billingKind: o.billingKind,
+              billingOrganization: o.billingOrganization,
+              paymentDueDate: o.paymentDueDate,
               status: o.status || "pending",
               source: "in_store" as const,
               paymentMethod:
@@ -495,6 +543,34 @@ export function OrderManagement() {
     );
   };
 
+  const getPaymentDueDateForOrder = (order: any): Date | null => {
+    if (order?.paymentStatus === "paid") return null;
+    if (order?.paymentDueDate) return new Date(order.paymentDueDate);
+    if (order?.billingKind === "gouvernement") {
+      const base = new Date(order.orderDate || order.createdAt);
+      const due = new Date(base);
+      due.setDate(due.getDate() + 60);
+      return due;
+    }
+    return null;
+  };
+
+  const isGovernmentLate = (order: any) => {
+    if (order?.billingKind !== "gouvernement") return false;
+    if (order?.paymentStatus === "paid") return false;
+    const base = new Date(order.orderDate || order.createdAt);
+    const daysOpen = Math.floor((Date.now() - base.getTime()) / (1000 * 60 * 60 * 24));
+    return daysOpen >= 60;
+  };
+
+  const formatDateOnly = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("fr-CA", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("fr-CA", {
       year: "numeric",
@@ -564,6 +640,29 @@ export function OrderManagement() {
       : "";
 
     return { options, allergies, note, description };
+  };
+
+  const formatSelectedOptions = (selectedOptions?: Record<string, string>) => {
+    if (!selectedOptions) return [] as string[];
+    return Object.entries(selectedOptions)
+      .map(([key, value]) => [String(key).trim(), String(value).trim()] as const)
+      .filter(([key, value]) => key && value)
+      .map(([key, value]) => `${key}: ${value}`);
+  };
+
+  const getItemOptionChips = (item: Pick<OrderItemWithPacking, "notes" | "selectedOptions">) => {
+    const parsed = parseItemNotes(item.notes);
+    const combined = [...formatSelectedOptions(item.selectedOptions), ...parsed.options];
+    const chips = Array.from(new Set(combined)).filter(Boolean);
+    // If notes are like "Pain: Baguette | Tranché: Oui" (web orders), treat them as options too.
+    if (chips.length === 0 && item.notes && item.notes.includes("|")) {
+      const fromNotes = item.notes
+        .split("|")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return { chips: Array.from(new Set(fromNotes)), parsed };
+    }
+    return { chips, parsed };
   };
 
   const formatCurrency = (amount: number) => {
@@ -981,7 +1080,31 @@ export function OrderManagement() {
       key: "paymentStatus",
       label: "Paiement",
       sortable: true,
-      render: (order: OrderWithPacking) => getPaymentBadge(order.paymentStatus),
+      render: (order: OrderWithPacking) => (
+        <div className="flex items-center gap-2">
+          {getPaymentBadge(order.paymentStatus)}
+          {isGovernmentLate(order) && (
+            <span className="px-2 py-1 rounded-full text-[10px] font-black bg-red-600 text-white">
+              EN RETARD (60j+)
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "paymentDueDate",
+      label: "Date limite",
+      sortable: false,
+      render: (order: OrderWithPacking) => {
+        const due = getPaymentDueDateForOrder(order);
+        if (!due) return <span className="text-xs text-gray-400">-</span>;
+        const isOverdue = order.paymentStatus !== "paid" && new Date() > due;
+        return (
+          <span className={isOverdue ? "text-xs font-bold text-red-700" : "text-xs text-gray-700"}>
+            {formatDateOnly(due.toISOString())}
+          </span>
+        );
+      },
     },
     {
       key: "status",
@@ -1106,7 +1229,7 @@ export function OrderManagement() {
       render: (order: OrderWithPacking) => (
         <div className="space-y-2 min-w-70">
           {order.items.map((item) => {
-            const parsed = parseItemNotes(item.notes);
+            const { chips, parsed } = getItemOptionChips(item);
             return (
               <div key={`${order.id}-${item.id}`} className="rounded-md border border-gray-200 bg-gray-50 p-2">
                 <div className="text-xs font-semibold text-gray-900">
@@ -1115,9 +1238,9 @@ export function OrderManagement() {
                     : (item.product?.name || `Produit #${item.productId}`)
                   }{" "}x{item.quantity}
                 </div>
-                {parsed.options.length > 0 && (
+                {chips.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {parsed.options.map((option) => (
+                    {chips.map((option) => (
                       <span key={option} className="inline-flex rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px]">
                         {option}
                       </span>
@@ -1177,7 +1300,7 @@ export function OrderManagement() {
         <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
           <div className="sm:w-56">
             <Label htmlFor="order-date-filter" className="text-xs text-gray-600">
-              Date de creation
+              Date de ramassage
             </Label>
             <Input
               id="order-date-filter"
@@ -1497,13 +1620,31 @@ export function OrderManagement() {
                           <Calendar className="w-5 h-5 text-(--bakery-gold)" />
                           <div>
                             <p className="text-xs text-(--bakery-text-secondary)">
-                              Date de retrait
+                              Date de ramassage
                             </p>
                             <p className="text-sm font-medium text-(--bakery-text)">
-                              {formatDate(selectedOrder.pickupDate)}
+                              {formatDateOnly(selectedOrder.pickupDate)}
                             </p>
                           </div>
                         </div>
+                        {selectedOrder.deliveryType === "pickup" && (
+                          <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
+                            <Clock className="w-5 h-5 text-(--bakery-gold)" />
+                            <div>
+                              <p className="text-xs text-(--bakery-text-secondary)">
+                                Heure de ramassage
+                              </p>
+                              <p className="text-sm font-medium text-(--bakery-text)">
+                                {selectedOrder.deliveryTimeSlot ||
+                                  new Date(selectedOrder.pickupDate).toLocaleTimeString("fr-CA", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    hour12: false,
+                                  })}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                         <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
                           <MapPin className="w-5 h-5 text-(--bakery-gold)" />
                           <div>
@@ -1528,7 +1669,7 @@ export function OrderManagement() {
                             </p>
                           </div>
                         </div>
-                        {selectedOrder.deliveryDate && (
+                        {selectedOrder.deliveryType === "delivery" && selectedOrder.deliveryDate && (
                           <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
                             <Calendar className="w-5 h-5 text-(--bakery-gold)" />
                             <div>
@@ -1536,17 +1677,12 @@ export function OrderManagement() {
                                 Date de livraison
                               </p>
                               <p className="text-sm font-medium text-(--bakery-text)">
-                                {new Date(selectedOrder.deliveryDate).toLocaleDateString('fr-CA', { 
-                                  weekday: 'long', 
-                                  year: 'numeric', 
-                                  month: 'long', 
-                                  day: 'numeric' 
-                                })}
+                                {formatDateOnly(selectedOrder.deliveryDate)}
                               </p>
                             </div>
                           </div>
                         )}
-                        {selectedOrder.deliveryTimeSlot && (
+                        {selectedOrder.deliveryType === "delivery" && selectedOrder.deliveryTimeSlot && (
                           <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
                             <Clock className="w-5 h-5 text-(--bakery-gold)" />
                             <div>
@@ -1609,10 +1745,24 @@ export function OrderManagement() {
                           </td>
                         </tr>
                       ) : (
-                        selectedOrder.items.map((item) => (
+                        selectedOrder.items.map((item) => {
+                          const { chips } = getItemOptionChips(item);
+                          return (
                           <tr key={item.id}>
                             <td className="px-4 py-3 text-sm">
-                              {item.product?.name ?? `Produit #${item.productId}`}
+                              <div>{item.product?.name ?? `Produit #${item.productId}`}</div>
+                              {chips.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {chips.map((option) => (
+                                    <span
+                                      key={option}
+                                      className="inline-flex rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px]"
+                                    >
+                                      {option}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               {item.quantity}
@@ -1641,7 +1791,8 @@ export function OrderManagement() {
                               </span>
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
                   </table>

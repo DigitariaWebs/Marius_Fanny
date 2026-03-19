@@ -104,6 +104,19 @@ export default function OrderForm({
   clients = [],
   onViewProducts,
 }: OrderFormProps) {
+  const normalizeOptionName = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const isAllergyOptionName = (name: string) =>
+    normalizeOptionName(name).includes("allerg");
+  const isClientNoteOptionName = (name: string) => {
+    const normalized = normalizeOptionName(name);
+    return (
+      normalized.includes("note") ||
+      normalized.includes("comment") ||
+      normalized.includes("remarque")
+    );
+  };
+
   const [formData, setFormData] = useState<OrderFormData>(() => {
     const initialItems = initialData?.items?.map(item => ({
       ...item,
@@ -162,6 +175,34 @@ export default function OrderForm({
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productSearch, setProductSearch] = useState<Record<string, string>>({}); // Search term per item
+  const [expandedTextOptionInputs, setExpandedTextOptionInputs] = useState<
+    Record<string, Record<string, boolean>>
+  >({});
+
+  const isTextOptionExpanded = (
+    itemId: string,
+    optionName: string,
+    currentValue: string,
+  ) => {
+    const stored = expandedTextOptionInputs[itemId]?.[optionName];
+    if (stored !== undefined) return stored;
+    return Boolean(currentValue && currentValue.trim().length > 0);
+  };
+
+  const toggleTextOptionExpanded = (
+    itemId: string,
+    optionName: string,
+    next?: boolean,
+  ) => {
+    setExpandedTextOptionInputs((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...(prev[itemId] || {}),
+        [optionName]:
+          typeof next === "boolean" ? next : !(prev[itemId]?.[optionName] ?? false),
+      },
+    }));
+  };
 
   const preparationWarnings = useMemo(() => {
     if (!formData.date) return [] as { itemId: string; label: string }[];
@@ -1724,36 +1765,113 @@ export default function OrderForm({
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 {product.customOptions.map((option) => (
                                   <div key={`${item.id}-${option.name}`}>
-                                    <Label className="text-[11px] text-gray-600">
-                                      {option.name}
-                                    </Label>
-                                    {option.type === "text" ? (
-                                      <Input
-                                        value={item.selectedOptions?.[option.name] || ""}
-                                        onChange={(e) =>
-                                          handleOptionChange(item.id, option.name, e.target.value)
-                                        }
-                                        placeholder={`Entrer ${option.name.toLowerCase()}...`}
-                                        className="h-8 text-xs"
-                                      />
+                                    {option.type === "text" &&
+                                    (isAllergyOptionName(option.name) ||
+                                      isClientNoteOptionName(option.name)) ? (
+                                      (() => {
+                                        const currentValue =
+                                          item.selectedOptions?.[option.name] || "";
+                                        const expanded = isTextOptionExpanded(
+                                          item.id,
+                                          option.name,
+                                          currentValue,
+                                        );
+                                        const actionLabel = expanded
+                                          ? "Fermer"
+                                          : currentValue.trim()
+                                            ? "Modifier"
+                                            : "Ajouter";
+
+                                        return (
+                                          <div className="space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <Label className="text-[11px] text-gray-600">
+                                                {option.name}
+                                              </Label>
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 px-2 text-[11px]"
+                                                onClick={() =>
+                                                  toggleTextOptionExpanded(
+                                                    item.id,
+                                                    option.name,
+                                                    !expanded,
+                                                  )
+                                                }
+                                              >
+                                                {actionLabel}
+                                              </Button>
+                                            </div>
+
+                                            {expanded ? (
+                                              <Input
+                                                value={currentValue}
+                                                onChange={(e) =>
+                                                  handleOptionChange(
+                                                    item.id,
+                                                    option.name,
+                                                    e.target.value,
+                                                  )
+                                                }
+                                                placeholder={`Entrer ${option.name.toLowerCase()}...`}
+                                                className="h-8 text-xs"
+                                              />
+                                            ) : currentValue.trim() ? (
+                                              <div className="text-[11px] text-gray-500 truncate">
+                                                {currentValue}
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })()
                                     ) : (
-                                      <Select
-                                        value={item.selectedOptions?.[option.name] || ""}
-                                        onValueChange={(value) =>
-                                          handleOptionChange(item.id, option.name, value)
-                                        }
-                                      >
-                                        <SelectTrigger className="h-8 text-xs">
-                                          <SelectValue placeholder="Choisir" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {option.choices.map((choice) => (
-                                            <SelectItem key={choice} value={choice}>
-                                              {choice}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+                                      <div>
+                                        <Label className="text-[11px] text-gray-600">
+                                          {option.name}
+                                        </Label>
+                                        {option.type === "text" ? (
+                                          <Input
+                                            value={
+                                              item.selectedOptions?.[option.name] || ""
+                                            }
+                                            onChange={(e) =>
+                                              handleOptionChange(
+                                                item.id,
+                                                option.name,
+                                                e.target.value,
+                                              )
+                                            }
+                                            placeholder={`Entrer ${option.name.toLowerCase()}...`}
+                                            className="h-8 text-xs"
+                                          />
+                                        ) : (
+                                          <Select
+                                            value={
+                                              item.selectedOptions?.[option.name] || ""
+                                            }
+                                            onValueChange={(value) =>
+                                              handleOptionChange(
+                                                item.id,
+                                                option.name,
+                                                value,
+                                              )
+                                            }
+                                          >
+                                            <SelectTrigger className="h-8 text-xs">
+                                              <SelectValue placeholder="Choisir" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {option.choices.map((choice) => (
+                                                <SelectItem key={choice} value={choice}>
+                                                  {choice}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 ))}

@@ -3,6 +3,7 @@ import userRoutes from "./user.routes.js";
 import profileRoutes from "./profile.routes.js";
 import authRoutes from "./auth.routes.js";
 import orderRoutes from "./order.routes.js";
+import proOrderRoutes from "./proOrder.routes.js";
 import paymentRoutes from "./payment.routes.js";
 import productRoutes from "./product.routes.js";
 import uploadRoutes from "./upload.routes.js";
@@ -25,6 +26,16 @@ router.get("/health", (req, res) => {
   });
 });
 
+router.get("/public/google-review", (req, res) => {
+  const placeId = String(process.env.GOOGLE_REVIEW_PLACE_ID_LAVAL || "").trim();
+  const url =
+    String(process.env.GOOGLE_REVIEW_URL || "").trim() ||
+    (placeId
+      ? `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`
+      : "https://www.google.com/maps/search/?api=1&query=Marius%20%26%20Fanny%20Laval");
+  res.redirect(302, url);
+});
+
 /**
  * Mount route modules
  */
@@ -32,6 +43,7 @@ router.use("/users", userRoutes);
 router.use("/profile", profileRoutes);
 router.use("/auth-password", authRoutes);
 router.use("/orders", orderRoutes);
+router.use("/pro-orders", proOrderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/products", productRoutes);
 router.use("/categories", categoryRoutes);

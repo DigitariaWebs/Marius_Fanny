@@ -292,14 +292,21 @@ const App: React.FC = () => {
               </RoleBasedRedirect>
             }
           />
-          <Route
-            path="/pro"
-            element={
-              <RoleBasedRedirect>
-                <ProDashboard />
-              </RoleBasedRedirect>
-            }
-          />
+           <Route
+             path="/pro"
+             element={
+               <RoleBasedRedirect>
+                <ProDashboard
+                  onCartClick={() => setIsCartOpen(true)}
+                  cartCount={cartItems.reduce(
+                    (sum, item) => sum + item.quantity,
+                    0,
+                  )}
+                  onAddToCart={addToCart}
+                />
+               </RoleBasedRedirect>
+             }
+           />
 
           {/* Auth Routes */}
           <Route path="/se-connecter" element={<AuthPage />} />

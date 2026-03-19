@@ -155,6 +155,9 @@ export interface Order {
   balancePaidAt?: string;
   paymentStatus: "unpaid" | "deposit_paid" | "paid";
   paymentLinkChannel?: "email" | "sms";
+  billingKind?: "standard" | "representant" | "gouvernement";
+  billingOrganization?: string;
+  paymentDueDate?: string;
   squarePaymentId?: string;
   squareInvoiceId?: string;
   refunds?: Array<{
@@ -192,6 +195,7 @@ export interface OrderItem {
   unitPrice: number;
   subtotal: number;
   notes?: string;
+  selectedOptions?: Record<string, string>;
   productionStatus: "pending" | "in_progress" | "ready";
   readyAt?: string;
 }

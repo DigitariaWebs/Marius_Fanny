@@ -27,6 +27,7 @@ interface CheckoutState {
   deliveryType: "pickup" | "delivery";
   pickupLocation?: "Montreal" | "Laval";
   deliveryFee: number;
+  proDeliveryDistanceTier?: "lt20" | "gt20";
   subtotal: number;
   discount?: number;
   promoCode?: string;
@@ -41,7 +42,28 @@ const Checkout: React.FC = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
-  const state = location.state as CheckoutState;
+
+  const stateFromNav = location.state as CheckoutState | undefined;
+  const state: CheckoutState | null =
+    stateFromNav ||
+    (() => {
+      try {
+        const raw = localStorage.getItem("checkout_data");
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed as CheckoutState;
+      } catch {
+        return null;
+      }
+    })();
+
+  useEffect(() => {
+    if (!state) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate, state]);
+
+  if (!state) return null;
 
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -56,6 +78,7 @@ const Checkout: React.FC = () => {
   const [deliveryDetails, setDeliveryDetails] = useState("");
   const [dateValidationError, setDateValidationError] = useState("");
   const [timeSlotError, setTimeSlotError] = useState("");
+  const [isProAccount, setIsProAccount] = useState(false);
   const [currentStep, setCurrentStep] = useState<
     "contact" | "delivery" | "payment"
   >("contact");
@@ -285,6 +308,7 @@ const Checkout: React.FC = () => {
           setCustomerName(user.name || "");
           setCustomerEmail(user.email || "");
           setCustomerPhone(user.profile?.phoneNumber || "");
+          setIsProAccount(user.role === "pro");
 
           console.log(
             "✅ [CHECKOUT] User data loaded and contact fields pre-populated",
@@ -441,15 +465,112 @@ const Checkout: React.FC = () => {
       `✅ [CHECKOUT] Payment successful! ID: ${paymentId}, Status: ${status}, Amount: ${amount}$, Payment Type: full`,
     );
 
-    // Save order to backend
     try {
       console.log("💾 [CHECKOUT] Saving order to backend...");
 
-      // Prepare order data
       const nameParts = customerName.trim().split(" ");
       const firstName = nameParts[0] || customerName;
       const lastName =
         nameParts.length > 1 ? nameParts.slice(1).join(" ") : "N/A";
+
+      if (isProAccount) {
+        const proOrderData = {
+          clientInfo: {
+            firstName,
+            lastName,
+            email: customerEmail,
+            phone: customerPhone,
+          },
+          deliveryType: state.deliveryType,
+          pickupDate:
+            state.deliveryType === "pickup" && deliveryDate
+              ? new Date(`${deliveryDate}T${deliveryTime || "00:00"}:00`).toISOString()
+              : undefined,
+          pickupLocation: state.pickupLocation || "Laval",
+          deliveryDate: state.deliveryType === "delivery" ? deliveryDate : undefined,
+          deliveryTimeSlot: state.deliveryType === "delivery" ? deliveryTime : undefined,
+          deliveryAddress:
+            state.deliveryType === "delivery"
+              ? {
+                  street: deliveryStreet || "À déterminer",
+                  city: deliveryCity || "À déterminer",
+                  province: "QC",
+                  postalCode: state.postalCode,
+                  contactPhone: deliveryContactPhone || undefined,
+                  details: deliveryDetails || undefined,
+                }
+              : undefined,
+          deliveryDistanceTier:
+            state.deliveryType === "delivery" ? state.proDeliveryDistanceTier : undefined,
+          items: state.items.map((item) => ({
+            productId: item.id,
+            productName: item.name,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            amount: item.price * item.quantity,
+            selectedOptions:
+              item.selectedOptions && Object.keys(item.selectedOptions).length > 0
+                ? item.selectedOptions
+                : undefined,
+            notes:
+              item.selectedOptions && Object.keys(item.selectedOptions).length > 0
+                ? Object.entries(item.selectedOptions)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([label, value]) => `${label}: ${value}`)
+                    .join(" | ")
+                : undefined,
+          })),
+          notes: `Commande PRO payée (${state.deliveryType === "pickup" ? "Ramassage" : "Livraison"}) - ${deliveryDate}${deliveryTime ? ` ${deliveryTime}` : ""} | Paiement Square: ${paymentId}`,
+        };
+
+        const response = await fetch(`${normalizedApiUrl}/api/pro-orders`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(proOrderData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || errorData.message || "Failed to submit pro order");
+        }
+
+        const result = await response.json();
+        const orderNumber = String(result?.data?.orderNumber || "");
+
+        clearCart();
+
+        setPaymentResultModal({
+          isOpen: true,
+          type: "details",
+          title: "Paiement réussi !",
+          content: (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 text-green-700 bg-green-50 p-4 rounded-lg border border-green-200">
+                <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-semibold">Commande pro transmise</p>
+                  <p>Votre commande payée a été envoyée à l'admin par email.</p>
+                </div>
+              </div>
+              <div className="space-y-2 text-stone-600 bg-stone-50 p-4 rounded-lg">
+                <p>
+                  <span className="font-medium">Référence:</span> {orderNumber}
+                </p>
+                <p>
+                  <span className="font-medium">Montant:</span> {amount}$ CAD
+                </p>
+                <p>
+                  <span className="font-medium">Statut:</span> {status}
+                </p>
+              </div>
+            </div>
+          ),
+          onClose: () => navigate("/pro"),
+        });
+
+        return;
+      }
 
       const orderData = {
         clientInfo: {
@@ -460,8 +581,13 @@ const Checkout: React.FC = () => {
         },
         promoCode: state?.promoCode || undefined,
         deliveryType: state.deliveryType,
-        deliveryDate: deliveryDate,
-        deliveryTimeSlot: deliveryTime, // Sera vide pour ramassage
+        pickupDate:
+          state.deliveryType === "pickup" && deliveryDate
+            ? new Date(`${deliveryDate}T${deliveryTime || "00:00"}:00`).toISOString()
+            : undefined,
+        pickupLocation: state.pickupLocation || "Laval",
+        deliveryDate: state.deliveryType === "delivery" ? deliveryDate : undefined,
+        deliveryTimeSlot: state.deliveryType === "delivery" ? deliveryTime : undefined,
         deliveryAddress:
           state.deliveryType === "delivery" && state.postalCode
             ? {
@@ -472,10 +598,6 @@ const Checkout: React.FC = () => {
                 contactPhone: deliveryContactPhone || undefined,
                 details: deliveryDetails || undefined,
               }
-            : undefined,
-        pickupLocation:
-          state.deliveryType === "pickup"
-            ? state.pickupLocation || "Laval"
             : undefined,
         items: state.items.map((item) => ({
           productId: item.id,
@@ -496,7 +618,7 @@ const Checkout: React.FC = () => {
               : undefined,
         })),
         paymentType: "full",
-        depositPaid: true, // Payment was made
+        depositPaid: true,
         squarePaymentId: paymentId,
         notes: `Square Payment ID: ${paymentId} | ${state.deliveryType === 'pickup' ? 'Ramassage' : 'Livraison'} prévu${state.deliveryType === 'pickup' ? '' : 'e'}: ${deliveryDate}${deliveryTime ? ` ${deliveryTime}` : ''}`,
       };
@@ -506,7 +628,7 @@ const Checkout: React.FC = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include", // Include cookies for auth
+        credentials: "include",
         body: JSON.stringify(orderData),
       });
 
@@ -523,10 +645,8 @@ const Checkout: React.FC = () => {
         : String(rawOrderNumber);
       console.log("✅ [CHECKOUT] Order saved successfully:", result);
 
-      // Clear cart from localStorage and notify UI
       clearCart();
 
-      // Show success message
       setPaymentResultModal({
         isOpen: true,
         type: "details",
@@ -1050,6 +1170,11 @@ const Checkout: React.FC = () => {
                       {deliveryTime && ` - ${deliveryTime}`}
                     </p>
                   </div>
+                  {isProAccount && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 mb-3">
+                      Après paiement, la commande pro sera envoyée directement à l'admin par email.
+                    </div>
+                  )}
                   <SquarePaymentForm
                     amount={state.total}
                     onPaymentSuccess={handlePaymentSuccess}

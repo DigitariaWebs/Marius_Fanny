@@ -155,10 +155,9 @@ export const createOrder = async (
         });
       }
 
-      if (
-        promoDoc.usageLimitPerUser !== undefined &&
-        promoDoc.usageLimitPerUser > 0
-      ) {
+      const perUserLimit =
+        promoDoc.usageLimitPerUser === undefined ? 1 : promoDoc.usageLimitPerUser;
+      if (perUserLimit > 0) {
         const userId = req.user?.id;
         const email = (orderData.clientInfo?.email || "").trim().toLowerCase();
         if (!userId && !email) {
@@ -173,7 +172,7 @@ export const createOrder = async (
         else perUserFilter.email = email;
 
         const usedCount = await PromoRedemption.countDocuments(perUserFilter);
-        if (usedCount >= promoDoc.usageLimitPerUser) {
+        if (usedCount >= perUserLimit) {
           return res.status(400).json({
             success: false,
             error: "Limite d'utilisation atteinte pour ce code promo.",
@@ -268,12 +267,14 @@ export const createOrder = async (
           const termsDays = Number.isFinite(billing?.paymentTermsDays)
             ? Number(billing.paymentTermsDays)
             : 0;
+          const effectiveTermsDays =
+            billingKind === "gouvernement" && termsDays === 0 ? 60 : termsDays;
 
           // If the client is allowed to order without paying, keep payment status as "unpaid"
           // and track a due date when not paid yet.
           if (allowUnpaidOrders && !depositPaid) {
             const due = new Date();
-            due.setDate(due.getDate() + Math.max(0, termsDays));
+            due.setDate(due.getDate() + Math.max(0, effectiveTermsDays));
             paymentDueDate = due;
           }
         }
@@ -281,12 +282,18 @@ export const createOrder = async (
     }
 
     // Create order
+    let pickupDate: Date | undefined;
+    if (orderData.pickupDate) {
+      pickupDate = new Date(orderData.pickupDate);
+    } else if (orderData.deliveryType === "pickup" && orderData.deliveryDate) {
+      const slot = String(orderData.deliveryTimeSlot || "00:00").trim() || "00:00";
+      pickupDate = new Date(`${orderData.deliveryDate}T${slot}:00`);
+    }
+
     const order = new Order({
       userId: req.user?.id,
       clientInfo: orderData.clientInfo,
-      pickupDate: orderData.pickupDate
-        ? new Date(orderData.pickupDate)
-        : undefined,
+      pickupDate,
       pickupLocation: orderData.pickupLocation,
       deliveryType: orderData.deliveryType,
       deliveryDate: orderData.deliveryDate,
@@ -785,7 +792,7 @@ export const setProductionItemStatus = async (
     console.error("Error updating production item status:", error);
     res.status(500).json({
       success: false,
-      error: "Erreur lors de la mise Ã  jour du statut de production",
+      error: "Erreur lors de la mise à jour du statut de production",
       message: error.message,
     });
   }

@@ -154,7 +154,7 @@ export async function updateProduct(req: AuthRequest, res: Response) {
     ] as const;
 
     for (const field of allowedFields) {
-      if (updateData[field] !== undefined) {
+      if (Object.prototype.hasOwnProperty.call(updateData, field)) {
         (product as any)[field] = updateData[field];
       }
     }
