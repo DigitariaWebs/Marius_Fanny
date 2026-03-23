@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { Checkbox } from "./ui/checkbox";
 import { productAPI } from "../lib/ProductAPI";
 import type { Client, Address, Product } from "../types";
 import { TAX_RATE } from "../data";
@@ -42,6 +43,11 @@ interface OrderFormProps {
   onSubmit: (formData: OrderFormData) => void;
   onCancel: () => void;
   initialData?: Partial<OrderFormData>;
+  pricingBaseline?: {
+    total: number;
+    depositAmount: number;
+    paymentStatus: "unpaid" | "deposit_paid" | "paid";
+  };
   isSubmitting?: boolean;
   clients?: Client[];
   onViewProducts?: () => void;
@@ -89,6 +95,7 @@ interface OrderFormItem {
   quantity: number;
   unitPrice: number;
   amount: number;
+  taxable?: boolean;
   notes: string;
   selectedOptions?: Record<string, string>;
   isPacked?: boolean;
@@ -100,6 +107,7 @@ export default function OrderForm({
   onSubmit,
   onCancel,
   initialData,
+  pricingBaseline,
   isSubmitting = false,
   clients = [],
   onViewProducts,
@@ -120,6 +128,7 @@ export default function OrderForm({
   const [formData, setFormData] = useState<OrderFormData>(() => {
     const initialItems = initialData?.items?.map(item => ({
       ...item,
+      taxable: item.taxable,
       isPacked: false
     })) || [];
     
@@ -224,6 +233,25 @@ export default function OrderForm({
     return warnings;
   }, [formData.date, formData.pickupTime, formData.items, products]);
 
+  const editPaymentAdjustment = useMemo(() => {
+    if (!pricingBaseline) return null;
+
+    const estimatedPaidAmount =
+      pricingBaseline.paymentStatus === "paid"
+        ? pricingBaseline.total
+        : pricingBaseline.paymentStatus === "deposit_paid"
+          ? pricingBaseline.depositAmount
+          : 0;
+
+    const totalDifference = formData.total - pricingBaseline.total;
+    const outstandingDifference = formData.total - estimatedPaidAmount;
+
+    return {
+      totalDifference,
+      outstandingDifference,
+    };
+  }, [pricingBaseline, formData.total]);
+
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -251,7 +279,13 @@ export default function OrderForm({
 
   useEffect(() => {
     const subtotal = formData.items.reduce((sum, item) => sum + item.amount, 0);
-    const taxAmount = subtotal * TAX_RATE;
+    const taxableSubtotal = formData.items.reduce((sum, item) => {
+      if (item.isCustom) {
+        return sum + (item.taxable === false ? 0 : item.amount);
+      }
+      return sum + item.amount;
+    }, 0);
+    const taxAmount = taxableSubtotal * TAX_RATE;
     const total = subtotal + taxAmount + formData.deliveryFee;
     const depositAmount =
       formData.paymentMethod === "in_store" ? total : total * 0.5;
@@ -384,6 +418,7 @@ export default function OrderForm({
             quantity,
             unitPrice: initialUnitPrice,
             amount: quantity * initialUnitPrice,
+            taxable: undefined,
             selectedOptions: initialOptions,
             isPacked: false,
           };
@@ -407,6 +442,7 @@ export default function OrderForm({
           quantity: 1,
           unitPrice: 0,
           amount: 0,
+          taxable: item.isCustom ? (item.taxable ?? true) : undefined,
           selectedOptions: undefined,
           isPacked: false,
         };
@@ -485,6 +521,7 @@ export default function OrderForm({
       quantity: 1,
       unitPrice: 0,
       amount: 0,
+      taxable: undefined,
       notes: "",
       isPacked: false,
       isCustom: false,
@@ -503,6 +540,7 @@ export default function OrderForm({
       quantity: 1,
       unitPrice: 0,
       amount: 0,
+      taxable: true,
       notes: "",
       isPacked: false,
       isCustom: true,
@@ -798,6 +836,7 @@ export default function OrderForm({
       const payloadItems = formData.items.map((item) => ({
         ...item,
         productId: item.isCustom ? 0 : item.productId,
+        taxable: item.isCustom ? item.taxable !== false : undefined,
         notes: getSerializedItemNotes(item),
       }));
       onSubmit({ ...formData, items: payloadItems });
@@ -1607,6 +1646,15 @@ export default function OrderForm({
                               onChange={(e) => handleItemChange(item.id, "customDescription", e.target.value)}
                               className="h-7 text-xs"
                             />
+                            <label className="flex items-center gap-2 text-xs text-purple-800 pt-1">
+                              <Checkbox
+                                checked={item.taxable !== false}
+                                onCheckedChange={(checked) =>
+                                  handleItemChange(item.id, "taxable", checked !== false)
+                                }
+                              />
+                              Taxable
+                            </label>
                           </div>
                         ) : (
                         <div className="space-y-1">
@@ -1976,6 +2024,32 @@ export default function OrderForm({
             <span className="text-gray-800">TOTAL:</span>
             <span className="text-amber-600">${formData.total.toFixed(2)}</span>
           </div>
+          {editPaymentAdjustment && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-blue-800 font-semibold">DIFFERENCE COMMANDE:</span>
+                <span
+                  className={`font-bold ${
+                    editPaymentAdjustment.totalDifference > 0
+                      ? "text-red-700"
+                      : editPaymentAdjustment.totalDifference < 0
+                        ? "text-green-700"
+                        : "text-blue-800"
+                  }`}
+                >
+                  {editPaymentAdjustment.totalDifference > 0 ? "+" : ""}
+                  ${editPaymentAdjustment.totalDifference.toFixed(2)}
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-blue-900">
+                {editPaymentAdjustment.outstandingDifference > 0.01
+                  ? `Montant a ajouter: ${editPaymentAdjustment.outstandingDifference.toFixed(2)}$`
+                  : editPaymentAdjustment.outstandingDifference < -0.01
+                    ? `Montant a rembourser / avoir: ${Math.abs(editPaymentAdjustment.outstandingDifference).toFixed(2)}$`
+                    : "Aucun ajustement de paiement requis"}
+              </div>
+            </div>
+          )}
           <div className="flex justify-between items-center text-sm bg-amber-50 p-2 rounded">
             <span className="text-gray-700">
               {formData.paymentMethod === "in_store"

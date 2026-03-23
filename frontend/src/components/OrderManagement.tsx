@@ -50,6 +50,7 @@ interface OrderItemWithPacking {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  taxable?: boolean;
   productionStatus: string;
   notes?: string;
   selectedOptions?: Record<string, string>;
@@ -71,6 +72,7 @@ const buildOrderItemsUpdatePayload = (items: OrderItemWithPacking[]) =>
     quantity: item.quantity,
     unitPrice: item.unitPrice,
     amount: item.subtotal,
+    taxable: item.taxable,
     notes: item.notes,
     selectedOptions:
       item.selectedOptions && Object.keys(item.selectedOptions).length > 0
@@ -2256,6 +2258,7 @@ export function OrderManagement() {
                   quantity: item.quantity,
                   unitPrice: item.unitPrice,
                   amount: item.amount,
+                  taxable: (item as any).isCustom ? (item as any).taxable !== false : undefined,
                   selectedOptions:
                     item.selectedOptions && Object.keys(item.selectedOptions).length > 0
                       ? item.selectedOptions
@@ -2336,6 +2339,7 @@ export function OrderManagement() {
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     subtotal: item.amount,
+                    taxable: (item as any).isCustom ? (item as any).taxable !== false : undefined,
                     productionStatus: "pending",
                     notes: item.notes || undefined,
                     selectedOptions:
@@ -2401,6 +2405,15 @@ export function OrderManagement() {
             setIsCreateModalOpen(false);
           }}
           clients={clients}
+          pricingBaseline={
+            selectedOrder
+              ? {
+                  total: selectedOrder.total,
+                  depositAmount: selectedOrder.depositAmount,
+                  paymentStatus: selectedOrder.paymentStatus,
+                }
+              : undefined
+          }
           isSubmitting={isSubmitting}
         />
       </Modal>
@@ -2450,6 +2463,7 @@ export function OrderManagement() {
                   quantity: item.quantity,
                   unitPrice: item.unitPrice,
                   amount: item.amount,
+                  taxable: (item as any).isCustom ? (item as any).taxable !== false : undefined,
                   selectedOptions:
                     item.selectedOptions && Object.keys(item.selectedOptions).length > 0
                       ? item.selectedOptions
@@ -2523,6 +2537,7 @@ export function OrderManagement() {
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     subtotal: item.amount,
+                    taxable: (item as any).isCustom ? (item as any).taxable !== false : undefined,
                     productionStatus: "pending",
                     notes: item.notes || undefined,
                     product: {
@@ -2597,6 +2612,7 @@ export function OrderManagement() {
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     amount: item.subtotal,
+                    taxable: item.taxable,
                     notes: item.notes || "",
                     selectedOptions: (item as any).selectedOptions || undefined,
                     isPacked: item.productionStatus === "ready"

@@ -27,7 +27,9 @@ import {
 // Tax rate for Quebec (TPS + TVQ)
 const TAX_RATE = 0.14975;
 
-async function computeTaxAmount(items: { productId: number; quantity: number; amount: number }[]) {
+async function computeTaxAmount(
+  items: { productId: number; quantity: number; amount: number; taxable?: boolean }[],
+) {
   const ids = Array.from(new Set(items.map((i) => i.productId).filter((id) => id > 0)));
   const products = ids.length
     ? await Product.find({ id: { $in: ids }, deletedAt: { $exists: false } }).select("id category productionType hasTaxes").lean()
@@ -55,6 +57,12 @@ async function computeTaxAmount(items: { productId: number; quantity: number; am
   const bakedGoodsExempt = viennoiseriesCount + patisseriesCount >= 6;
 
   return items.reduce((sum, item) => {
+    if ((item.productId || 0) <= 0) {
+      const customItemTaxable = item.taxable !== undefined ? !!item.taxable : true;
+      if (!customItemTaxable) return sum;
+      return sum + (item.amount || 0) * TAX_RATE;
+    }
+
     const p = productMap.get(item.productId);
     const category = categoryText(p?.category);
     const isViennoiserie = category.includes("viennoiser");
@@ -1134,6 +1142,9 @@ export const updateOrder = async (
 
     // Track and update items - recalculate totals if items changed
     if (updateData.items) {
+      const oldTotal = order.total;
+      const oldDepositAmount = order.depositAmount;
+      const oldPaymentStatus = order.paymentStatus;
       const oldItems = [...order.items];
       order.items = updateData.items;
       
@@ -1169,6 +1180,44 @@ export const updateOrder = async (
       const total = Math.max(0, subtotal - promoDiscountAmount) + taxAmount + deliveryFee;
       const depositAmount = order.paymentType === "full" ? total : total * 0.5;
 
+      const estimatedPaidAmount =
+        oldPaymentStatus === "paid"
+          ? oldTotal
+          : oldPaymentStatus === "deposit_paid"
+            ? oldDepositAmount
+            : 0;
+      const epsilon = 0.01;
+
+      const previousDepositPaid = order.depositPaid;
+      const previousBalancePaid = order.balancePaid;
+      const previousPaymentStatus = order.paymentStatus;
+
+      if (estimatedPaidAmount >= total - epsilon) {
+        order.depositPaid = true;
+        order.balancePaid = true;
+        order.paymentStatus = "paid";
+      } else if (estimatedPaidAmount > epsilon && estimatedPaidAmount >= depositAmount - epsilon) {
+        order.depositPaid = true;
+        order.balancePaid = false;
+        order.paymentStatus = "deposit_paid";
+      } else {
+        order.depositPaid = false;
+        order.balancePaid = false;
+        order.paymentStatus = "unpaid";
+      }
+
+      if (!order.depositPaid) {
+        order.depositPaidAt = undefined;
+      } else if (!order.depositPaidAt) {
+        order.depositPaidAt = new Date();
+      }
+
+      if (!order.balancePaid) {
+        order.balancePaidAt = undefined;
+      } else if (!order.balancePaidAt) {
+        order.balancePaidAt = new Date();
+      }
+
       order.subtotal = subtotal;
       order.taxAmount = taxAmount;
       order.deliveryFee = deliveryFee;
@@ -1182,8 +1231,32 @@ export const updateOrder = async (
         oldValue: oldItems,
         newValue: updateData.items,
         changeType: "items_modified",
-        notes: `Order items modified. New total: ${total.toFixed(2)}$`
+        notes: `Order items modified. Total: ${oldTotal.toFixed(2)}$ -> ${total.toFixed(2)}$`
       });
+
+      const paymentDifference = total - estimatedPaidAmount;
+      const paymentAdjustmentNote =
+        paymentDifference > epsilon
+          ? `Additional amount to collect: ${paymentDifference.toFixed(2)}$`
+          : paymentDifference < -epsilon
+            ? `Customer credit/refund due: ${Math.abs(paymentDifference).toFixed(2)}$`
+            : "No payment adjustment needed";
+
+      if (
+        order.depositPaid !== previousDepositPaid ||
+        order.balancePaid !== previousBalancePaid ||
+        order.paymentStatus !== previousPaymentStatus
+      ) {
+        changes.push({
+          changedAt: new Date(),
+          changedBy: userId,
+          field: "paymentStatus",
+          oldValue: previousPaymentStatus,
+          newValue: order.paymentStatus,
+          changeType: "payment_updated",
+          notes: paymentAdjustmentNote,
+        });
+      }
     }
 
     // Track and update status

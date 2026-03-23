@@ -194,6 +194,7 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  taxable?: boolean;
   notes?: string;
   selectedOptions?: Record<string, string>;
   productionStatus: "pending" | "in_progress" | "ready";

@@ -13,6 +13,7 @@ export interface IOrderItem {
   quantity: number;
   unitPrice: number;
   amount: number;
+  taxable?: boolean;
   notes?: string;
   selectedOptions?: Record<string, string>;
   productionStatus?: "pending" | "in_progress" | "ready";
@@ -145,6 +146,10 @@ const OrderItemSchema = new Schema<IOrderItem>(
       type: Number,
       required: true,
       min: 0,
+    },
+    taxable: {
+      type: Boolean,
+      default: undefined,
     },
     notes: {
       type: String,

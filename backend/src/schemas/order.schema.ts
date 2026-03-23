@@ -22,6 +22,7 @@ export const orderItemSchema = z.object({
   quantity: z.number().int().positive("La quantité doit être positive"),
   unitPrice: z.number().nonnegative("Le prix unitaire doit être non négatif"),
   amount: z.number().nonnegative("Le montant doit être non négatif"),
+  taxable: z.boolean().optional(),
   notes: z.string().optional(),
   selectedOptions: z.record(z.string(), z.string()).optional(),
   productionStatus: z.enum(["pending", "in_progress", "ready"]).optional(),
