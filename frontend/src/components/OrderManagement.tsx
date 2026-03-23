@@ -1362,15 +1362,11 @@ export function OrderManagement() {
                   </p>
                   <div className="space-y-2">
                     {overdueOrders.slice(0, 5).map((order) => {
-                      const dueDate = getPaymentDueDateForOrder(order);
-                      const daysOverdue = dueDate 
-                        ? Math.ceil((new Date().getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
-                        : 0;
                       return (
                         <div key={order.id} className="text-sm text-red-900 flex justify-between items-center p-2 bg-white rounded">
                           <span className="font-medium">{getOrderDisplayNumber(order)}</span>
                           <span className="text-xs bg-red-200 px-2 py-1 rounded font-bold">
-                            {daysOverdue} jour{daysOverdue > 1 ? 's' : ''} en retard
+                            En retard
                           </span>
                         </div>
                       );
