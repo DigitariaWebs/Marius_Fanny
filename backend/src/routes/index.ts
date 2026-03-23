@@ -30,7 +30,6 @@ router.get("/health", (req, res) => {
 router.get("/public/google-review", (req, res) => {
   const placeId = String(process.env.GOOGLE_REVIEW_PLACE_ID_LAVAL || "").trim();
   const url =
-    String(process.env.GOOGLE_REVIEW_URL || "").trim() ||
     (placeId
       ? `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`
       : "https://www.google.com/maps/search/?api=1&query=Marius%20%26%20Fanny%20Laval");

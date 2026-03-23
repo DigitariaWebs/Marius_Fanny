@@ -736,22 +736,9 @@ export function OrderManagement() {
     return String(numeric).padStart(4, "0");
   };
 
-  const extractOrderDateCode = (order: OrderWithPacking) => {
-    const mfMatch = order.orderNumber.trim().match(/^MF-(\d{8})-\d{1,4}$/i);
-    if (mfMatch) return mfMatch[1];
-    return new Date(order.orderDate).toISOString().slice(0, 10).replace(/-/g, "");
-  };
-
-  const orderNumberCounts = filteredOrders.reduce<Record<string, number>>((acc, order) => {
-    const shortNumber = formatOrderNumber(order.orderNumber);
-    acc[shortNumber] = (acc[shortNumber] || 0) + 1;
-    return acc;
-  }, {});
-
   const getOrderDisplayNumber = (order: OrderWithPacking) => {
     const shortNumber = formatOrderNumber(order.orderNumber);
-    if ((orderNumberCounts[shortNumber] || 0) <= 1) return shortNumber;
-    return `${shortNumber} (${extractOrderDateCode(order)})`;
+    return shortNumber;
   };
 
   const generateFallbackOrderNumber = (isoDate: string) => {
@@ -1381,7 +1368,7 @@ export function OrderManagement() {
                         : 0;
                       return (
                         <div key={order.id} className="text-sm text-red-900 flex justify-between items-center p-2 bg-white rounded">
-                          <span className="font-medium">{order.orderNumber}</span>
+                          <span className="font-medium">{getOrderDisplayNumber(order)}</span>
                           <span className="text-xs bg-red-200 px-2 py-1 rounded font-bold">
                             {daysOverdue} jour{daysOverdue > 1 ? 's' : ''} en retard
                           </span>

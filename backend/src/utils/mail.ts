@@ -25,7 +25,6 @@ const LOGO_URL = "https://res.cloudinary.com/deyjooxbi/image/upload/v1773330080/
 // Google review link for post-order feedback.
 const GOOGLE_REVIEW_PLACE_ID_LAVAL = (process.env.GOOGLE_REVIEW_PLACE_ID_LAVAL || "").trim();
 const GOOGLE_REVIEW_URL =
-  process.env.GOOGLE_REVIEW_URL ||
   (GOOGLE_REVIEW_PLACE_ID_LAVAL
     ? `https://search.google.com/local/writereview?placeid=${encodeURIComponent(GOOGLE_REVIEW_PLACE_ID_LAVAL)}`
     : "https://www.google.com/maps/search/?api=1&query=Marius%20%26%20Fanny%20Laval");
