@@ -656,7 +656,7 @@ export const createInvoice = async (req: Request, res: Response) => {
 
           await sendSms({
             to: normalizedPhone,
-            body: `Maison Fanny: votre lien de paiement pour la commande ${orderId}: ${publicUrl}`,
+            body: `Marius et Fanny: votre lien de paiement pour la commande #${(orderNumber || orderId).split("-").pop()}: ${publicUrl}`,
           });
           console.log(`✅ [INVOICE] Invoice published and SMS sent`);
         } else {

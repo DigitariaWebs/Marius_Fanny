@@ -13,6 +13,9 @@ import {
   Check,
   X,
   ImageIcon,
+  Filter,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 import { DataTable } from "./ui/DataTable";
 import { Modal } from "./ui/modal";
@@ -182,7 +185,19 @@ export function ProductManagement() {
 
   useEffect(() => {
     fetchData();
-  }, []); 
+  }, []);
+
+  // Close category filter on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryFilterRef.current && !categoryFilterRef.current.contains(e.target as Node)) {
+        setShowCategoryFilter(false);
+        setExpandedParent(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const flattenCategoriesWithIndentation = (cats: any[] = [], level: number = 0): Array<{ id: number; name: string; display: string }> => {
     const result: Array<{ id: number; name: string; display: string }> = [];
@@ -272,22 +287,52 @@ export function ProductManagement() {
     });
   };
 
+  // Category filter
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
+  const [expandedParent, setExpandedParent] = useState<string | null>(null);
+  const categoryFilterRef = useRef<HTMLDivElement>(null);
+
+  const getCategoryAndDescendantNames = (catName: string, cats: any[]): string[] => {
+    const names: string[] = [];
+    const findAndCollect = (list: any[]): boolean => {
+      for (const cat of list) {
+        if (cat.name.toLowerCase() === catName.toLowerCase()) {
+          const collectAll = (c: any) => {
+            names.push(c.name.toLowerCase());
+            if (c.children) c.children.forEach(collectAll);
+          };
+          collectAll(cat);
+          return true;
+        }
+        if (cat.children && findAndCollect(cat.children)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    findAndCollect(cats);
+    return names;
+  };
+
+  const filteredProductsByCategory = selectedCategoryFilter === "all"
+    ? products
+    : (() => {
+        const allowedNames = getCategoryAndDescendantNames(selectedCategoryFilter, categories);
+        return products.filter((p) => {
+          const cats = Array.isArray(p.category) ? p.category : [p.category];
+          return cats.some((cat) => allowedNames.includes(String(cat).toLowerCase()));
+        });
+      })();
+
   const filters = [
-    {
-      key: "category",
-      label: "Catégorie",
-      options: [
-        { value: "all", label: "Toutes les catégories" },
-        ...categories.map((cat) => ({ value: cat.name, label: cat.name })),
-      ],
-    },
     {
       key: "available",
       label: "Disponibilité",
       options: [
         { value: "all", label: "Tous" },
-        { value: "available", label: "Disponibles" },
-        { value: "unavailable", label: "Indisponibles" },
+        { value: "true", label: "Disponibles" },
+        { value: "false", label: "Indisponibles" },
       ],
     },
   ];
@@ -704,14 +749,110 @@ export function ProductManagement() {
         )}
 
         {!loading && !error && !reorderMode && (
+          <>
+          <div className="relative mb-4" ref={categoryFilterRef}>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setShowCategoryFilter(!showCategoryFilter); setExpandedParent(null); }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  selectedCategoryFilter !== "all"
+                    ? "bg-[#C5A065] text-white border-[#C5A065]"
+                    : "bg-white text-stone-600 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <Filter size={16} />
+                {selectedCategoryFilter === "all" ? "Catégories" : selectedCategoryFilter}
+              </button>
+              {selectedCategoryFilter !== "all" && (
+                <button
+                  onClick={() => { setSelectedCategoryFilter("all"); setShowCategoryFilter(false); setExpandedParent(null); }}
+                  className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {showCategoryFilter && (
+              <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 z-50 min-w-[250px] overflow-hidden">
+                {expandedParent === null ? (
+                  <>
+                    <div className="px-4 py-2.5 bg-stone-50 border-b text-xs font-bold uppercase tracking-wider text-stone-400">
+                      Catégories
+                    </div>
+                    <button
+                      onClick={() => { setSelectedCategoryFilter("all"); setShowCategoryFilter(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-stone-50 transition-colors ${selectedCategoryFilter === "all" ? "font-bold text-[#C5A065]" : "text-stone-700"}`}
+                    >
+                      Toutes les catégories
+                    </button>
+                    {categories.map((cat: any) => {
+                      const children = (cat.children || []).filter((c: any) => c.active !== false);
+                      return (
+                        <button
+                          key={cat.id}
+                          onClick={() => {
+                            if (children.length > 0) {
+                              setExpandedParent(cat.name);
+                            } else {
+                              setSelectedCategoryFilter(cat.name);
+                              setShowCategoryFilter(false);
+                              setExpandedParent(null);
+                            }
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-sm hover:bg-stone-50 transition-colors flex items-center justify-between ${
+                            selectedCategoryFilter.toLowerCase() === cat.name.toLowerCase() ? "font-bold text-[#C5A065]" : "text-stone-700"
+                          }`}
+                        >
+                          <span>{cat.name}</span>
+                          {children.length > 0 && <ChevronRight size={14} className="text-stone-400" />}
+                        </button>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <>
+                    <div className="px-4 py-2.5 bg-stone-50 border-b flex items-center gap-2">
+                      <button onClick={() => setExpandedParent(null)} className="text-stone-400 hover:text-stone-600">
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="text-xs font-bold uppercase tracking-wider text-stone-400">{expandedParent}</span>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedCategoryFilter(expandedParent); setShowCategoryFilter(false); setExpandedParent(null); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-stone-50 transition-colors ${
+                        selectedCategoryFilter.toLowerCase() === expandedParent.toLowerCase() ? "font-bold text-[#C5A065]" : "text-stone-700"
+                      }`}
+                    >
+                      Tous — {expandedParent}
+                    </button>
+                    {((categories.find((c: any) => c.name === expandedParent) as any)?.children || [])
+                      .filter((c: any) => c.active !== false)
+                      .map((sub: any) => (
+                        <button
+                          key={sub.id}
+                          onClick={() => { setSelectedCategoryFilter(sub.name); setShowCategoryFilter(false); setExpandedParent(null); }}
+                          className={`w-full text-left px-4 py-2.5 text-sm hover:bg-stone-50 transition-colors ${
+                            selectedCategoryFilter.toLowerCase() === sub.name.toLowerCase() ? "font-bold text-[#C5A065]" : "text-stone-700"
+                          }`}
+                        >
+                          {sub.name}
+                        </button>
+                      ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           <DataTable
-            data={[...products].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))}
+            data={[...filteredProductsByCategory].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))}
             columns={columns}
             filters={filters}
             searchPlaceholder="Rechercher un produit..."
             searchKeys={["name", "category"]}
             itemsPerPage={10}
           />
+          </>
         )}
 
         {!loading && !error && reorderMode && (() => {

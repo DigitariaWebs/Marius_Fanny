@@ -49,6 +49,7 @@ interface CartItem {
   hasTaxes?: boolean;
   category?: string;
   productionType?: string;
+  preparationTimeHours?: number;
 }
 
 interface HomePageProps {

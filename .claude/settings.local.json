@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /c/Users/Hp/marius_fanny -name .env* -type f)"
+      "Bash(find /c/Users/Hp/marius_fanny -name .env* -type f)",
+      "Bash(find /c/Users/Hp/marius_fanny -type f -name *.env*)",
+      "Bash(find /c/Users/Hp/marius_fanny -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.js \\\\\\) ! -path */node_modules/* ! -path */dist/*)",
+      "Bash(xargs grep:*)",
+      "Bash(node scripts/fix-categories.js)",
+      "Bash(mv \"c:/Users/Hp/marius_fanny/backend/scripts/fix-categories.js\" \"c:/Users/Hp/marius_fanny/backend/scripts/fix-categories.cjs\")",
+      "Bash(node scripts/fix-categories.cjs)"
     ]
   }
 }

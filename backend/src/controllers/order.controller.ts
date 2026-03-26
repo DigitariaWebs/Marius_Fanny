@@ -89,21 +89,39 @@ export const createOrder = async (
   try {
     const orderData = req.body;
 
-    // --- Noon cutoff: orders for tomorrow must be placed before 12:00 ---
+    // --- Noon cutoff: orders for tomorrow must be placed before 12:00 (Montreal time) ---
+    const toMontrealDate = (d: Date) => {
+      const s = d.toLocaleDateString("en-CA", { timeZone: "America/Montreal" });
+      return s; // "YYYY-MM-DD"
+    };
+    const getMontrealHour = (d: Date) => {
+      return parseInt(d.toLocaleString("en-CA", { timeZone: "America/Montreal", hour: "numeric", hour12: false }));
+    };
+
     const now = new Date();
     const targetDateStr =
       orderData.pickupDate
-        ? new Date(orderData.pickupDate).toISOString().split("T")[0]
+        ? toMontrealDate(new Date(orderData.pickupDate))
         : orderData.deliveryDate
-          ? new Date(orderData.deliveryDate).toISOString().split("T")[0]
+          ? toMontrealDate(new Date(orderData.deliveryDate))
           : null;
 
     if (targetDateStr) {
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split("T")[0];
-      const currentHour = now.getHours();
+      const todayStr = toMontrealDate(now);
+      const todayDate = new Date(todayStr + "T00:00:00");
+      const tomorrowDate = new Date(todayDate);
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      const tomorrowStr = tomorrowDate.toISOString().split("T")[0];
+      const currentHour = getMontrealHour(now);
+
+      // Reject orders for today
+      if (targetDateStr === todayStr) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "Les commandes doivent être passées au minimum pour le lendemain.",
+        });
+      }
 
       // If the order is for tomorrow and it's past noon, reject
       if (targetDateStr === tomorrowStr && currentHour >= 12) {

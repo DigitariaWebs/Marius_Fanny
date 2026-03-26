@@ -41,6 +41,7 @@ interface CartItem {
   category?: string;
   productionType?: string;
   availableDays?: number[];
+  preparationTimeHours?: number;
 }
 
 interface CartProps {

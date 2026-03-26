@@ -163,7 +163,10 @@ const Checkout: React.FC = () => {
   // Calculate minimum delivery date based on preparation times
   const getMinimumDeliveryDate = () => {
     if (!state?.items || state.items.length === 0) {
-      return new Date();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      return tomorrow;
     }
 
     // Find the longest preparation time in hours
@@ -171,17 +174,28 @@ const Checkout: React.FC = () => {
       ...state.items.map((item) => item.preparationTimeHours || 0),
     );
 
-    // Calculate when products will be ready
     const now = new Date();
+
+    // Minimum is always tomorrow (can't order for today)
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    // Calculate when products will be ready based on prep time
     const readyTime = new Date();
     readyTime.setHours(now.getHours() + maxPreparationHours);
 
-    // Get the day when products will be ready
     const readyDate = new Date(readyTime);
     readyDate.setHours(0, 0, 0, 0);
 
+    // If products won't be ready until late in the day (after 6 PM),
+    // push delivery to next day since we can't deliver late at night
+    if (readyTime.getHours() >= 18) {
+      readyDate.setDate(readyDate.getDate() + 1);
+    }
+
     // Business rule: Must order before noon for next day pickup
-    // After noon, minimum date is day after tomorrow regardless of prep time
+    // After noon, minimum date is day after tomorrow
     if (now.getHours() >= 12) {
       const dayAfterTomorrow = new Date(now);
       dayAfterTomorrow.setDate(now.getDate() + 2);
@@ -191,10 +205,9 @@ const Checkout: React.FC = () => {
       }
     }
 
-    // If products won't be ready until late in the day (after 6 PM),
-    // push delivery to next day since we can't deliver late at night
-    if (readyTime.getHours() >= 18) {
-      readyDate.setDate(readyDate.getDate() + 1);
+    // Never allow ordering for today — minimum is tomorrow
+    if (readyDate < tomorrow) {
+      readyDate.setTime(tomorrow.getTime());
     }
 
     return readyDate;
