@@ -451,19 +451,17 @@ export default function InventaireJournalier() {
                   return (
                     <tr key={row.productId} className={`group transition-colors hover:bg-amber-50/30 ${idx % 2 === 0 ? "bg-white" : "bg-stone-50/40"}`}>
                       <td className="px-5 py-2.5 font-medium text-stone-800">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 truncate">
-                            <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ background: gold }}>
-                              {idx + 1}
-                            </span>
-                            <span className="truncate">{row.productName}</span>
-                          </div>
-                          <button 
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ background: gold }}>
+                            {idx + 1}
+                          </span>
+                          <span className="truncate">{row.productName}</span>
+                          <button
                             onClick={() => handleRemoveProduct(row.productId)}
-                            className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                             title="Retirer de la liste"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>

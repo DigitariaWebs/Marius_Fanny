@@ -22,6 +22,7 @@ import {
   Undo2,
   Bell,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { DataTable } from "./ui/DataTable";
 import { Modal } from "./ui/modal";
@@ -992,6 +993,33 @@ export function OrderManagement() {
     }
   };
 
+  const handleMarkPaid = async (order: OrderWithPacking) => {
+    const payload: any = {
+      depositPaid: true,
+      balancePaid: true,
+    };
+
+    const updatedOrder: OrderWithPacking = {
+      ...order,
+      depositPaid: true,
+      balancePaid: true,
+      paymentStatus: "paid",
+      depositPaidAt: order.depositPaidAt || new Date().toISOString(),
+      balancePaidAt: new Date().toISOString(),
+    };
+
+    const updatedOrders = orders.map((o) => (o.id === order.id ? updatedOrder : o));
+    setOrders(updatedOrders);
+    setFilteredOrders(applyOrderFilters(updatedOrders));
+
+    try {
+      await orderAPI.updateOrder(order.id, payload);
+    } catch (err: any) {
+      console.error("❌ Failed to mark order as paid:", err);
+      alert(`Erreur lors du marquage comme payé: ${err.message || err}`);
+    }
+  };
+
   const canRefundOrder = (order: OrderWithPacking) => {
     const hasSquareReference = Boolean(order.squarePaymentId || order.squareInvoiceId);
     return hasSquareReference && order.status !== "cancelled";
@@ -1276,6 +1304,12 @@ export function OrderManagement() {
                 Revenir à prête
               </DropdownMenuItem>
             )}
+            {order.paymentStatus !== "paid" && (
+              <DropdownMenuItem onClick={() => handleMarkPaid(order)}>
+                <DollarSign className="h-4 w-4 mr-2" />
+                Marquer payé
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               onClick={() => handleDeleteClick(order)}
               className="text-red-600"
@@ -1354,7 +1388,7 @@ export function OrderManagement() {
           <div className="p-4 md:p-4">
             <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 md:p-6 max-w-4xl mx-auto">
               <div className="flex items-start gap-4">
-                <div className="text-3xl">🚨</div>
+                <AlertTriangle className="w-8 h-8 text-red-500 shrink-0" />
                 <div className="flex-1">
                   <h3 className="font-bold text-red-900 text-lg mb-2">
                     {overdueOrders.length} Paiement{overdueOrders.length > 1 ? 's' : ''} en Retard
@@ -2119,6 +2153,36 @@ export function OrderManagement() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Balance after modification */}
+                  {(() => {
+                    const paidAmount =
+                      selectedOrder.paymentStatus === "paid"
+                        ? selectedOrder.total
+                        : selectedOrder.depositPaid
+                          ? selectedOrder.depositAmount
+                          : 0;
+                    const balance = selectedOrder.total - paidAmount;
+                    if (Math.abs(balance) < 0.01 || paidAmount < 0.01) return null;
+                    const isRefund = balance < 0;
+                    return (
+                      <div className={`border-2 rounded-lg p-4 ${isRefund ? 'bg-green-50 border-green-300' : 'bg-orange-50 border-orange-300'}`}>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className={`font-bold ${isRefund ? 'text-green-800' : 'text-orange-800'}`}>
+                              {isRefund ? 'Crédit client' : 'Balance à payer'}
+                            </div>
+                            <div className={`text-xs mt-1 ${isRefund ? 'text-green-600' : 'text-orange-600'}`}>
+                              Total: {formatCurrency(selectedOrder.total)} — Payé: {formatCurrency(paidAmount)}
+                            </div>
+                          </div>
+                          <div className={`text-2xl font-black ${isRefund ? 'text-green-700' : 'text-orange-700'}`}>
+                            {formatCurrency(Math.abs(balance))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </TabsContent>
 

@@ -35,6 +35,7 @@ import { RoleBasedRedirect } from "./components/RoleBasedRedirect";
 
 // Utils
 import { loadCart, saveCart } from "./utils/cartPersistence";
+import { SettingsProvider } from "./lib/SettingsContext";
 
 interface CartItem {
   id: number;
@@ -192,6 +193,7 @@ const App: React.FC = () => {
   };
 
   return (
+    <SettingsProvider>
     <Router>
       <GoldenBackground />
 
@@ -346,6 +348,7 @@ const App: React.FC = () => {
         </Routes>
       </div>
     </Router>
+    </SettingsProvider>
   );
 };
 

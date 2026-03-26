@@ -68,11 +68,7 @@ export default function StaffPlanning() {
     const checkAuth = async () => {
       try {
         const session = await authClient.getSession();
-
-        if (!session?.data) {
-          navigate("/se-connecter");
-          return;
-        }
+        if (!session?.data) return;
 
         const sUser: UserWithRole = session.data.user;
         const userRole = sUser.user_metadata?.role || sUser.role || "kitchen_staff";
@@ -92,14 +88,13 @@ export default function StaffPlanning() {
 
         setUser(userData);
         setLoading(false);
-      } catch (error) {
-        console.error("Session check error:", error);
-        navigate("/se-connecter");
+      } catch {
+        // silently ignore auth errors
       }
     };
 
     checkAuth();
-  }, [navigate]);
+  }, []);
 
   if (loading || !user) {
     return (

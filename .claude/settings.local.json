@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Hp/marius_fanny -name .env* -type f)"
+    ]
+  }
+}

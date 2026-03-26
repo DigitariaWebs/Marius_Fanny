@@ -461,34 +461,36 @@ const ProductionList: React.FC = () => {
             </div>
 
             {/* Produits */}
-            <div className="space-y-0.5 mb-2">
-              {group.items.map(item => (
-                <div
-                  key={item.id}
-                  className={`text-sm ${group.done ? 'line-through text-stone-400' : 'text-[#2D2A26] font-medium'}`}
-                >
-                  <div>
-                    {item.productName} <span className="text-stone-400 font-normal">× {item.quantity}</span>
-                  </div>
-                  {Object.keys(item.selectedOptions || {}).some((k) => !isAllergyOptionName(k) && String(item.selectedOptions?.[k] || "").trim()) && (
-                    <div className={`mt-0.5 text-[12px] ${group.done ? "text-stone-400" : "text-stone-600"} font-normal`}>
-                      {Object.entries(item.selectedOptions || {})
-                        .filter(([k, v]) => !isAllergyOptionName(k) && String(v || "").trim())
-                        .map(([k, v]) => `${k}: ${String(v).trim()}`)
-                        .join(" \u2022 ")}
+            <div className="space-y-1 mb-2">
+              {group.items.map(item => {
+                const itemAllergies = extractAllergies(item);
+                return (
+                  <div
+                    key={item.id}
+                    className={`text-sm ${group.done ? 'line-through text-stone-400' : 'text-[#2D2A26] font-medium'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span>
+                        {item.productName} <span className="text-stone-400 font-normal">× {item.quantity}</span>
+                      </span>
+                      {itemAllergies && (
+                        <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-50 rounded text-[11px] text-red-700 border border-red-200 font-bold">
+                          ⚠️ {itemAllergies}
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                    {Object.keys(item.selectedOptions || {}).some((k) => !isAllergyOptionName(k) && String(item.selectedOptions?.[k] || "").trim()) && (
+                      <div className={`mt-0.5 text-[12px] ${group.done ? "text-stone-400" : "text-stone-600"} font-normal`}>
+                        {Object.entries(item.selectedOptions || {})
+                          .filter(([k, v]) => !isAllergyOptionName(k) && String(v || "").trim())
+                          .map(([k, v]) => `${k}: ${String(v).trim()}`)
+                          .join(" \u2022 ")}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-
-            {/* Allergies */}
-            {group.allergies.length > 0 && (
-              <div className="mt-2 px-2 py-1.5 bg-red-50 rounded-lg text-xs text-red-700 border border-red-200">
-                <span className="font-bold">⚠️ Allergie : </span>
-                {group.allergies.join(', ')}
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -2,9 +2,50 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Phone, Instagram } from "lucide-react";
 import GoldenBackground from "./GoldenBackground";
+import { useSettings } from "../lib/SettingsContext";
+
+function formatTime(t: string) {
+  const [h, m] = t.split(":");
+  return `${parseInt(h)}h${m !== "00" ? m : "00"}`;
+}
+
+function formatHoursForPolitique(hours: Record<string, { open: string; close: string; closed: boolean }>) {
+  const dayNames = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const longNames: Record<string, string> = {
+    monday: "Lundi", tuesday: "Mardi", wednesday: "Mercredi", thursday: "Jeudi",
+    friday: "Vendredi", saturday: "Samedi", sunday: "Dimanche",
+  };
+
+  const groups: { days: string[]; open: string; close: string }[] = [];
+  for (const day of dayNames) {
+    const h = hours[day];
+    if (!h || h.closed) {
+      const last = groups[groups.length - 1];
+      if (last && last.open === "closed") last.days.push(day);
+      else groups.push({ days: [day], open: "closed", close: "" });
+    } else {
+      const last = groups[groups.length - 1];
+      if (last && last.open === h.open && last.close === h.close) last.days.push(day);
+      else groups.push({ days: [day], open: h.open, close: h.close });
+    }
+  }
+
+  return groups.map((g, i) => {
+    const label =
+      g.days.length === 1
+        ? longNames[g.days[0]]
+        : `${longNames[g.days[0]]} au ${longNames[g.days[g.days.length - 1]].toLowerCase()}`;
+    return (
+      <p key={i}>
+        {label} : {g.open === "closed" ? "Fermé" : `${formatTime(g.open)} à ${formatTime(g.close)}`}
+      </p>
+    );
+  });
+}
 
 const Politique: React.FC = () => {
   const currentYear = new Date().getFullYear();
+  const settings = useSettings();
 
   return (
     <div className="min-h-screen bg-linear-to-b from-[#F9F7F2] to-white relative overflow-hidden">
@@ -170,7 +211,7 @@ const Politique: React.FC = () => {
                   <li className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-[#337957]" />
                     <span className="text-[#2D2A26]">
-                      Par téléphone : 450-689-0655
+                      Par téléphone : {settings.contactPhone}
                     </span>
                   </li>
                   <li className="flex items-center gap-3">
@@ -182,7 +223,7 @@ const Politique: React.FC = () => {
                       <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
                     </svg>
                     <span className="text-[#2D2A26]">
-                      Par email : contact@mariusfanny.com
+                      Par email : {settings.contactEmail}
                     </span>
                   </li>
                   <li className="flex items-center gap-3">
@@ -289,21 +330,19 @@ const Politique: React.FC = () => {
                       <p className="font-black text-[#337957] uppercase mb-1">
                         Laval
                       </p>
-                      <p className="font-bold">239-E Boulevard Samson, Laval</p>
+                      <p className="font-bold">{settings.address}</p>
                     </div>
                   </div>
                   <div className="ml-8 text-[#2D2A26]/70">
-                    <p>Lundi au jeudi : 7h00 à 18h00</p>
-                    <p>Vendredi : 7h00 à 18h30</p>
-                    <p>Samedi-dimanche : 8h00 à 18h00</p>
+                    {formatHoursForPolitique(settings.businessHoursLaval)}
                   </div>
                   <div className="flex items-center gap-3 ml-8 mt-2">
                     <Phone className="w-[18px] h-[18px] shrink-0 text-[#337957]" />
                     <a
-                      href="tel:+14506890655"
+                      href={`tel:${settings.contactPhone.replace(/[^+\d]/g, "")}`}
                       className="hover:text-[#337957] transition-colors font-bold"
                     >
-                      450-689-0655
+                      {settings.contactPhone}
                     </a>
                   </div>
                 </div>
@@ -332,35 +371,35 @@ const Politique: React.FC = () => {
                       <p className="font-black text-[#337957] uppercase mb-1">
                         Montréal
                       </p>
-                      <p className="font-bold">2006 rue St-Hubert, Montréal</p>
+                      <p className="font-bold">{settings.addressMontreal}</p>
                     </div>
                   </div>
                   <div className="ml-8 text-[#2D2A26]/70">
-                    <p>Lundi au vendredi : 7h00 à 17h00</p>
-                    <p>Samedi : 8h00 à 17h00</p>
-                    <p>Dimanche : 8h00 à 17h00</p>
+                    {formatHoursForPolitique(settings.businessHoursMontreal)}
                   </div>
                   <div className="flex items-center gap-3 ml-8 mt-2">
                     <Phone className="w-[18px] h-[18px] shrink-0 text-[#337957]" />
                     <a
-                      href="tel:+15143791898"
+                      href={`tel:${settings.contactPhoneMontreal.replace(/[^+\d]/g, "")}`}
                       className="hover:text-[#337957] transition-colors font-bold"
                     >
-                      514-379-1898
+                      {settings.contactPhoneMontreal}
                     </a>
                   </div>
                 </div>
               </div>
-              <div className="mt-8 flex gap-4">
-                <a
-                  href="https://www.instagram.com/patisseriemariusetfanny/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-12 h-12 bg-[#337957] rounded-full flex items-center justify-center hover:bg-[#B59055] transition-colors"
-                >
-                  <Instagram className="w-6 h-6 text-white" />
-                </a>
-              </div>
+              {settings.instagramUrl && (
+                <div className="mt-8 flex gap-4">
+                  <a
+                    href={settings.instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-12 h-12 bg-[#337957] rounded-full flex items-center justify-center hover:bg-[#B59055] transition-colors"
+                  >
+                    <Instagram className="w-6 h-6 text-white" />
+                  </a>
+                </div>
+              )}
             </div>
 
             <div>
@@ -437,7 +476,7 @@ const Politique: React.FC = () => {
 
           <div className="border-t-2 border-[#337957]/30 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
             <p className="text-[#2D2A26]/70">
-              Copyright {currentYear} | Pâtisserie Provençale
+              Copyright {currentYear} | {settings.storeName}
             </p>
             <div className="flex gap-6">
               <span className="text-[#2D2A26]/70">

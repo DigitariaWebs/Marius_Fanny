@@ -132,26 +132,19 @@ export default function ProDashboard({
     const init = async () => {
       try {
         const session = await authClient.getSession();
-        if (!session?.data?.user) {
-          navigate("/se-connecter");
-          return;
-        }
+        if (!session?.data?.user) return;
         const user: any = session.data.user;
         const role = user.role || user.user_metadata?.role;
-        if (role !== "pro") {
-          navigate("/");
-          return;
-        }
+        if (role !== "pro") return;
         setUserName(user.name || "Partenaire");
 
         await fetchData();
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        navigate("/se-connecter");
+      } catch {
+        // silently ignore auth errors
       }
     };
     init();
-  }, [navigate]);
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);

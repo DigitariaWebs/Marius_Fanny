@@ -134,11 +134,7 @@ export default function StaffDashboard() {
     const checkAuth = async () => {
       try {
         const session = await authClient.getSession();
-
-        if (!session?.data) {
-          navigate("/se-connecter");
-          return;
-        }
+        if (!session?.data) return;
 
         const sUser: UserWithRole = session.data.user;
 
@@ -163,14 +159,13 @@ export default function StaffDashboard() {
 
         setUser(userData);
         setLoading(false);
-      } catch (error) {
-        console.error("Session check error:", error);
-        navigate("/se-connecter");
+      } catch {
+        // silently ignore auth errors
       }
     };
 
     checkAuth();
-  }, [navigate]);
+  }, []);
 
   // ----- LOGOUT -----
   const handleLogout = async () => {

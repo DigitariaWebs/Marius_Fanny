@@ -206,13 +206,24 @@ export default function InventaireFour() {
               <th className="text-center">Comm Berri</th>
               <th className="text-center">Comm CLIENT</th>
               <th className="text-center">Total</th>
-              <th className="w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-50">
             {rows.map((row, idx) => (
               <tr key={row.id} className="hover:bg-amber-50/20 transition-colors">
-                <td className="px-6 py-3 font-medium text-stone-800">{row.name}</td>
+                <td className="px-6 py-3 font-medium text-stone-800">
+                  <div className="flex items-center justify-between">
+                    <span>{row.name}</span>
+                    <button onClick={() => {
+                      if (window.confirm(`Retirer "${row.name}" de la liste pour tous les utilisateurs ?`)) {
+                        const up = products.filter(p => p !== row.id);
+                        setProducts(up);
+                        localStorage.setItem("produits_inventaire_four", JSON.stringify(up));
+                        saveProductsToBackend(up);
+                      }
+                    }} className="text-stone-300 hover:text-red-500 shrink-0"><Trash2 size={14}/></button>
+                  </div>
+                </td>
                 <td className="px-2 py-2 text-center">
                   <input 
                     type="number" 
@@ -270,16 +281,6 @@ export default function InventaireFour() {
                 </td>
                 <td className="text-center font-bold text-stone-800">
                   {row.stdo + row.comm_berri + row.client}
-                </td>
-                <td className="pr-4">
-                  <button onClick={() => {
-                    if (window.confirm(`Retirer "${row.name}" de la liste pour tous les utilisateurs ?`)) {
-                      const up = products.filter(p => p !== row.id);
-                      setProducts(up);
-                      localStorage.setItem("produits_inventaire_four", JSON.stringify(up));
-                      saveProductsToBackend(up);
-                    }
-                  }} className="text-stone-300 hover:text-red-500"><Trash2 size={16}/></button>
                 </td>
               </tr>
             ))}

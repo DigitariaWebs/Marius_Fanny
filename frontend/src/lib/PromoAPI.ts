@@ -44,14 +44,12 @@ class PromoAPI {
       if (retryOn401) {
         try {
           await authClient.getSession();
+          return this.request<T>(endpoint, options, false);
         } catch {
-          // ignore - fallthrough to redirect
+          // silently ignore auth errors
         }
-        return this.request<T>(endpoint, options, false);
       }
-
-      window.location.href = "/se-connecter";
-      throw new Error("AUTH_REDIRECT");
+      return undefined as any;
     }
 
     if (!response.ok) {

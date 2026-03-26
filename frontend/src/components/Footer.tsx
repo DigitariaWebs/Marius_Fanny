@@ -1,8 +1,55 @@
 import { Phone, MapPin, Instagram, Facebook } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useSettings } from "../lib/SettingsContext";
+
+function formatTime(t: string) {
+  const [h, m] = t.split(":");
+  return `${parseInt(h)}h${m !== "00" ? m : "00"}`;
+}
+
+function formatHoursCompact(hours: Record<string, { open: string; close: string; closed: boolean }>) {
+  const dayNames = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const shortNames: Record<string, string> = {
+    monday: "Lun", tuesday: "Mar", wednesday: "Mer", thursday: "Jeu",
+    friday: "Ven", saturday: "Sam", sunday: "Dim",
+  };
+
+  const groups: { days: string[]; open: string; close: string }[] = [];
+  for (const day of dayNames) {
+    const h = hours[day];
+    if (!h || h.closed) {
+      const last = groups[groups.length - 1];
+      if (last && last.open === "closed") {
+        last.days.push(day);
+      } else {
+        groups.push({ days: [day], open: "closed", close: "" });
+      }
+    } else {
+      const last = groups[groups.length - 1];
+      if (last && last.open === h.open && last.close === h.close) {
+        last.days.push(day);
+      } else {
+        groups.push({ days: [day], open: h.open, close: h.close });
+      }
+    }
+  }
+
+  return groups.map((g, i) => {
+    const label =
+      g.days.length === 1
+        ? shortNames[g.days[0]]
+        : `${shortNames[g.days[0]]} - ${shortNames[g.days[g.days.length - 1]]}`;
+    return (
+      <p key={i}>
+        {label} : {g.open === "closed" ? "Fermé" : `${formatTime(g.open)} à ${formatTime(g.close)}`}
+      </p>
+    );
+  });
+}
 
 const Footer: React.FC = () => {
   const navigate = useNavigate();
+  const settings = useSettings();
 
   const mainLinks = [
     { name: "La Boutique", id: "shop" },
@@ -45,53 +92,36 @@ const Footer: React.FC = () => {
               Nos Boutiques
             </h3>
             <div className="space-y-6 text-sm">
-              <div>
-                <div className="flex items-start gap-3 mb-2">
-                  <MapPin size={20} className="shrink-0 mt-1 text-[#337957]" />
-                  <div>
-                    <p className="font-black text-[#337957] uppercase mb-1">Laval</p>
-                    <p className="font-bold">239-E Boulevard Samson, Laval</p>
+              {([
+                { label: "Laval", address: settings.address, phone: settings.contactPhone, hours: settings.businessHoursLaval },
+                { label: "Montréal", address: settings.addressMontreal, phone: settings.contactPhoneMontreal, hours: settings.businessHoursMontreal },
+              ] as const).map((loc) => (
+                <div key={loc.label}>
+                  <div className="flex items-start gap-3 mb-2">
+                    <MapPin size={20} className="shrink-0 mt-1 text-[#337957]" />
+                    <div>
+                      <p className="font-black text-[#337957] uppercase mb-1">{loc.label}</p>
+                      <p className="font-bold">{loc.address}</p>
+                    </div>
+                  </div>
+                  <div className="ml-8 text-[#2D2A26]/70">
+                    {formatHoursCompact(loc.hours)}
+                  </div>
+                  <div className="flex items-center gap-3 ml-8 mt-2">
+                    <Phone size={18} className="shrink-0 text-[#337957]" />
+                    <a href={`tel:${loc.phone.replace(/[^+\d]/g, "")}`} className="hover:text-[#337957] transition-colors font-bold">
+                      {loc.phone}
+                    </a>
                   </div>
                 </div>
-                <div className="ml-8 text-[#2D2A26]/70">
-                  <p>Lun - Jeu : 7h00 à 18h00</p>
-                  <p>Ven : 7h00 à 18h30</p>
-                  <p>Sam - Dim : 8h00 à 18h00</p>
-                </div>
-                <div className="flex items-center gap-3 ml-8 mt-2">
-                  <Phone size={18} className="shrink-0 text-[#337957]" />
-                  <a href="tel:+14506890655" className="hover:text-[#337957] transition-colors font-bold">
-                    450-689-0655
-                  </a>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-start gap-3 mb-2">
-                  <MapPin size={20} className="shrink-0 mt-1 text-[#337957]" />
-                  <div>
-                    <p className="font-black text-[#337957] uppercase mb-1">Montréal</p>
-                    <p className="font-bold">2006 rue St-Hubert, Montréal</p>
-                  </div>
-                </div>
-                <div className="ml-8 text-[#2D2A26]/70">
-                  <p>Lun - Ven : 7h00 à 17h00</p>
-                  <p>Sam - Dim : 8h00 à 17h00</p>
-                </div>
-                <div className="flex items-center gap-3 ml-8 mt-2">
-                  <Phone size={18} className="shrink-0 text-[#337957]" />
-                  <a href="tel:+15143791898" className="hover:text-[#337957] transition-colors font-bold">
-                    514-379-1898
-                  </a>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
           {/* Colonne 2 - MILIEU : Marque & Description */}
           <div className="order-2 flex flex-col items-center text-center px-4">
             <h3 className="text-3xl font-black mb-6 uppercase tracking-widest text-[#337957]">
-              Pâtisserie Provençale
+              {settings.storeName}
             </h3>
             <p className="text-sm font-medium leading-relaxed text-[#2D2A26]/80 max-w-xs mb-8">
               Artisans passionnés depuis des générations, nous mettons tout notre savoir-faire au service de vos papilles pour créer des moments de pure gourmandise.
@@ -132,7 +162,7 @@ const Footer: React.FC = () => {
         <div className="border-t-2 border-[#337957]/30 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
             <p className="text-[#2D2A26]/70 font-bold">
-              Copyright 2026 | Pâtisserie Provençale
+              Copyright {new Date().getFullYear()} | {settings.storeName}
             </p>
 
             <div className="flex gap-6">

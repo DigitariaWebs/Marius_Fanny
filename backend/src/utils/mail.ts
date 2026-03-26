@@ -1343,3 +1343,217 @@ export async function sendPaymentOverdueEmail(
     throw error;
   }
 }
+
+/**
+ * Send a contact form message to the admin
+ */
+export async function sendContactEmail(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  subject: string;
+  message: string;
+  cvFilename?: string;
+  cvBuffer?: Buffer;
+  cvMimetype?: string;
+}): Promise<void> {
+  const isCareer = data.subject === "Carrière";
+
+  const attachments: any[] = [];
+  if (isCareer && data.cvBuffer && data.cvFilename) {
+    attachments.push({
+      filename: data.cvFilename,
+      content: data.cvBuffer,
+      contentType: data.cvMimetype || "application/pdf",
+    });
+  }
+
+  const mailOptions = {
+    from: DISPLAY_FROM,
+    to: "mariusetfanny@bellnet.ca",
+    subject: `📩 Nouveau message — ${data.subject}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #F9F7F2; border-radius: 10px;">
+
+        <div style="text-align: center; margin-bottom: 30px;">
+          <img src="${LOGO_URL}" alt="Marius & Fanny" style="max-width: 120px; margin-bottom: 10px;" />
+          <h1 style="color: #C5A065; font-family: 'Great Vibes', cursive; font-size: 36px; margin: 0;">
+            Marius & Fanny
+          </h1>
+        </div>
+
+        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="color: #337957; margin: 0; font-size: 22px;">
+              ${isCareer ? "📄 Candidature reçue" : "📩 Nouveau message de contact"}
+            </h2>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #337957; width: 130px;">Nom</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; color: #2D2A26;">${data.firstName} ${data.lastName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #337957;">Email</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; color: #2D2A26;">
+                <a href="mailto:${data.email}" style="color: #337957;">${data.email}</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #337957;">Sujet</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; color: #2D2A26;">${data.subject}</td>
+            </tr>
+            ${isCareer && data.cvFilename ? `
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #337957;">CV</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; color: #2D2A26;">📎 ${data.cvFilename} (en pièce jointe)</td>
+            </tr>
+            ` : ""}
+          </table>
+
+          <div style="background-color: #F9F7F2; padding: 16px; border-radius: 8px; border-left: 4px solid #337957;">
+            <p style="font-weight: bold; color: #337957; margin: 0 0 8px 0; font-size: 13px;">MESSAGE :</p>
+            <p style="color: #2D2A26; margin: 0; line-height: 1.6; white-space: pre-wrap;">${data.message}</p>
+          </div>
+
+          <div style="text-align: center; margin-top: 24px;">
+            <a href="mailto:${data.email}?subject=Re: ${encodeURIComponent(data.subject)}"
+               style="display: inline-block; padding: 12px 28px; background-color: #337957; color: white; text-decoration: none; border-radius: 999px; font-weight: bold; font-size: 14px;">
+              Répondre à ${data.firstName}
+            </a>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+          <p>© ${new Date().getFullYear()} Marius &amp; Fanny. Tous droits réservés.</p>
+        </div>
+      </div>
+    `,
+  };
+
+  await transporter.sendMail({ ...mailOptions, replyTo: data.email, attachments });
+  console.log("✅ Email de contact envoyé à mariusetfanny@bellnet.ca");
+}
+
+/**
+ * Send order modification balance email to the client
+ */
+export async function sendOrderBalanceEmail(data: {
+  clientName: string;
+  clientEmail: string;
+  orderNumber: string;
+  oldTotal: number;
+  newTotal: number;
+  amountPaid: number;
+  balance: number;
+  items: { name: string; quantity: number; unitPrice: number; amount: number }[];
+}): Promise<void> {
+  const isRefund = data.balance < 0;
+  const absBalance = Math.abs(data.balance);
+
+  const itemsRows = data.items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; color: #2D2A26;">${item.name}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; color: #2D2A26; text-align: center;">${item.quantity}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; color: #2D2A26; text-align: right;">${item.unitPrice.toFixed(2)}$</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; color: #2D2A26; text-align: right;">${item.amount.toFixed(2)}$</td>
+      </tr>`
+    )
+    .join("");
+
+  const mailOptions = {
+    from: DISPLAY_FROM,
+    to: data.clientEmail,
+    subject: isRefund
+      ? `💰 Crédit sur votre commande #${data.orderNumber} — Marius & Fanny`
+      : `📋 Modification de votre commande #${data.orderNumber} — Marius & Fanny`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #F9F7F2; border-radius: 10px;">
+
+        <div style="text-align: center; margin-bottom: 30px;">
+          <img src="${LOGO_URL}" alt="Marius & Fanny" style="max-width: 120px; margin-bottom: 10px;" />
+          <h1 style="color: #C5A065; font-family: 'Great Vibes', cursive; font-size: 36px; margin: 0;">
+            Marius & Fanny
+          </h1>
+        </div>
+
+        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="color: #337957; margin: 0; font-size: 22px;">
+              Votre commande a été modifiée
+            </h2>
+          </div>
+
+          <p style="color: #2D2A26; line-height: 1.6;">
+            Bonjour <strong>${data.clientName}</strong>,
+          </p>
+          <p style="color: #2D2A26; line-height: 1.6;">
+            Votre commande <strong>#${data.orderNumber}</strong> a été mise à jour. Voici le récapitulatif :
+          </p>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <thead>
+              <tr style="background-color: #F9F7F2;">
+                <th style="padding: 10px; text-align: left; color: #337957; font-size: 13px;">Produit</th>
+                <th style="padding: 10px; text-align: center; color: #337957; font-size: 13px;">Qté</th>
+                <th style="padding: 10px; text-align: right; color: #337957; font-size: 13px;">Prix unit.</th>
+                <th style="padding: 10px; text-align: right; color: #337957; font-size: 13px;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRows}
+            </tbody>
+          </table>
+
+          <div style="background-color: #F9F7F2; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <table style="width: 100%;">
+              <tr>
+                <td style="padding: 4px 0; color: #555;">Nouveau total :</td>
+                <td style="padding: 4px 0; text-align: right; font-weight: bold; color: #2D2A26;">${data.newTotal.toFixed(2)}$</td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 0; color: #555;">Montant déjà payé :</td>
+                <td style="padding: 4px 0; text-align: right; font-weight: bold; color: #337957;">${data.amountPaid.toFixed(2)}$</td>
+              </tr>
+              <tr>
+                <td colspan="2" style="border-top: 2px solid #C5A065; padding-top: 8px; margin-top: 8px;"></td>
+              </tr>
+              <tr>
+                <td style="padding: 4px 0; font-weight: bold; font-size: 16px; color: ${isRefund ? '#337957' : '#C5A065'};">
+                  ${isRefund ? 'Crédit à rembourser :' : 'Balance à payer :'}
+                </td>
+                <td style="padding: 4px 0; text-align: right; font-weight: bold; font-size: 18px; color: ${isRefund ? '#337957' : '#C5A065'};">
+                  ${absBalance.toFixed(2)}$
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          ${isRefund ? `
+          <p style="color: #337957; font-weight: bold; text-align: center;">
+            Un crédit de ${absBalance.toFixed(2)}$ vous sera remboursé.
+          </p>
+          ` : `
+          <p style="color: #C5A065; font-weight: bold; text-align: center;">
+            Un montant de ${absBalance.toFixed(2)}$ reste à payer pour finaliser votre commande.
+          </p>
+          `}
+
+          <p style="color: #555; font-size: 13px; line-height: 1.5; margin-top: 16px;">
+            Pour toute question, n'hésitez pas à nous contacter.
+          </p>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+          <p>© ${new Date().getFullYear()} Marius &amp; Fanny. Tous droits réservés.</p>
+        </div>
+      </div>
+    `,
+  };
+
+  await sendEmail(mailOptions);
+  console.log(`✅ Email de balance envoyé à ${data.clientEmail} pour commande #${data.orderNumber}`);
+}

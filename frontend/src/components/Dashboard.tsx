@@ -22,7 +22,6 @@ import {
   ChefHat,
   Clock,
   TicketPercent,
-  Bell,
 } from "lucide-react";
 import StaffManagement from "./StaffManagement";
 import ClientManagement from "./ClientManagement";
@@ -108,21 +107,17 @@ export default function AdminDashboard() {
     }
   };
 
-  // Check authentication on mount
+  // Check authentication on mount (silent - no redirect)
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const session = await authClient.getSession();
-        if (!session) {
-          navigate("/login");
-        }
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        navigate("/login");
+        await authClient.getSession();
+      } catch {
+        // silently ignore auth errors
       }
     };
     checkAuth();
-  }, [navigate]);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -133,29 +128,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Handle payment reminders - send emails to government/representative clients
-  const [reminderLoading, setReminderLoading] = useState(false);
-  const [reminderResult, setReminderResult] = useState<any>(null);
-
-  const handleProcessPaymentReminders = async () => {
-    try {
-      setReminderLoading(true);
-      setReminderResult(null);
-      const response = await fetch(`${normalizedApiUrl}/api/payment-reminders/process`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-      const data = await response.json();
-      setReminderResult(data);
-      console.log("Payment reminders processed:", data);
-    } catch (error: any) {
-      console.error("Failed to process payment reminders:", error);
-      setReminderResult({ error: error.message || "Failed to process reminders" });
-    } finally {
-      setReminderLoading(false);
-    }
-  };
 
   const statistics: Statistics = {
     totalProducts: products.length,
@@ -568,48 +540,6 @@ export default function AdminDashboard() {
         {/* VUE PARAMÈTRES */}
         {viewMode === "settings" && (
           <div className="p-6">
-            {/* Section Rappels de paiement */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Bell className="w-6 h-6 text-amber-600" />
-                <h2 className="text-xl font-bold text-gray-800">Rappels de paiement</h2>
-              </div>
-              <p className="text-gray-600 mb-4">
-                Envoyer des rappels par email aux clients gouvernementaux et représentants avant les dates d'échéance. 
-                Les commandes en retard seront automatiquement annulées.
-              </p>
-              <button
-                onClick={handleProcessPaymentReminders}
-                disabled={reminderLoading}
-                className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${
-                  reminderLoading 
-                    ? "bg-gray-400 cursor-not-allowed" 
-                    : "bg-amber-600 hover:bg-amber-700"
-                }`}
-              >
-                {reminderLoading ? "Traitement en cours..." : "Envoyer les rappels"}
-              </button>
-              
-              {reminderResult && (
-                <div className={`mt-4 p-4 rounded-lg ${reminderResult.error ? "bg-red-100" : "bg-green-100"}`}>
-                  {reminderResult.error ? (
-                    <p className="text-red-700">{reminderResult.error}</p>
-                  ) : (
-                    <div>
-                      <p className="font-medium text-green-800">Rappels traités avec succès!</p>
-                      <ul className="mt-2 text-sm text-green-700">
-                        <li>📧 Rappels (1 semaine): {reminderResult.summary?.remindersSentWeek || 0}</li>
-                        <li>📧 Rappels (48h): {reminderResult.summary?.remindersSent48h || 0}</li>
-                        <li>📧 Rappels (en retard): {reminderResult.summary?.remindersSentOverdue || 0}</li>
-                        <li>⚠️ Commandes annulées: {reminderResult.summary?.ordersCancelled || 0}</li>
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            {/* Settings Management */}
             <SettingsManagement />
           </div>
         )}

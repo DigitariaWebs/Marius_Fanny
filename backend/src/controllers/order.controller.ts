@@ -18,6 +18,7 @@ import {
   getAllDeliveryZones,
 } from "../utils/deliveryZones.js";
 import { sendOrderReceipt } from "../utils/emailService.js";
+import { sendOrderBalanceEmail } from "../utils/mail.js";
 import {
   calculatePromoDiscount,
   isPromoCurrentlyValid,
@@ -1377,6 +1378,52 @@ export const updateOrder = async (
     await order.save();
 
     console.log(`✅ Order ${order.orderNumber} updated with ${changes.length} changes`);
+
+    // Send balance email to client if items were modified, client already paid, and there's a balance
+    if (updateData.items && order.clientInfo?.email) {
+      const itemsChange = changes.find((c) => c.changeType === "items_modified");
+      const paymentChange = changes.find((c) => c.field === "paymentStatus");
+      if (itemsChange) {
+        const oldTotal = parseFloat(itemsChange.notes?.match(/Total: ([\d.]+)\$/)?.[1] || "0");
+        // Figure out how much the client had paid BEFORE this edit
+        const previousPaymentStatus = paymentChange ? paymentChange.oldValue : order.paymentStatus;
+        const paidBeforeEdit =
+          previousPaymentStatus === "paid"
+            ? oldTotal
+            : previousPaymentStatus === "deposit_paid"
+              ? oldTotal * 0.5
+              : 0;
+
+        // Only send email if the client has already paid something
+        if (paidBeforeEdit > 0.01) {
+          const balance = order.total - paidBeforeEdit;
+
+          if (Math.abs(balance) > 0.01) {
+            // Extract short order number (e.g. "0028" from "MF-20260326-0028")
+            const shortNumber = order.orderNumber.split("-").pop() || order.orderNumber;
+            try {
+              await sendOrderBalanceEmail({
+                clientName: `${order.clientInfo.firstName} ${order.clientInfo.lastName}`,
+                clientEmail: order.clientInfo.email,
+                orderNumber: shortNumber,
+                oldTotal,
+                newTotal: order.total,
+                amountPaid: paidBeforeEdit,
+                balance,
+                items: order.items.map((item: any) => ({
+                  name: item.productName || `Produit #${item.productId}`,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
+                  amount: item.amount,
+                })),
+              });
+            } catch (emailErr) {
+              console.error("❌ Failed to send balance email:", emailErr);
+            }
+          }
+        }
+      }
+    }
 
     res.json({
       success: true,

@@ -1,7 +1,9 @@
 import React from 'react';
 import { Instagram, Facebook } from 'lucide-react';
+import { useSettings } from '../lib/SettingsContext';
 
 const ClientVideo: React.FC = () => {
+  const settings = useSettings();
   return (
     <section className="py-24 bg-[#F9F7F2]">
       <div className="max-w-7xl mx-auto px-6">
@@ -58,24 +60,28 @@ const ClientVideo: React.FC = () => {
                 Partagez votre moment : #MariusEtFanny
               </p>
               <div className="flex gap-4">
-                <a
-                  href="https://www.instagram.com/patisseriemariusetfanny/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-[#337957]/10 text-[#337957] rounded-full hover:bg-[#337957] hover:text-white transition-all duration-300 hover:scale-110"
-                  title="Suivez-nous sur Instagram"
-                >
-                  <Instagram size={24} />
-                </a>
-                <a
-                  href="https://www.facebook.com/mariusetfanny/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-[#337957]/10 text-[#337957] rounded-full hover:bg-[#337957] hover:text-white transition-all duration-300 hover:scale-110"
-                  title="Suivez-nous sur Facebook"
-                >
-                  <Facebook size={24} />
-                </a>
+                {settings.instagramUrl && (
+                  <a
+                    href={settings.instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 bg-[#337957]/10 text-[#337957] rounded-full hover:bg-[#337957] hover:text-white transition-all duration-300 hover:scale-110"
+                    title="Suivez-nous sur Instagram"
+                  >
+                    <Instagram size={24} />
+                  </a>
+                )}
+                {settings.facebookUrl && (
+                  <a
+                    href={settings.facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-3 bg-[#337957]/10 text-[#337957] rounded-full hover:bg-[#337957] hover:text-white transition-all duration-300 hover:scale-110"
+                    title="Suivez-nous sur Facebook"
+                  >
+                    <Facebook size={24} />
+                  </a>
+                )}
               </div>
             </div>
           </div>

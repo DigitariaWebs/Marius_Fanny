@@ -170,13 +170,8 @@ const FourDashboard: React.FC = () => {
         }
       );
 
-      if (response.status === 401) {
-        navigate("/se-connecter");
+      if (response.status === 401 || !response.ok) {
         return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();

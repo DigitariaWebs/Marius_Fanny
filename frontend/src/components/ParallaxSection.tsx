@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import GoldenBackground from './GoldenBackground'; 
+import GoldenBackground from './GoldenBackground';
+import { useSettings } from '../lib/SettingsContext';
 
 import {
   Mail,
@@ -23,6 +24,7 @@ interface FormData {
 }
 
 const WholesaleSection = () => {
+  const settings = useSettings();
   const [formData, setFormData] = useState<FormData>({
     companyName: '',
     contactName: '',
@@ -207,8 +209,8 @@ const WholesaleSection = () => {
                     </div>
                     <div>
                       <div className="text-xs text-[#2D2A26]/50 uppercase tracking-wider font-bold mb-1">Téléphone</div>
-                      <div className="font-bold text-[#2D2A26]">Montréal : 514-379-1898</div>
-                      <div className="font-bold text-[#2D2A26]">Laval : 450-689-0655</div>
+                      <div className="font-bold text-[#2D2A26]">Montréal : {settings.contactPhoneMontreal}</div>
+                      <div className="font-bold text-[#2D2A26]">Laval : {settings.contactPhone}</div>
                     </div>
                   </div>
                 </div>

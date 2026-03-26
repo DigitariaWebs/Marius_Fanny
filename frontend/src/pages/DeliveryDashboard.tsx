@@ -241,18 +241,12 @@ const DeliveryDashboard: React.FC = () => {
     const checkAuth = async () => {
       try {
         const session = await authClient.getSession();
-        if (!session?.data) {
-          navigate("/se-connecter");
-          return;
-        }
+        if (!session?.data) return;
 
         const user: any = session.data.user;
         const userRole = user.user_metadata?.role || user.role || "deliveryDriver";
 
-        if (userRole !== "deliveryDriver") {
-          navigate("/");
-          return;
-        }
+        if (userRole !== "deliveryDriver") return;
 
         const driverData: DeliveryDriver = {
           id: Number(user.id),
@@ -265,14 +259,13 @@ const DeliveryDashboard: React.FC = () => {
 
         setDriver(driverData);
         setLoading(false);
-      } catch (error) {
-        console.error("Auth error:", error);
-        navigate("/se-connecter");
+      } catch {
+        // silently ignore auth errors
       }
     };
 
     checkAuth();
-  }, [navigate]);
+  }, []);
 
   useEffect(() => {
     const loadOrders = async () => {

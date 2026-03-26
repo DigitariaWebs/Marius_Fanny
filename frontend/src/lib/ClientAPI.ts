@@ -58,7 +58,6 @@ class ClientAPI {
     });
 
     if (response.status === 401) {
-      // Try a single session refresh before redirecting
       try {
         await authClient.getSession();
         const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
@@ -70,21 +69,13 @@ class ClientAPI {
           },
         });
 
-        if (retryResponse.status !== 401) {
-          if (!retryResponse.ok) {
-            const error = await retryResponse
-              .json()
-              .catch(() => ({ error: "Request failed" }));
-            throw new Error(error.error || error.message || "Request failed");
-          }
+        if (retryResponse.ok) {
           return retryResponse.json();
         }
       } catch {
-        // ignore - fallthrough to redirect
+        // silently ignore auth errors
       }
-
-      window.location.href = "/se-connecter";
-      throw new Error("AUTH_REDIRECT");
+      return undefined as any;
     }
 
     if (!response.ok) {
