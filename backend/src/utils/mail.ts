@@ -1468,16 +1468,13 @@ export async function sendOrderBalanceEmail(data: {
     from: DISPLAY_FROM,
     to: data.clientEmail,
     subject: isRefund
-      ? `💰 Crédit sur votre commande #${data.orderNumber} — Marius & Fanny`
-      : `📋 Modification de votre commande #${data.orderNumber} — Marius & Fanny`,
+      ? `Crédit sur votre commande #${data.orderNumber} — Marius & Fanny`
+      : `Modification de votre commande #${data.orderNumber} — Marius & Fanny`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #F9F7F2; border-radius: 10px;">
 
         <div style="text-align: center; margin-bottom: 30px;">
           <img src="${LOGO_URL}" alt="Marius & Fanny" style="max-width: 120px; margin-bottom: 10px;" />
-          <h1 style="color: #C5A065; font-family: 'Great Vibes', cursive; font-size: 36px; margin: 0;">
-            Marius & Fanny
-          </h1>
         </div>
 
         <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
