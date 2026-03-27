@@ -197,10 +197,7 @@ const WholesaleSection = () => {
                     <div className="p-3 bg-[#F9F7F2] rounded-full">
                       <Mail className="text-[#337957]" size={20} />
                     </div>
-                    <div>
-                      <div className="text-xs text-[#2D2A26]/50 uppercase tracking-wider font-bold mb-1">Email Pro</div>
-                      <a href="mailto:fanny.chiecchio@gmail.com" className="font-bold text-[#2D2A26] hover:text-[#337957] transition-colors">fanny.chiecchio@gmail.com</a>
-                    </div>
+                     
                   </div>
 
                   <div className="flex items-start gap-4">

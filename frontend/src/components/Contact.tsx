@@ -118,10 +118,6 @@ const Contact: React.FC = () => {
                   <div className="w-10 h-10 rounded-full bg-[#337957]/10 flex items-center justify-center shrink-0">
                     <Mail className="w-5 h-5 text-[#337957]" />
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-[#337957] uppercase">Email</p>
-                    <p className="text-[#2D2A26] font-medium">{settings.contactEmail}</p>
-                  </div>
                 </div>
 
                 <div className="flex items-start gap-4">
