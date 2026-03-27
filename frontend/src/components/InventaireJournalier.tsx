@@ -11,7 +11,8 @@ import {
   ChevronUp,
   Info,
   Trash2,
-  Plus
+  Plus,
+  Printer
 } from "lucide-react";
 import {
   dailyInventoryAPI,
@@ -333,6 +334,39 @@ export default function InventaireJournalier() {
         </button>
 
         <button
+          onClick={() => {
+            const printContent = document.getElementById("inventaire-journalier-table");
+            if (!printContent) return;
+            const win = window.open("", "_blank");
+            if (!win) return;
+            win.document.write(`
+              <html><head><title>Inventaire Journalier — ${date}</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h1 { font-size: 18px; margin-bottom: 4px; }
+                p { color: #666; font-size: 12px; margin-bottom: 16px; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #ddd; padding: 6px 10px; font-size: 12px; text-align: center; }
+                th { background: #f5f5f5; font-weight: bold; }
+                td:first-child, th:first-child { text-align: left; }
+                @media print { body { padding: 0; } }
+              </style></head><body>
+              <h1>Inventaire Journalier</h1>
+              <p>${new Date(date + "T00:00:00").toLocaleDateString("fr-CA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+              ${printContent.outerHTML}
+              </body></html>
+            `);
+            win.document.close();
+            win.print();
+          }}
+          disabled={!rows.length}
+          className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-stone-200 bg-white text-stone-600 hover:bg-stone-50 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+        >
+          <Printer size={18} />
+          <span className="text-sm font-medium hidden sm:inline">Imprimer</span>
+        </button>
+
+        <button
           onClick={handleSave}
           disabled={saving || loading || !rows.length}
           className="ml-auto flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-semibold shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
@@ -427,7 +461,7 @@ export default function InventaireJournalier() {
               <p className="text-sm">Aucun produit dans la liste.</p>
             </div>
           ) : (
-            <table className="w-full min-w-[700px] text-sm">
+            <table id="inventaire-journalier-table" className="w-full min-w-[700px] text-sm">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-100">
                   <th className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-stone-400 w-64">
