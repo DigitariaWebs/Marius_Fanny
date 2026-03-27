@@ -9,6 +9,7 @@ import { authClient, normalizedApiUrl } from "../lib/AuthClient";
 import { productAPI } from "../lib/ProductAPI";
 import { promoAPI } from "../lib/PromoAPI";
 import { clearCart } from "../utils/cartPersistence";
+import { useSettings } from "../lib/SettingsContext";
 
 interface CartItem {
   id: number;
@@ -39,6 +40,7 @@ interface CheckoutState {
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const siteSettings = useSettings();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -259,6 +261,15 @@ const Checkout: React.FC = () => {
 
       setDateValidationError(
         `❌ Date trop tôt! Les produits suivants nécessitent ${maxPreparationTime}h (${daysNeeded} jour${daysNeeded > 1 ? "s" : ""}) de préparation: ${productNames}. Date minimum: ${minDate.toLocaleDateString("fr-CA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}.${noonCutoffMessage}`,
+      );
+      return false;
+    }
+
+    // Check closed dates
+    const mmdd = selectedDate.slice(5); // "YYYY-MM-DD" -> "MM-DD"
+    if (siteSettings.closedDates && siteSettings.closedDates.includes(mmdd)) {
+      setDateValidationError(
+        "Le magasin est fermé à cette date. Veuillez choisir une autre date."
       );
       return false;
     }

@@ -31,6 +31,7 @@ export async function updateSettings(req: Request, res: Response) {
     "emailOnOrderConfirmed",
     "emailOnPaymentReceived",
     "emailOnOrderReady",
+    "closedDates",
     "facebookUrl",
     "instagramUrl",
     "twitterUrl",

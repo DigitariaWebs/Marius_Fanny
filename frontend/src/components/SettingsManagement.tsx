@@ -14,6 +14,9 @@ import {
   Twitter,
   Save,
   Loader2,
+  CalendarOff,
+  Plus,
+  X,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -36,6 +39,7 @@ interface Settings {
   emailOnOrderConfirmed: boolean;
   emailOnPaymentReceived: boolean;
   emailOnOrderReady: boolean;
+  closedDates: string[];
   facebookUrl: string;
   instagramUrl: string;
   twitterUrl: string;
@@ -70,6 +74,7 @@ const defaultSettings: Settings = {
   emailOnOrderConfirmed: true,
   emailOnPaymentReceived: true,
   emailOnOrderReady: true,
+  closedDates: ["01-01", "12-25"],
   facebookUrl: "https://www.facebook.com/mariusetfanny/",
   instagramUrl: "https://www.instagram.com/patisseriemariusetfanny/",
   twitterUrl: "",
@@ -108,6 +113,7 @@ export default function SettingsManagement() {
           emailOnOrderReady: d.emailOnOrderReady ?? defaultSettings.emailOnOrderReady,
           facebookUrl: d.facebookUrl ?? defaultSettings.facebookUrl,
           instagramUrl: d.instagramUrl ?? defaultSettings.instagramUrl,
+          closedDates: d.closedDates ?? defaultSettings.closedDates,
           twitterUrl: d.twitterUrl ?? defaultSettings.twitterUrl,
         });
       }
@@ -441,6 +447,67 @@ export default function SettingsManagement() {
                 </div>
               </label>
             ))}
+          </div>
+        </div>
+
+        {/* Closed Dates */}
+        <div className="bg-white/70 backdrop-blur-md rounded-3xl shadow-xl border border-white p-6 md:p-8 hover:shadow-2xl transition-all duration-300">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-full bg-[#C5A065] bg-opacity-20 flex items-center justify-center">
+              <CalendarOff size={20} className="text-[#C5A065]" />
+            </div>
+            <h3 className="text-xl md:text-2xl font-bold text-[#2D2A26]">
+              Dates de fermeture
+            </h3>
+          </div>
+
+          <p className="text-sm text-stone-600 mb-4">
+            Les clients ne pourront pas commander pour ces dates. Format : jour et mois.
+          </p>
+
+          <div className="space-y-3">
+            {settings.closedDates.map((dateStr, idx) => {
+              const [mm, dd] = dateStr.split("-");
+              const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+              const label = `${parseInt(dd)} ${monthNames[parseInt(mm) - 1] || mm}`;
+              return (
+                <div key={idx} className="flex items-center justify-between p-3 bg-stone-50 rounded-xl">
+                  <span className="text-sm font-medium text-stone-700">{label}</span>
+                  <button
+                    onClick={() => {
+                      const updated = settings.closedDates.filter((_, i) => i !== idx);
+                      handleInputChange("closedDates", updated);
+                    }}
+                    className="text-stone-400 hover:text-red-500 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              );
+            })}
+
+            <div className="flex items-center gap-3 pt-2">
+              <input
+                type="date"
+                id="new-closed-date"
+                className="p-2 bg-stone-50 border border-stone-200 rounded-lg focus:ring-2 focus:ring-[#C5A065] focus:border-transparent outline-none text-sm"
+              />
+              <button
+                onClick={() => {
+                  const input = document.getElementById("new-closed-date") as HTMLInputElement;
+                  if (!input.value) return;
+                  const mmdd = input.value.slice(5); // "YYYY-MM-DD" -> "MM-DD"
+                  if (!settings.closedDates.includes(mmdd)) {
+                    handleInputChange("closedDates", [...settings.closedDates, mmdd]);
+                  }
+                  input.value = "";
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#C5A065] hover:bg-[#2D2A26] text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                <Plus size={16} />
+                Ajouter
+              </button>
+            </div>
           </div>
         </div>
 

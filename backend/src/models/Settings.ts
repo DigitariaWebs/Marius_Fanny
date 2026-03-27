@@ -25,6 +25,9 @@ export interface ISettings extends Document {
   emailOnPaymentReceived: boolean;
   emailOnOrderReady: boolean;
 
+  // Closed dates (store holidays — no orders allowed)
+  closedDates: string[];
+
   // Social Media
   facebookUrl: string;
   instagramUrl: string;
@@ -83,6 +86,12 @@ const settingsSchema = new Schema<ISettings>(
     emailOnOrderConfirmed: { type: Boolean, default: true },
     emailOnPaymentReceived: { type: Boolean, default: true },
     emailOnOrderReady: { type: Boolean, default: true },
+
+    // Closed dates (MM-DD format, e.g. "01-01" for January 1st)
+    closedDates: {
+      type: [String],
+      default: ["01-01", "12-25"],
+    },
 
     // Social Media
     facebookUrl: {

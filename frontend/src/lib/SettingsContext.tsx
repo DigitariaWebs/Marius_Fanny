@@ -16,6 +16,7 @@ export interface SiteSettings {
   addressMontreal: string;
   businessHoursLaval: BusinessHours;
   businessHoursMontreal: BusinessHours;
+  closedDates: string[];
   facebookUrl: string;
   instagramUrl: string;
   twitterUrl: string;
@@ -46,6 +47,7 @@ const defaultSettings: SiteSettings = {
     saturday: { open: "08:00", close: "17:00", closed: false },
     sunday: { open: "08:00", close: "17:00", closed: false },
   },
+  closedDates: ["01-01", "12-25"],
   facebookUrl: "https://www.facebook.com/mariusetfanny/",
   instagramUrl: "https://www.instagram.com/patisseriemariusetfanny/",
   twitterUrl: "",
@@ -61,6 +63,7 @@ function parseSettings(d: any): SiteSettings {
     addressMontreal: d.addressMontreal ?? defaultSettings.addressMontreal,
     businessHoursLaval: d.businessHoursLaval ?? defaultSettings.businessHoursLaval,
     businessHoursMontreal: d.businessHoursMontreal ?? defaultSettings.businessHoursMontreal,
+    closedDates: d.closedDates ?? defaultSettings.closedDates,
     facebookUrl: d.facebookUrl ?? defaultSettings.facebookUrl,
     instagramUrl: d.instagramUrl ?? defaultSettings.instagramUrl,
     twitterUrl: d.twitterUrl ?? defaultSettings.twitterUrl,

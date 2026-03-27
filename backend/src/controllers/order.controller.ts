@@ -131,6 +131,21 @@ export const createOrder = async (
             "Les commandes pour demain doivent être passées avant 12h00. Veuillez choisir une date ultérieure.",
         });
       }
+
+      // Reject orders on closed dates (store holidays)
+      const { Settings } = await import("../models/Settings.js");
+      const siteSettings = await Settings.findOne();
+      if (siteSettings?.closedDates && siteSettings.closedDates.length > 0) {
+        // targetDateStr is "YYYY-MM-DD", extract "MM-DD"
+        const targetMMDD = targetDateStr.slice(5); // "MM-DD"
+        if (siteSettings.closedDates.includes(targetMMDD)) {
+          return res.status(400).json({
+            success: false,
+            error:
+              "Le magasin est fermé à cette date. Veuillez choisir une autre date.",
+          });
+        }
+      }
     }
 
     // Calculate totals
